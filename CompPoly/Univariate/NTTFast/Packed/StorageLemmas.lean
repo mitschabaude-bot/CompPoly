@@ -96,4 +96,12 @@ theorem storeWords_replace_pack (words : Array UInt32) (offset : USize)
   simp only [storeWords, Nat.not_lt.mpr hc, ↓reduceIte, Bool.false_eq_true, ho, hb, hu,
     and_self, Storage.replace_pack, hv]
 
+/-- A machine-index batch store is the natural-index batch store. -/
+theorem write16U_eq (b : ByteArray) (i : USize)
+    (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) :
+    write16U b i v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 =
+      write16 b i.toNat v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 := by
+  unfold write16U write16
+  simp only [Nat.toUSize_eq, USize.ofNat_toNat]
+
 end CompPoly.CPolynomial.NTTFast.Packed.Native

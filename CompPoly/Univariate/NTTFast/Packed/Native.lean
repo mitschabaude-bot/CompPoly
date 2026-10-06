@@ -57,6 +57,10 @@ def encode (a : Array KoalaBear.Fast.Field) : ByteArray :=
 @[inline] def write16 (b : ByteArray) (i : @& Nat) (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13
   v14 v15 : UInt32) : ByteArray :=
   storeWords b (i.toUSize * 4) 16 false v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
+/-- `write16` at a machine word index, without a natural-number round trip. -/
+@[inline] def write16U (b : ByteArray) (i : USize) (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13
+  v14 v15 : UInt32) : ByteArray :=
+  storeWords b (i * 4) 16 false v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
 @[inline] def push16 (b : ByteArray) (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 :
   UInt32) : ByteArray :=
   storeWords b 0 16 true v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
@@ -412,13 +416,13 @@ decreasing_by omega
   let y3_15 := mul (readUOffset tl (j) 15 (by
       rw [usize_numeral 15 (by decide)]
       omega)) (sub a2_15 a3_15)
-  let b := write16 b i0.toNat y0_0 y0_1 y0_2 y0_3 y0_4 y0_5 y0_6 y0_7 y0_8 y0_9 y0_10 y0_11 y0_12
+  let b := write16U b i0 y0_0 y0_1 y0_2 y0_3 y0_4 y0_5 y0_6 y0_7 y0_8 y0_9 y0_10 y0_11 y0_12
     y0_13 y0_14 y0_15
-  let b := write16 b i1.toNat y1_0 y1_1 y1_2 y1_3 y1_4 y1_5 y1_6 y1_7 y1_8 y1_9 y1_10 y1_11 y1_12
+  let b := write16U b i1 y1_0 y1_1 y1_2 y1_3 y1_4 y1_5 y1_6 y1_7 y1_8 y1_9 y1_10 y1_11 y1_12
     y1_13 y1_14 y1_15
-  let b := write16 b i2.toNat y2_0 y2_1 y2_2 y2_3 y2_4 y2_5 y2_6 y2_7 y2_8 y2_9 y2_10 y2_11 y2_12
+  let b := write16U b i2 y2_0 y2_1 y2_2 y2_3 y2_4 y2_5 y2_6 y2_7 y2_8 y2_9 y2_10 y2_11 y2_12
     y2_13 y2_14 y2_15
-  let b := write16 b i3.toNat y3_0 y3_1 y3_2 y3_3 y3_4 y3_5 y3_6 y3_7 y3_8 y3_9 y3_10 y3_11 y3_12
+  let b := write16U b i3 y3_0 y3_1 y3_2 y3_3 y3_4 y3_5 y3_6 y3_7 y3_8 y3_9 y3_10 y3_11 y3_12
     y3_13 y3_14 y3_15
   b
 def inner16 (th tl : ByteArray) (q j i0 i1 i2 i3 : Nat) (b : ByteArray) : ByteArray :=
@@ -557,7 +561,7 @@ decreasing_by omega
   let x4_13 := sub x3_12 x3_13
   let x4_14 := add x3_14 x3_15
   let x4_15 := sub x3_14 x3_15
-  write16 b i.toNat x4_0 x4_1 x4_2 x4_3 x4_4 x4_5 x4_6 x4_7 x4_8 x4_9 x4_10 x4_11 x4_12 x4_13
+  write16U b i x4_0 x4_1 x4_2 x4_3 x4_4 x4_5 x4_6 x4_7 x4_8 x4_9 x4_10 x4_11 x4_12 x4_13
     x4_14 x4_15
 @[noinline] def leaf16Scaled (t3 t2 t1 : @& ByteArray) (i : USize) (nInv : UInt32) (b : ByteArray)
     (h : 4 * (i.toNat + 15) + 3 < b.size ∧ b.size < USize.size ∧
@@ -692,7 +696,7 @@ decreasing_by omega
   let z13 := mul nInv x4_13
   let z14 := mul nInv x4_14
   let z15 := mul nInv x4_15
-  write16 b i.toNat z0 z1 z2 z3 z4 z5 z6 z7 z8 z9 z10 z11 z12 z13 z14 z15
+  write16U b i z0 z1 z2 z3 z4 z5 z6 z7 z8 z9 z10 z11 z12 z13 z14 z15
 def stages (logN : Nat) (tw : Array ByteArray) (a : ByteArray) (nInv : UInt32) (normalize : Bool) :
     ByteArray := Id.run do
   let mut a := a
