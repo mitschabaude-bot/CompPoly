@@ -52,35 +52,52 @@ def main (args : List String) : IO UInt32 := do
     let logWorkers := workers.log2
     let variant := (← IO.getEnv "COMPPOLY_NTT_IMPL").getD "packed"
     let depth := ((← IO.getEnv "NTT_DEPTH").bind String.toNat?).getD 4
-    let (perform, method) ← match variant with
-      | "packed" =>
-        have h32 : domain.logN ≤ 32 := by
-          change logN ≤ 32
-          have : KoalaBear.twoAdicity = 24 := rfl
-          omega
-        have hu : 4 * domain.n < USize.size := by
-          have hp : 2 ^ logN ≤ 2 ^ 24 := Nat.pow_le_pow_right (by decide) h
-          have := USize.le_size
-          change 4 * 2 ^ logN < USize.size
-          omega
-        let plan := CPolynomial.NTTFast.Packed.Plan.ofDomain domain h32 hu
-        pure ((fun input ↦ if direction == "forward" then plan.forward input depth
-          else plan.inverse input depth), "proved packed parallel radix-4, two storage externs")
-      | "externless" =>
-        let plan := CPolynomial.NTTFast.NaturalPlan.ofDomain domain
-        pure ((fun input ↦ if direction == "forward" then plan.forwardParallel input logWorkers
-          else plan.inverseParallel input logWorkers), "proved externless parallel radix-4")
-      | _ => throw <| IO.userError "COMPPOLY_NTT_IMPL must be packed or externless"
+    have h32 : domain.logN ≤ 32 := by
+      change logN ≤ 32
+      have : KoalaBear.twoAdicity = 24 := rfl
+      omega
+    have hu : 4 * domain.n < USize.size := by
+      have hp : 2 ^ logN ≤ 2 ^ 24 := Nat.pow_le_pow_right (by decide) h
+      have := USize.le_size
+      change 4 * 2 ^ logN < USize.size
+      omega
     validateOnlyRef.set (validate == "true")
-    let row ← runTimedSpec
-      { name := s!"ntt-koalabear-{logN}-{direction}-fast", representation := "Array",
+    let spec (method representation : String) : BenchSpec :=
+      { name := s!"ntt-koalabear-{logN}-{direction}-fast", representation := representation,
         method := method, field := "koalabear",
         inputShape := s!"{n} elements",
         digestIterations := 2, digestClass := direction }
-      .medium
-      (fun i ↦ perform inputs[i % 2]!)
-      (checksumArray checksumKoalaBearFast)
-      (sink := arraySampleSink (fun x ↦ x.toNat.toUInt64))
+    let fields (method : String)
+        (perform : Array KoalaBear.Fast.Field → Array KoalaBear.Fast.Field) :=
+      runTimedSpec (spec method "Array") .medium
+        (fun i ↦ perform inputs[i % 2]!)
+        (checksumArray checksumKoalaBearFast)
+        (sink := arraySampleSink (fun x ↦ x.toNat.toUInt64))
+    let row ← match variant with
+      | "packed" =>
+        let plan := CPolynomial.NTTFast.Packed.Plan.ofDomain domain h32 hu
+        fields "proved packed parallel radix-4, two storage externs" fun input ↦
+          if direction == "forward" then plan.forward input depth else plan.inverse input depth
+      | "packed-io" =>
+        let plan := CPolynomial.NTTFast.Packed.Plan.ofDomain domain h32 hu
+        -- Packed Montgomery words in and out, like Plonky3's contiguous field vectors.
+        let words := inputs.map CPolynomial.NTTFast.Packed.Native.encode
+        let word (b : ByteArray) (i : Nat) : UInt64 :=
+          (CPolynomial.NTTFast.Packed.Native.read b i).toUInt64
+        runTimedSpec (spec "proved packed parallel radix-4, packed words in and out" "ByteArray")
+          .medium
+          (fun i ↦ if direction == "forward" then plan.forwardPacked words[i % 2]! depth
+            else plan.inversePacked words[i % 2]! depth)
+          (fun b ↦ checksumArray checksumKoalaBearFast
+            (CPolynomial.NTTFast.Packed.Native.unpack b n))
+          (sink := fun b ↦ sinkStep (sinkStep (sinkStep (word b 0) (word b (n / 3)))
+            (word b (2 * n / 3))) (word b (n - 1)))
+      | "externless" =>
+        let plan := CPolynomial.NTTFast.NaturalPlan.ofDomain domain
+        fields "proved externless parallel radix-4" fun input ↦
+          if direction == "forward" then plan.forwardParallel input logWorkers
+          else plan.inverseParallel input logWorkers
+      | _ => throw <| IO.userError "COMPPOLY_NTT_IMPL must be packed, packed-io or externless"
     let record : BenchRecord := { row with groupKey := s!"ntt-koalabear-{logN}-{direction}" }
     IO.println record.toJsonLine
     return 0

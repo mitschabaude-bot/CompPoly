@@ -1,0 +1,209 @@
+/-
+Copyright (c) 2026 CompPoly Contributors. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Gregor Mitscha-Baude
+-/
+module
+
+public import CompPoly.Univariate.NTTFast.Packed.Native
+
+/-! # Parallel natural-order output for the packed FFT
+
+The sixteen task leaves of the packed FFT hold a bit-reversed transform. Each leaf is
+first reversed locally, in parallel. Natural order is then a sixteen-way interleave of
+the reversed leaves, which parallel tasks compute as cache-line `16 × 16` transposes.
+The task outputs are packed buffers, so joining them is a byte copy. The decoder into
+field arrays is a single sequential pass over the natural-order buffer.
+-/
+
+@[expose] public section
+open CompPoly
+namespace CompPoly.CPolynomial.NTTFast.Packed.Native
+
+/-- Apply the optional inverse normalization to one Montgomery word. -/
+@[inline] def scaleWord (factor : UInt32) (scale : Bool) (x : UInt32) : UInt32 :=
+  if scale then mul factor x else x
+
+/-- Read a leaf word at its locally bit-reversed position. -/
+@[inline] def revWord (b : @& ByteArray) (base : USize) (shift factor : UInt32) (scale : Bool)
+    (q : USize) : UInt32 :=
+  scaleWord factor scale (readWord b (base + (reverse32 q.toUInt32 >>> shift).toUSize))
+
+/-- Append sixteen consecutive locally reversed leaf words. -/
+@[noinline] def leafRevStep (b : @& ByteArray) (base : USize) (shift factor : UInt32)
+    (scale : Bool) (q : USize) (out : ByteArray) : ByteArray :=
+  storeWords out 0 16 true (revWord b base shift factor scale q)
+    (revWord b base shift factor scale (q + 1)) (revWord b base shift factor scale (q + 2))
+    (revWord b base shift factor scale (q + 3)) (revWord b base shift factor scale (q + 4))
+    (revWord b base shift factor scale (q + 5)) (revWord b base shift factor scale (q + 6))
+    (revWord b base shift factor scale (q + 7)) (revWord b base shift factor scale (q + 8))
+    (revWord b base shift factor scale (q + 9)) (revWord b base shift factor scale (q + 10))
+    (revWord b base shift factor scale (q + 11)) (revWord b base shift factor scale (q + 12))
+    (revWord b base shift factor scale (q + 13)) (revWord b base shift factor scale (q + 14))
+    (revWord b base shift factor scale (q + 15))
+
+/-- Append `count` batches of sixteen locally reversed words, starting at local index `q`. -/
+def leafRevGo (b : @& ByteArray) (base : USize) (shift factor : UInt32) (scale : Bool) :
+    Nat → USize → ByteArray → ByteArray
+  | 0, _, out => out
+  | count + 1, q, out =>
+    leafRevGo b base shift factor scale count (q + 16)
+      (leafRevStep b base shift factor scale q out)
+
+/-- Leaf `l` of sixteen `2 ^ logM`-word leaves of `b`, in locally bit-reversed order. -/
+def leafRev (b : @& ByteArray) (logM l : Nat) (factor : UInt32) (scale : Bool) : ByteArray :=
+  leafRevGo b (l * 2 ^ logM).toUSize (32 - logM).toUInt32 factor scale (2 ^ logM / 16) 0
+    (ByteArray.emptyWithCapacity (4 * 2 ^ logM))
+
+/-- Sixteen consecutive words of one buffer. -/
+structure Line where
+  w0 : UInt32
+  w1 : UInt32
+  w2 : UInt32
+  w3 : UInt32
+  w4 : UInt32
+  w5 : UInt32
+  w6 : UInt32
+  w7 : UInt32
+  w8 : UInt32
+  w9 : UInt32
+  w10 : UInt32
+  w11 : UInt32
+  w12 : UInt32
+  w13 : UInt32
+  w14 : UInt32
+  w15 : UInt32
+
+/-- Read one aligned line of sixteen words; inlining removes the record. -/
+@[inline] def line (b : @& ByteArray) (q : USize) : Line :=
+  ⟨readRaw b q 0 true (by intro h; cases h), readRaw b q 1 true (by intro h; cases h),
+    readRaw b q 2 true (by intro h; cases h), readRaw b q 3 true (by intro h; cases h),
+    readRaw b q 4 true (by intro h; cases h), readRaw b q 5 true (by intro h; cases h),
+    readRaw b q 6 true (by intro h; cases h), readRaw b q 7 true (by intro h; cases h),
+    readRaw b q 8 true (by intro h; cases h), readRaw b q 9 true (by intro h; cases h),
+    readRaw b q 10 true (by intro h; cases h), readRaw b q 11 true (by intro h; cases h),
+    readRaw b q 12 true (by intro h; cases h), readRaw b q 13 true (by intro h; cases h),
+    readRaw b q 14 true (by intro h; cases h), readRaw b q 15 true (by intro h; cases h)⟩
+
+/-- Append the transpose of one `16 × 16` tile: word `u` of every stream, for each `u`.
+Reading whole lines first keeps sixteen equally aligned streams from evicting each other. -/
+@[noinline] def transposeStep (s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 :
+    @& ByteArray) (q : USize) (out : ByteArray) : ByteArray :=
+  let x0 := line s0 q
+  let x1 := line s1 q
+  let x2 := line s2 q
+  let x3 := line s3 q
+  let x4 := line s4 q
+  let x5 := line s5 q
+  let x6 := line s6 q
+  let x7 := line s7 q
+  let x8 := line s8 q
+  let x9 := line s9 q
+  let x10 := line s10 q
+  let x11 := line s11 q
+  let x12 := line s12 q
+  let x13 := line s13 q
+  let x14 := line s14 q
+  let x15 := line s15 q
+  let out := storeWords out 0 16 true x0.w0 x1.w0 x2.w0 x3.w0 x4.w0 x5.w0 x6.w0 x7.w0 x8.w0
+    x9.w0 x10.w0 x11.w0 x12.w0 x13.w0 x14.w0 x15.w0
+  let out := storeWords out 0 16 true x0.w1 x1.w1 x2.w1 x3.w1 x4.w1 x5.w1 x6.w1 x7.w1 x8.w1
+    x9.w1 x10.w1 x11.w1 x12.w1 x13.w1 x14.w1 x15.w1
+  let out := storeWords out 0 16 true x0.w2 x1.w2 x2.w2 x3.w2 x4.w2 x5.w2 x6.w2 x7.w2 x8.w2
+    x9.w2 x10.w2 x11.w2 x12.w2 x13.w2 x14.w2 x15.w2
+  let out := storeWords out 0 16 true x0.w3 x1.w3 x2.w3 x3.w3 x4.w3 x5.w3 x6.w3 x7.w3 x8.w3
+    x9.w3 x10.w3 x11.w3 x12.w3 x13.w3 x14.w3 x15.w3
+  let out := storeWords out 0 16 true x0.w4 x1.w4 x2.w4 x3.w4 x4.w4 x5.w4 x6.w4 x7.w4 x8.w4
+    x9.w4 x10.w4 x11.w4 x12.w4 x13.w4 x14.w4 x15.w4
+  let out := storeWords out 0 16 true x0.w5 x1.w5 x2.w5 x3.w5 x4.w5 x5.w5 x6.w5 x7.w5 x8.w5
+    x9.w5 x10.w5 x11.w5 x12.w5 x13.w5 x14.w5 x15.w5
+  let out := storeWords out 0 16 true x0.w6 x1.w6 x2.w6 x3.w6 x4.w6 x5.w6 x6.w6 x7.w6 x8.w6
+    x9.w6 x10.w6 x11.w6 x12.w6 x13.w6 x14.w6 x15.w6
+  let out := storeWords out 0 16 true x0.w7 x1.w7 x2.w7 x3.w7 x4.w7 x5.w7 x6.w7 x7.w7 x8.w7
+    x9.w7 x10.w7 x11.w7 x12.w7 x13.w7 x14.w7 x15.w7
+  let out := storeWords out 0 16 true x0.w8 x1.w8 x2.w8 x3.w8 x4.w8 x5.w8 x6.w8 x7.w8 x8.w8
+    x9.w8 x10.w8 x11.w8 x12.w8 x13.w8 x14.w8 x15.w8
+  let out := storeWords out 0 16 true x0.w9 x1.w9 x2.w9 x3.w9 x4.w9 x5.w9 x6.w9 x7.w9 x8.w9
+    x9.w9 x10.w9 x11.w9 x12.w9 x13.w9 x14.w9 x15.w9
+  let out := storeWords out 0 16 true x0.w10 x1.w10 x2.w10 x3.w10 x4.w10 x5.w10 x6.w10 x7.w10
+    x8.w10 x9.w10 x10.w10 x11.w10 x12.w10 x13.w10 x14.w10 x15.w10
+  let out := storeWords out 0 16 true x0.w11 x1.w11 x2.w11 x3.w11 x4.w11 x5.w11 x6.w11 x7.w11
+    x8.w11 x9.w11 x10.w11 x11.w11 x12.w11 x13.w11 x14.w11 x15.w11
+  let out := storeWords out 0 16 true x0.w12 x1.w12 x2.w12 x3.w12 x4.w12 x5.w12 x6.w12 x7.w12
+    x8.w12 x9.w12 x10.w12 x11.w12 x12.w12 x13.w12 x14.w12 x15.w12
+  let out := storeWords out 0 16 true x0.w13 x1.w13 x2.w13 x3.w13 x4.w13 x5.w13 x6.w13 x7.w13
+    x8.w13 x9.w13 x10.w13 x11.w13 x12.w13 x13.w13 x14.w13 x15.w13
+  let out := storeWords out 0 16 true x0.w14 x1.w14 x2.w14 x3.w14 x4.w14 x5.w14 x6.w14 x7.w14
+    x8.w14 x9.w14 x10.w14 x11.w14 x12.w14 x13.w14 x14.w14 x15.w14
+  storeWords out 0 16 true x0.w15 x1.w15 x2.w15 x3.w15 x4.w15 x5.w15 x6.w15 x7.w15
+    x8.w15 x9.w15 x10.w15 x11.w15 x12.w15 x13.w15 x14.w15 x15.w15
+
+/-- Append `count` transposed tiles, starting at stream word `q`. -/
+def transposeGo (s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 : @& ByteArray) :
+    Nat → USize → ByteArray → ByteArray
+  | 0, _, out => out
+  | count + 1, q, out =>
+    transposeGo s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 count (q + 16)
+      (transposeStep s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 q out)
+
+/-- Natural-order words `16 * q` up to `16 * (q + 16 * count)` from reversed leaves `r`.
+Output word `16 * j + c` is word `j` of leaf `bitrev₄ c`. -/
+def interleaveRange (r : @& Array ByteArray) (q count : Nat) : ByteArray :=
+  transposeGo (r.getD 0 .empty) (r.getD 8 .empty) (r.getD 4 .empty) (r.getD 12 .empty)
+    (r.getD 2 .empty) (r.getD 10 .empty) (r.getD 6 .empty) (r.getD 14 .empty)
+    (r.getD 1 .empty) (r.getD 9 .empty) (r.getD 5 .empty) (r.getD 13 .empty)
+    (r.getD 3 .empty) (r.getD 11 .empty) (r.getD 7 .empty) (r.getD 15 .empty)
+    count q.toUSize (ByteArray.emptyWithCapacity (1024 * count))
+
+/-- Natural-order packed words of a bit-reversed `2 ^ logN`-word buffer, `8 ≤ logN`.
+Leaf reversal and interleaving each use sixteen tasks; the joins copy bytes. -/
+def natural (b : ByteArray) (logN : Nat) (factor : UInt32) (scale : Bool) : ByteArray :=
+  let logM := logN - 4
+  let r := (Array.range 16).map fun l ↦ Task.spawn fun _ ↦ leafRev b logM l factor scale
+  let r := r.map Task.get
+  let count := 2 ^ logM / 256
+  let blocks := (Array.range 16).map fun t ↦ Task.spawn fun _ ↦
+    interleaveRange r (16 * count * t) count
+  blocks.foldl (fun acc t ↦ acc ++ t.get) (ByteArray.emptyWithCapacity (4 * 2 ^ logN))
+
+/-- Store words `i` up to `n` of `b` into the field array. -/
+def unpackGo (b : @& ByteArray) (n i : USize) (out : Array KoalaBear.Fast.Field) :
+    Array KoalaBear.Fast.Field :=
+  if hi : i < n then
+    if h : i.toNat < out.size then
+      unpackGo b n (i + 1) (out.uset i (ofWord (readWord b i)) h)
+    else out
+  else out
+termination_by n.toNat - i.toNat
+decreasing_by
+  have hlt := USize.lt_iff_toNat_lt.mp hi
+  have hn := n.toNat_lt_size
+  have h1 := Plan.usize_add_one i (by omega)
+  omega
+
+/-- Decode `n` packed Montgomery words into a field array, in one sequential pass. -/
+def unpack (b : @& ByteArray) (n : Nat) : Array KoalaBear.Fast.Field :=
+  unpackGo b n.toUSize 0 (Array.replicate n 0)
+
+/-- Whether the parallel natural-order output applies: sixteen leaves of whole tiles. -/
+def naturalShape (logN depth : Nat) : Bool :=
+  depth == 4 && 12 ≤ logN && logN ≤ 28
+
+/-- Complete transform of a packed buffer; packed natural-order output. -/
+def runPacked (tw : Array ByteArray) (logN depth : Nat) (nInv : UInt32) (a : ByteArray)
+    (inverse : Bool) : ByteArray :=
+  let normalize := inverse && logN - depth ≥ 4 && (logN - depth) % 2 == 0
+  let b := assembleChunks (4 * 2 ^ logN) (splitChunks tw logN a nInv normalize depth).get
+  if naturalShape logN depth then natural b logN nInv (inverse && !normalize)
+  else encode (decodeTiled logN b nInv (inverse && !normalize))
+
+/-- Complete transform of a field array; natural-order field output. -/
+def runFields (tw : Array ByteArray) (logN depth : Nat) (nInv : UInt32)
+    (a : Array KoalaBear.Fast.Field) (inverse : Bool) : Array KoalaBear.Fast.Field :=
+  if naturalShape logN depth then
+    let normalize := inverse && logN - depth ≥ 4 && (logN - depth) % 2 == 0
+    let b := assembleChunks (4 * 2 ^ logN) (splitInputChunks tw logN a nInv normalize depth).get
+    unpack (natural b logN nInv (inverse && !normalize)) (2 ^ logN)
+  else run tw logN depth nInv a inverse
+
+end CompPoly.CPolynomial.NTTFast.Packed.Native

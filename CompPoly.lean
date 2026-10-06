@@ -384,6 +384,8 @@ public import CompPoly.Univariate.NTTFast.Packed.LocalLayers
 public import CompPoly.Univariate.NTTFast.Packed.LoopRefinement
 public import CompPoly.Univariate.NTTFast.Packed.Native
 public import CompPoly.Univariate.NTTFast.Packed.NativeLeaf
+public import CompPoly.Univariate.NTTFast.Packed.NativeOrder
+public import CompPoly.Univariate.NTTFast.Packed.NativeOrderCorrectness
 public import CompPoly.Univariate.NTTFast.Packed.Normalization
 public import CompPoly.Univariate.NTTFast.Packed.PartitionKernels
 public import CompPoly.Univariate.NTTFast.Packed.PassRefinement

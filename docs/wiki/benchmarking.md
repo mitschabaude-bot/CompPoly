@@ -725,3 +725,26 @@ The normal NTT benchmark now measures both proved Lean variants beside unchanged
 `lake exe CompPolyNativeSmoke` also checks the actual C storage implementations against independent bytewise Lean operations. These runtime checks cover the remaining extern trust boundary rather than re-testing results already guaranteed by the field/FFT proofs.
 
 The complete proof port was measured with the normal driver in five alternating three-way rounds at eight and sixteen workers. Million-point forward/inverse medians at eight workers were 11.095 / 10.828 ms packed Lean, 28.514 / 32.876 ms externless Lean and 3.670 / 3.826 ms Plonky3. At sixteen workers they were 11.636 / 11.607 ms packed Lean, 27.464 / 29.124 ms externless Lean and 3.318 / 3.343 ms Plonky3. The Rust executable retained its frozen SHA-256. Separate five-round prototype/proved comparisons found no slowdown at either worker count; full-output digests agreed at thirteen log sizes in both directions. All 1,548 compiled storage checks, library build, tests, style/import/documentation checks and the axiom sweep passed, with zero sorry/nonstandard-axiom taint across 11,986 declarations. Local reports are under ignored `bench/out/ntt-proved-packed-{eight,sixteen}/`; the normal driver reproduces their three-way tables.
+
+### Parallel natural-order output and packed I/O (2026-10-06)
+
+Phase timings of the packed pipeline at one million points and eight workers showed that the serial tiled decoder took about 4.5 ms of an 11 ms forward transform, while all FFT arithmetic and task joins took about 4.9 ms. Single-worker packed Lean took 20 ms against 10 ms for Plonky3, so most of the gap was scaling, not arithmetic. `NTTFast.Packed.NativeOrder` replaces the serial decoder for sixteen-leaf trees (`depth = 4`, `12 ≤ logN ≤ 28`): sixteen tasks reverse each leaf locally, then sixteen tasks interleave the reversed leaves into natural order with cache-line `16 × 16` transposes. Task outputs are packed buffers, so the join is a byte copy. The field-array API then decodes the natural-order buffer in one sequential pass; the new `forwardPacked`/`inversePacked` API returns the packed buffer directly. Other shapes keep the tiled decoder. `NativeOrderCorrectness` proves the new path equal to `decodedFields`, and `runFields_dft`/`runPacked_dft` give the complete DFT equalities used by the plan theorems. No externs were added; the module joins `CompPolyPackedNative`.
+
+Rejected and diagnostic variants, measured in throwaway executables:
+
+- A decoder that gathers bit-reversed words directly into natural-order blocks took 16 ms serially for one million words: each read misses, and each output block touches one word per cache line of the source.
+- `Array` append is an element-by-element push. Joining sixteen field-array blocks took 2.7 ms, as long as decoding everything serially, so parallel tasks must join packed buffers.
+- `lean_array_push` is an out-of-line runtime call. Decoding into a preallocated array with bounds-proved `uset` and a `USize` loop took 2.3 ms instead of 2.7–3.1 ms; a `Nat` fuel counter alone added about 0.7 ms. This 2.3 ms, including 0.7 ms to allocate and zero the output, is the remaining serial floor of the field-array API.
+- Reading the sixteen leaves one word at a time aliased sixteen equally aligned streams to the same L1 sets: 0.74 ms per interleave block versus 0.09 ms for the line-wise transpose.
+- A fused radix-sixteen first pass over sixteen strided rows (`n/16` apart) was slower than the four split levels, for the same aliasing reason. A cache-blocked four-step layout (sixteen-column blocks in L2, 1,024-point rows in L1) was correct but did about 25 ms of total work against 19 ms for the split tree, mostly per-leaf overhead and bit reversal of 1,024 small leaves.
+
+Five alternating rounds with the normal driver, one million points, milliseconds:
+
+| Workers | Direction | Packed I/O Lean | Packed Lean | Plonky3 | Packed I/O / Rust | Packed / Rust |
+|---:|---|---:|---:|---:|---:|---:|
+| 8 | forward | 6.274 | 10.375 | 4.017 | 1.56× | 2.58× |
+| 8 | inverse | 6.185 | 10.303 | 3.954 | 1.56× | 2.61× |
+| 16 | forward | 6.696 | 10.596 | 3.364 | 1.99× | 3.15× |
+| 16 | inverse | 6.492 | 10.312 | 3.284 | 1.98× | 3.14× |
+
+Before this change, packed Lean measured 11.1–11.6 ms (3.5× Plonky3 at sixteen workers). The field-array API improves by about 1 ms; packed I/O removes the remaining serial decode. Small transforms still lose to task overhead: at 4,096 points the packed variants take 0.33–0.44 ms against 0.07–0.09 ms for externless Lean and Plonky3. Reproduce with `python3 scripts/bench-fields.py --suite ntt --cpus 0,1,2,3,4,5,6,7`; local reports are under ignored `bench/out/ntt-natural-order-{eight,sixteen}/`.
