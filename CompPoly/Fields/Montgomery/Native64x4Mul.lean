@@ -155,14 +155,30 @@ private theorem fold4 {T1 T2 T3 T4 A Q B0 B1 B2 B3 m0 m1 m2 m3 : ℕ}
       (m0 * Q + 2 ^ 64 * (m1 * Q) + 2 ^ 128 * (m2 * Q) + 2 ^ 192 * (m3 * Q)) := by
   omega
 
-/-- The final conditional subtraction of `mul`, given the folded Montgomery identity. -/
-private theorem mul_finish (q : Limbs4) (t : State5) {A M : ℕ}
-    (hlt : t.toNat < 2 * q.toNat) (hfold : 2 ^ 256 * t.toNat = A + M * q.toNat) :
+/-- The unnormalized product is below `2 * q` and agrees with Montgomery multiplication.
+Only the first operand must be canonical; the second may be any four-limb value. -/
+theorem mulUnreduced_spec (q : Limbs4) (negInv : UInt64) (a b : Limbs4)
+    (hnq : negInv.toNat * q.toNat % 2 ^ 64 = 2 ^ 64 - 1) (haq : a.toNat < q.toNat) :
+    (mulUnreduced q negInv a b).toNat < 2 * q.toNat ∧
+      2 ^ 256 * (mulUnreduced q negInv a b).toNat ≡ a.toNat * b.toNat [MOD q.toNat] := by
+  obtain ⟨L1, m0, hm0, r0⟩ :=
+    mulRound_spec q a negInv b.l0 State5.zero hnq haq (by rw [State5.zero_toNat]; omega)
+  obtain ⟨L2, m1, hm1, r1⟩ := mulRound_spec q a negInv b.l1 _ hnq haq L1
+  obtain ⟨L3, m2, hm2, r2⟩ := mulRound_spec q a negInv b.l2 _ hnq haq L2
+  obtain ⟨L4, m3, hm3, r3⟩ := mulRound_spec q a negInv b.l3 _ hnq haq L3
+  rw [State5.zero_toNat] at r0
+  have hfold := fold4 r0 r1 r2 r3
+  rw [← mul_sum4, ← sum4_mul, ← Limbs4.toNat] at hfold
+  refine ⟨L4, ?_⟩
+  change (2 ^ 256 * (mulUnreduced q negInv a b).toNat) % q.toNat = _
+  simp only [mulUnreduced]
+  rw [hfold, Nat.add_mul_mod_self_right]
+
+/-- The final conditional subtraction preserves the unnormalized product's congruence. -/
+private theorem mul_finish (q : Limbs4) (t : State5) {A : ℕ}
+    (hlt : t.toNat < 2 * q.toNat) (hmod : 2 ^ 256 * t.toNat ≡ A [MOD q.toNat]) :
     (condSubWide q t).toNat < q.toNat ∧
       2 ^ 256 * (condSubWide q t).toNat ≡ A [MOD q.toNat] := by
-  have hmod : 2 ^ 256 * t.toNat ≡ A [MOD q.toNat] := by
-    unfold Nat.ModEq
-    rw [hfold, Nat.add_mul_mod_self_right]
   refine ⟨condSubWide_lt q _ hlt, ?_⟩
   rw [condSubWide_toNat q _ hlt]
   split
@@ -175,16 +191,8 @@ theorem mul_spec (q : Limbs4) (negInv : UInt64) (a b : Limbs4)
     (hnq : negInv.toNat * q.toNat % 2 ^ 64 = 2 ^ 64 - 1) (haq : a.toNat < q.toNat) :
     (mul q negInv a b).toNat < q.toNat ∧
       2 ^ 256 * (mul q negInv a b).toNat ≡ a.toNat * b.toNat [MOD q.toNat] := by
-  obtain ⟨L1, m0, hm0, r0⟩ :=
-    mulRound_spec q a negInv b.l0 State5.zero hnq haq (by rw [State5.zero_toNat]; omega)
-  obtain ⟨L2, m1, hm1, r1⟩ := mulRound_spec q a negInv b.l1 _ hnq haq L1
-  obtain ⟨L3, m2, hm2, r2⟩ := mulRound_spec q a negInv b.l2 _ hnq haq L2
-  obtain ⟨L4, m3, hm3, r3⟩ := mulRound_spec q a negInv b.l3 _ hnq haq L3
-  rw [State5.zero_toNat] at r0
-  have hfold := fold4 r0 r1 r2 r3
-  rw [← mul_sum4, ← sum4_mul, ← Limbs4.toNat] at hfold
-  simp only [mul]
-  exact mul_finish q _ L4 hfold
+  obtain ⟨hbound, hmod⟩ := mulUnreduced_spec q negInv a b hnq haq
+  exact mul_finish q _ hbound hmod
 
 private theorem mulHi_comm (a b : UInt64) : mulHi a b = mulHi b a := by
   have h1 := mulHi_spec a b
@@ -214,7 +222,8 @@ theorem squareCached_eq_mul (q : Limbs4) (negInv : UInt64) (a : Limbs4) :
     fun t c ↦ mac_comm t a.l3 a.l1 c
   have h23 : ∀ t c, mac t a.l3 a.l2 c = mac t a.l2 a.l3 c :=
     fun t c ↦ mac_comm t a.l3 a.l2 c
-  simp only [squareCached, mul, mulRound, mulAccum, macWords_mul, h01, h02, h03, h12, h13, h23]
+  simp only [squareCached, mul, mulUnreduced, mulRound, mulAccum, macWords_mul,
+    h01, h02, h03, h12, h13, h23]
 
 end Native64x4
 end Montgomery
