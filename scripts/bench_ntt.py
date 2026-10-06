@@ -22,7 +22,7 @@ def run(args, common, allowed):
         for c in sorted(allowed):
             siblings = Path(f"/sys/devices/system/cpu/cpu{c}/topology/thread_siblings_list").read_text()
             physical.setdefault(siblings, c)
-        preferred = list(physical.values()) + sorted(allowed - set(physical.values()))
+        preferred = list(physical.values())
         cpus = preferred[:min(16, 2 ** (len(preferred).bit_length() - 1))]
     workers = len(cpus)
     if not workers or workers & (workers - 1) or len(set(cpus)) != workers or not set(cpus) <= allowed:
