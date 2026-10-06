@@ -27,7 +27,8 @@ variable {R : Type*}
 /-- The column-parallel transform applies to an exactly sized input of an even size with at
 least `2 ^ (logWorkers + 1)` columns per row of sixteen. -/
 def ColumnsShape (n logN logWorkers : Nat) : Prop :=
-  n = 2 ^ logN ∧ logN % 2 = 0 ∧ logWorkers + 5 ≤ logN ∧ logN ≤ 36 ∧ 2 ^ logN < USize.size
+  n = 2 ^ logN ∧ logN % 2 = 0 ∧ logWorkers + 5 ≤ logN ∧ logN ≤ 36 ∧
+    4 * 2 ^ logN + 1024 ≤ USize.size
 
 instance (n logN logWorkers : Nat) : Decidable (ColumnsShape n logN logWorkers) := by
   unfold ColumnsShape; exact inferInstance
@@ -41,7 +42,8 @@ theorem size_twiddleTable_getD [Field R] (D : NTT.Domain R) (s : Nat) (hs : s < 
 theorem runPasses_topPasses [Field R] [DecidableEq R] (D : NTT.Domain R) (tw : Array (Array R))
     (a : Array R) (h4 : 4 ≤ D.logN) :
     Parallel.runPasses false tw ((Parallel.forwardPasses D).drop 2)
-      (Columns.topPasses tw D.logN a) = Parallel.runPasses false tw (Parallel.forwardPasses D) a := by
+      (Columns.topPasses tw D.logN a) =
+        Parallel.runPasses false tw (Parallel.forwardPasses D) a := by
   have htake : (Parallel.forwardPasses D).take 2 = [D.logN - 2, D.logN - 4] := by
     rw [Parallel.forwardPasses, ← List.map_take, List.take_range, Nat.min_eq_left (by omega)]
     simp only [List.range_succ, List.range_zero, List.nil_append, List.cons_append,
@@ -52,7 +54,7 @@ theorem runPasses_topPasses [Field R] [DecidableEq R] (D : NTT.Domain R) (tw : A
   rfl
 
 /-- The column transform computes the scalar forward stages of a domain, in natural order. -/
-theorem transform_eq_checkedStages [Field R] [DecidableEq R] (D : NTT.Domain R)
+theorem transform_eq_checkedStages [Field R] [DecidableEq R] [Word32Repr R] (D : NTT.Domain R)
     (tw : Array (Array R)) (S : Nat) (scale : Bool) (f : R) (a : Array R)
     (htw : ∀ s < D.logN, (tw.getD s #[]).size = 2 ^ s) (hS : 0 < S)
     (hdiv : S ∣ 2 ^ (D.logN - 4)) (hshape : ColumnsShape a.size D.logN 0) :
@@ -74,7 +76,7 @@ theorem transform_eq_checkedStages [Field R] [DecidableEq R] (D : NTT.Domain R)
 /-- Parallel forward NTT. Even sizes run `2 ^ (logWorkers + 1)` column tasks and sixteen leaf
 tasks; other sizes use at most `2 ^ logWorkers` independent array segments. Small transforms
 use the scalar loop to avoid task and copy costs. -/
-@[inline] def forwardParallel [Field R] [DecidableEq R] (P : NaturalPlan R)
+@[inline] def forwardParallel [Field R] [DecidableEq R] [Word32Repr R] (P : NaturalPlan R)
     (a : Array R) (logWorkers : Nat := 4) : Array R :=
   if P.plan.domain.logN < 18 ∨ logWorkers = 0 then P.forward a else
   if ColumnsShape a.size P.plan.domain.logN logWorkers then
@@ -93,7 +95,7 @@ use the scalar loop to avoid task and copy costs. -/
 
 /-- Parallel inverse NTT with the same natural-order input/output and normalization. Even
 sizes run the forward column transform with the inverse twiddles and scale the leaves. -/
-@[inline] def inverseParallel [Field R] [DecidableEq R] (P : NaturalPlan R)
+@[inline] def inverseParallel [Field R] [DecidableEq R] [Word32Repr R] (P : NaturalPlan R)
     (a : Array R) (logWorkers : Nat := 4) : Array R :=
   if P.plan.domain.logN < 18 ∨ logWorkers = 0 ∨
       P.plan.inverseDomain.n ≠ P.plan.domain.n then P.inverse a else
@@ -114,7 +116,7 @@ sizes run the forward column transform with the inverse twiddles and scale the l
     P.normalize c
 
 /-- The complete parallel forward transform refines the proved scalar transform. -/
-theorem forwardParallel_eq [Field R] [DecidableEq R] (P : NaturalPlan R)
+theorem forwardParallel_eq [Field R] [DecidableEq R] [Word32Repr R] (P : NaturalPlan R)
     (a : Array R) (logWorkers : Nat) : P.forwardParallel a logWorkers = P.forward a := by
   unfold forwardParallel
   split
@@ -126,7 +128,8 @@ theorem forwardParallel_eq [Field R] [DecidableEq R] (P : NaturalPlan R)
       rw [P.wellFormed.2.2.1]; exact size_twiddleTable_getD _
     rw [transform_eq_checkedStages _ _ _ false 1 a htw (Nat.two_pow_pos _)
       (Nat.pow_dvd_pow 2 (by omega)) ⟨hn, heven, by omega, h36, hu⟩,
-      forward, permute_eq, load, ite_eq_left_of_eq_true _ _ (eq_true (show a.size = P.plan.domain.n from hn))]
+      forward, permute_eq, load,
+      ite_eq_left_of_eq_true _ _ (eq_true (show a.size = P.plan.domain.n from hn))]
     rfl
   · simp only [Parallel.chunksTask_eq, extract_self]
     have hsplit (xs : List Nat) (n : Nat) (a : Array R) :
@@ -139,7 +142,7 @@ theorem forwardParallel_eq [Field R] [DecidableEq R] (P : NaturalPlan R)
     rfl
 
 /-- The complete parallel inverse transform refines the proved scalar transform. -/
-theorem inverseParallel_eq [Field R] [DecidableEq R] (P : NaturalPlan R)
+theorem inverseParallel_eq [Field R] [DecidableEq R] [Word32Repr R] (P : NaturalPlan R)
     (a : Array R) (logWorkers : Nat) : P.inverseParallel a logWorkers = P.inverse a := by
   unfold inverseParallel
   split

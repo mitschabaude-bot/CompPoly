@@ -125,21 +125,20 @@ theorem size_copyGo (src : Array α) (si di cnt : USize) :
   · exact size_copyGo src _ _ _ _ 0 dst _ _ _ _ rfl
   · rfl
 
-/-- Copying range `k` of source `k` to row `k` of a fresh array, for every `k < r`. -/
-theorem foldl_copy_spec [Zero α] (src : Nat → Array α) (si : Nat → Nat) (cs r : Nat)
-    (hsrc : ∀ k < r, si k + cs ≤ (src k).size) (hu : ∀ k < r, (src k).size < USize.size)
-    (hr : r * cs < USize.size) :
-    ((List.range r).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
-        (Array.replicate (r * cs) 0)).size = r * cs ∧
+/-- Filling row `k` of a fresh `r × cs` array by `op k`, for every `k < r`. -/
+theorem foldl_rows_spec [Zero α] (op : Nat → Array α → Array α) (val : Nat → Nat → α)
+    (cs r : Nat) (hop : ∀ k < r, ∀ acc : Array α, acc.size = r * cs →
+      (op k acc).size = r * cs ∧ ∀ i, (op k acc).getD i 0 =
+        if k * cs ≤ i ∧ i < k * cs + cs then val k (i - k * cs) else acc.getD i 0) :
+    ((List.range r).foldl (fun acc k ↦ op k acc) (Array.replicate (r * cs) 0)).size = r * cs ∧
       ∀ k < r, ∀ c < cs,
-        ((List.range r).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
-          (Array.replicate (r * cs) 0)).getD (k * cs + c) 0 = (src k).getD (si k + c) 0 := by
+        ((List.range r).foldl (fun acc k ↦ op k acc) (Array.replicate (r * cs) 0)).getD
+          (k * cs + c) 0 = val k c := by
   suffices h : ∀ t ≤ r,
-      ((List.range t).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
-        (Array.replicate (r * cs) 0)).size = r * cs ∧
+      ((List.range t).foldl (fun acc k ↦ op k acc) (Array.replicate (r * cs) 0)).size = r * cs ∧
       ∀ k < t, ∀ c < cs,
-        ((List.range t).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
-          (Array.replicate (r * cs) 0)).getD (k * cs + c) 0 = (src k).getD (si k + c) 0 by
+        ((List.range t).foldl (fun acc k ↦ op k acc) (Array.replicate (r * cs) 0)).getD
+          (k * cs + c) 0 = val k c by
     exact h r (Nat.le_refl r)
   intro t
   induction t with
@@ -149,27 +148,17 @@ theorem foldl_copy_spec [Zero α] (src : Nat → Array α) (si : Nat → Nat) (c
     intro ht
     obtain ⟨hsz, hval⟩ := ih (by omega)
     rw [List.range_succ, List.foldl_append, List.foldl_cons, List.foldl_nil]
-    have hcopy : t * cs + cs ≤ r * cs := by
-      have := Nat.mul_le_mul_right cs (show t + 1 ≤ r by omega)
-      rw [Nat.add_mul, Nat.one_mul] at this
-      exact this
-    have hg : si t + cs ≤ (src t).size ∧ t * cs + cs ≤
-        ((List.range t).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
-          (Array.replicate (r * cs) 0)).size ∧ (src t).size < USize.size ∧
-        ((List.range t).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
-          (Array.replicate (r * cs) 0)).size < USize.size := by
-      rw [hsz]
-      exact ⟨hsrc t (by omega), hcopy, hu t (by omega), hr⟩
-    refine ⟨by rw [size_copyRange, hsz], fun k hk c hc ↦ ?_⟩
-    rw [copyRange_getD _ _ _ _ _ _ hg]
+    obtain ⟨h1, h2⟩ := hop t (by omega) _ hsz
+    refine ⟨h1, fun k hk c hc ↦ ?_⟩
+    rw [h2]
     by_cases hkt : k = t
     · subst k
-      rw [ite_eq_left (by omega), show t * cs + c - t * cs = c by omega]
+      rw [ite_eq_left_of_eq_true _ _ (eq_true (by omega)), show t * cs + c - t * cs = c by omega]
     · have hlt : k * cs + c < t * cs := by
         have := Nat.mul_le_mul_right cs (show k + 1 ≤ t by omega)
         rw [Nat.add_mul, Nat.one_mul] at this
         omega
-      rw [ite_eq_right (by omega)]
+      rw [ite_eq_right_of_eq_false _ _ (eq_false (by omega))]
       exact hval k (by omega) c hc
 
 /-- Gathered rows have the requested shape and entries. -/
@@ -179,19 +168,178 @@ theorem gatherRows_spec [Zero α] (src : Array α) (M j0 cs r : Nat)
     (gatherRows src M j0 cs r).size = r * cs ∧
       ∀ k < r, ∀ c < cs, (gatherRows src M j0 cs r).getD (k * cs + c) 0 =
         src.getD (k * M + (j0 + c)) 0 := by
-  obtain ⟨h1, h2⟩ := foldl_copy_spec (fun _ ↦ src) (fun k ↦ k * M + j0) cs r hsrc
-    (fun _ _ ↦ hu.1) hu.2
-  exact ⟨h1, fun k hk c hc ↦ by rw [← Nat.add_assoc]; exact h2 k hk c hc⟩
+  refine foldl_rows_spec (fun k acc ↦ copyRange src (k * M + j0) acc (k * cs) cs)
+    (fun k c ↦ src.getD (k * M + (j0 + c)) 0) cs r (fun k hk acc hacc ↦ ?_)
+  have hcopy : k * cs + cs ≤ r * cs := by
+    have := Nat.mul_le_mul_right cs (show k + 1 ≤ r by omega)
+    rw [Nat.add_mul, Nat.one_mul] at this
+    exact this
+  refine ⟨by rw [size_copyRange, hacc], fun i ↦ ?_⟩
+  rw [copyRange_getD _ _ _ _ _ _ ⟨hsrc k hk, by omega, hu.1, by omega⟩, Nat.add_assoc]
 
-/-- Row `l` of every column result, in column order. -/
-theorem gatherLeaf_spec [Zero α] (cols : Array (Array α)) (cs l : Nat)
-    (hsrc : ∀ s < cols.size, l * cs + cs ≤ (cols.getD s #[]).size)
-    (hu : ∀ s < cols.size, (cols.getD s #[]).size < USize.size)
+/-- The word loop keeps the size and decodes the remaining range. -/
+theorem decodeGo_spec [Zero α] [Word32Repr α] (src : ByteArray) (si di cnt : USize) :
+    ∀ (m : Nat) (k : USize) (dst : Array α) (hk hs hd hu), cnt.toNat - k.toNat = m →
+      (decodeGo src si di cnt k dst hk hs hd hu).size = dst.size ∧
+      ∀ i, (decodeGo src si di cnt k dst hk hs hd hu).getD i 0 =
+        if di.toNat + k.toNat ≤ i ∧ i < di.toNat + cnt.toNat then
+          Word32Repr.ofWord (ByteWords.wordAt src (si.toNat + (i - di.toNat)))
+        else dst.getD i 0 := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  intro m
+  induction m with
+  | zero =>
+    intro k dst hk hs hd hu hm
+    have hk' := USize.le_iff_toNat_le.mp hk
+    rw [decodeGo]
+    have hnot : ¬k < cnt := by rw [USize.lt_iff_toNat_lt]; omega
+    simp only [hnot, ↓reduceDIte, true_and]
+    intro i
+    rw [ite_eq_right_of_eq_false _ _ (eq_false (by omega))]
+  | succ m ih =>
+    intro k dst hk hs hd hu hm
+    have hk' := USize.le_iff_toNat_le.mp hk
+    have hlt : k < cnt := by rw [USize.lt_iff_toNat_lt]; omega
+    have hcs := cnt.toNat_lt_size
+    have hds := di.toNat_lt_size
+    have ha : (si + k).toNat = si.toNat + k.toNat := by
+      rw [USize.toNat_add]; exact Nat.mod_eq_of_lt (by omega)
+    have hb : (di + k).toNat = di.toNat + k.toNat := by
+      rw [USize.toNat_add]; exact Nat.mod_eq_of_lt (by omega)
+    have hk1 : (k + 1).toNat = k.toNat + 1 := Plan.usize_add_one k (by omega)
+    rw [decodeGo]
+    simp only [hlt, ↓reduceDIte]
+    obtain ⟨h1, h2⟩ := ih (k + 1) _ _ _ _ _ (by rw [hk1]; omega)
+    refine ⟨by rw [h1, Array.size_uset], fun i ↦ ?_⟩
+    rw [h2 i, hk1, getD_uset, hb, ByteWords.readWordU_eq, ha]
+    split_ifs <;> first
+      | rfl
+      | omega
+      | (congr 2; omega)
+
+/-- A guarded range decode writes exactly its range. -/
+theorem decodeRange_getD [Zero α] [Word32Repr α] (src : ByteArray) (si : Nat) (dst : Array α)
+    (di cnt : Nat)
+    (h : 4 * (si + cnt) ≤ src.size ∧ di + cnt ≤ dst.size ∧ src.size < USize.size ∧
+      dst.size < USize.size) (i : Nat) :
+    (decodeRange src si dst di cnt).getD i 0 =
+      if di ≤ i ∧ i < di + cnt then Word32Repr.ofWord (ByteWords.wordAt src (si + (i - di)))
+      else dst.getD i 0 := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  unfold decodeRange
+  rw [dite_eq_left_of_eq_true (eq_true h)]
+  obtain ⟨_, h2⟩ := decodeGo_spec src (USize.ofNatLT si (by omega))
+    (USize.ofNatLT di (by omega)) (USize.ofNatLT cnt (by omega)) _ 0 dst
+    (by simp only [USize.zero_le]) (by simp only [USize.toNat_ofNatLT]; omega)
+    (by simp only [USize.toNat_ofNatLT]; omega) ⟨h.2.2.1, h.2.2.2⟩ rfl
+  rw [h2 i]
+  simp only [USize.toNat_ofNatLT, USize.toNat_zero, Nat.add_zero]
+
+/-- A range decode keeps the destination size. -/
+@[simp] theorem size_decodeRange [Zero α] [Word32Repr α] (src : ByteArray) (si : Nat)
+    (dst : Array α) (di cnt : Nat) : (decodeRange src si dst di cnt).size = dst.size := by
+  unfold decodeRange
+  split
+  · exact (decodeGo_spec src _ _ _ _ 0 dst _ _ _ _ rfl).1
+  · rfl
+
+/-- Row `l` of every stored column result, decoded. -/
+theorem gatherLeaf_spec [Zero α] [Word32Repr α] (cols : Array ByteArray) (cs l : Nat)
+    (hsrc : ∀ s < cols.size, 4 * (l * cs + cs) ≤ (cols.getD s ByteArray.empty).size)
+    (hu : ∀ s < cols.size, (cols.getD s ByteArray.empty).size < USize.size)
     (hr : cols.size * cs < USize.size) :
-    (gatherLeaf cols cs l).size = cols.size * cs ∧
-      ∀ s < cols.size, ∀ c < cs, (gatherLeaf cols cs l).getD (s * cs + c) 0 =
-        (cols.getD s #[]).getD (l * cs + c) 0 :=
-  foldl_copy_spec (fun s ↦ cols.getD s #[]) (fun _ ↦ l * cs) cs cols.size hsrc hu hr
+    (gatherLeaf cols cs l : Array α).size = cols.size * cs ∧
+      ∀ s < cols.size, ∀ c < cs, (gatherLeaf cols cs l : Array α).getD (s * cs + c) 0 =
+        Word32Repr.ofWord (ByteWords.wordAt (cols.getD s ByteArray.empty) (l * cs + c)) := by
+  refine foldl_rows_spec (fun s acc ↦ decodeRange (cols.getD s ByteArray.empty) (l * cs) acc
+    (s * cs) cs) (fun s c ↦ Word32Repr.ofWord (ByteWords.wordAt (cols.getD s ByteArray.empty)
+      (l * cs + c))) cs cols.size (fun s hs acc hacc ↦ ?_)
+  have hcopy : s * cs + cs ≤ cols.size * cs := by
+    have := Nat.mul_le_mul_right cs (show s + 1 ≤ cols.size by omega)
+    rw [Nat.add_mul, Nat.one_mul] at this
+    exact this
+  refine ⟨by rw [size_decodeRange, hacc], fun i ↦ ?_⟩
+  rw [decodeRange_getD _ _ _ _ _ ⟨by have := hsrc s hs; omega, by omega, hu s hs, by omega⟩ i]
+
+/-- The encoding loop keeps the size and stores the remaining range. -/
+theorem encodeGo_spec [Zero α] [Word32Repr α] (src : Array α) (off cnt : USize) :
+    ∀ (m : Nat) (k : USize) (dst : ByteArray) (hk hs hd hu), cnt.toNat - k.toNat = m →
+      (encodeGo src off cnt k dst hk hs hd hu).size = dst.size ∧
+      ∀ j, ByteWords.wordAt (encodeGo src off cnt k dst hk hs hd hu) j =
+        if off.toNat + k.toNat ≤ j ∧ j < off.toNat + cnt.toNat then
+          Word32Repr.toWord (src.getD (j - off.toNat) 0)
+        else ByteWords.wordAt dst j := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  intro m
+  induction m with
+  | zero =>
+    intro k dst hk hs hd hu hm
+    have hk' := USize.le_iff_toNat_le.mp hk
+    rw [encodeGo]
+    have hnot : ¬k < cnt := by rw [USize.lt_iff_toNat_lt]; omega
+    simp only [hnot, ↓reduceDIte, true_and]
+    intro j
+    rw [ite_eq_right_of_eq_false _ _ (eq_false (by omega))]
+  | succ m ih =>
+    intro k dst hk hs hd hu hm
+    have hk' := USize.le_iff_toNat_le.mp hk
+    have hlt : k < cnt := by rw [USize.lt_iff_toNat_lt]; omega
+    have hcs := cnt.toNat_lt_size
+    have ha : (off + k).toNat = off.toNat + k.toNat := by
+      rw [USize.toNat_add]; exact Nat.mod_eq_of_lt (by omega)
+    have hk1 : (k + 1).toNat = k.toNat + 1 := Plan.usize_add_one k (by omega)
+    rw [encodeGo]
+    simp only [hlt, ↓reduceDIte]
+    obtain ⟨h1, h2⟩ := ih (k + 1) _ _ _ _ _ (by rw [hk1]; omega)
+    refine ⟨by rw [h1, ByteWords.size_writeWordU], fun j ↦ ?_⟩
+    rw [h2 j, hk1, ByteWords.wordAt_writeWordU, ha]
+    split_ifs <;> first
+      | rfl
+      | omega
+      | (rw [uget_eq_getD _ _ _ 0 _ rfl]; congr 2; omega)
+
+/-- An encoded array: `off` padding words, then the entries. -/
+theorem encode_spec [Zero α] [Word32Repr α] (a : Array α) (off : Nat)
+    (hu : 4 * (off + a.size) < USize.size) :
+    (encode a off).size = 4 * (off + a.size) ∧
+      ∀ i < a.size, ByteWords.wordAt (encode a off) (off + i) = Word32Repr.toWord (a.getD i 0) := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  unfold encode
+  rw [dite_eq_left_of_eq_true (eq_true hu)]
+  obtain ⟨h1, h2⟩ := encodeGo_spec a (USize.ofNatLT off (by omega))
+    (USize.ofNatLT a.size (by omega))
+    _ 0 (ByteWords.buffer (4 * (off + a.size))) (by simp only [USize.zero_le])
+    (by simp only [USize.toNat_ofNatLT]; omega)
+    (by simp only [USize.toNat_ofNatLT, ByteWords.size_buffer]; omega)
+    (by simp only [ByteWords.size_buffer]; exact hu) rfl
+  refine ⟨by rw [h1, ByteWords.size_buffer], fun i hi ↦ ?_⟩
+  rw [h2]
+  simp only [USize.toNat_ofNatLT, USize.toNat_zero, Nat.add_zero]
+  rw [ite_eq_left_of_eq_true _ _ (eq_true (by omega)), Nat.add_sub_cancel_left]
+
+/-- A guarded store changes exactly its index. -/
+theorem getD_setW (a : Array α) (i : USize) (v : α) (k : Nat) (d : α) (hu : a.size < USize.size) :
+    (setW a i v).getD k d = if i.toNat = k ∧ i.toNat < a.size then v else a.getD k d := by
+  have hus : a.usize.toNat = a.size := by
+    simp only [Array.usize, Nat.toUSize, USize.toNat_ofNat']
+    exact Nat.mod_eq_of_lt hu
+  unfold setW
+  split
+  · rename_i h
+    have h' : i.toNat < a.size := by rw [← hus]; exact h
+    rw [getD_uset]
+    by_cases hk : i.toNat = k
+    · simp only [hk, true_and, ↓reduceIte, show k < a.size by omega]
+    · simp only [hk, false_and, ↓reduceIte]
+  · rename_i h
+    have h' : ¬i.toNat < a.size := by rw [← hus]; exact h
+    simp only [h', and_false, ↓reduceIte]
+
+@[simp] theorem size_setW (a : Array α) (i : USize) (v : α) : (setW a i v).size = a.size := by
+  unfold setW
+  split
+  · exact Array.size_uset ..
+  · rfl
 
 /-- Joining tasks keeps their results in order. -/
 theorem joinTasks_get (ts : Array (Task α)) : (joinTasks ts).get = ts.map Task.get := by
@@ -523,46 +671,114 @@ theorem getD_set! (a : Array α) (i : Nat) (v : α) (k : Nat) (d : α) :
         Array.getElem?_eq_none (Nat.le_of_not_lt hi)]
   · simp only [h, false_and, ↓reduceIte]
 
+/-- Machine indices `16 q + c` and `o + q` of the assembly do not overflow. -/
+theorem toNat_rowIndex (q c : USize) (n : Nat) (hc : c.toNat < 16) (hq : 16 * q.toNat + 16 ≤ n)
+    (hn : n < USize.size) : (16 * q + c).toNat = 16 * q.toNat + c.toNat := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  simp only [USize.toNat_add, USize.toNat_mul, USize.reduceToNat, Nat.mod_add_mod, hsize]
+  exact Nat.mod_eq_of_lt (by omega)
+
+theorem getElem_eq_getD (r : Array β) (l : Nat) (h : l < r.size) (d : β) : r[l] = r.getD l d := by
+  simp only [Array.getD_eq_getD_getElem?, Array.getElem?_eq_getElem h, Option.getD_some]
+
+set_option maxHeartbeats 1000000 in
 /-- One assembly step stores the sixteen entries of row `q`. -/
-theorem assembleGo_spec [Zero α] (V : Nat → Array α) (M : Nat) :
-    ∀ (n q : Nat) (out : Array α), M - q = n → out.size = 16 * M →
-      (assembleGo (V 0) (V 1) (V 2) (V 3) (V 4) (V 5) (V 6) (V 7) (V 8) (V 9) (V 10) (V 11)
-        (V 12) (V 13) (V 14) (V 15) q M out).size = 16 * M ∧
-      ∀ k, (assembleGo (V 0) (V 1) (V 2) (V 3) (V 4) (V 5) (V 6) (V 7) (V 8) (V 9) (V 10)
-        (V 11) (V 12) (V 13) (V 14) (V 15) q M out).getD k 0 =
-        if 16 * q ≤ k ∧ k < 16 * M then (V (NTT.Transform.bitRevNat 4 (k % 16))).getD (k / 16) 0
+theorem assembleGo_spec [Zero α] [Word32Repr α] (r : Array ByteArray) (M : USize)
+    (hr : r.size = 16)
+    (hb : ∀ l (h : l < 16), 4 * (16 * l + M.toNat) ≤ (r[l]'(by omega)).size ∧
+      (r[l]'(by omega)).size < USize.size) (hM : 16 * M.toNat < USize.size) :
+    ∀ (n : Nat) (q : USize) (out : Array α), M.toNat - q.toNat = n → out.size = 16 * M.toNat →
+      (assembleGo r M hr hb q out).size = 16 * M.toNat ∧
+      ∀ k, (assembleGo r M hr hb q out).getD k 0 =
+        if 16 * q.toNat ≤ k ∧ k < 16 * M.toNat then
+          Word32Repr.ofWord (ByteWords.wordAt (r.getD (NTT.Transform.bitRevNat 4 (k % 16))
+            ByteArray.empty) (16 * NTT.Transform.bitRevNat 4 (k % 16) + k / 16))
         else out.getD k 0 := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
   intro n
   induction n with
   | zero =>
     intro q out hn hout
-    rw [assembleGo.eq_def, ite_eq_right (by omega)]
-    exact ⟨hout, fun k ↦ by rw [ite_eq_right (by omega)]⟩
+    rw [assembleGo]
+    have hnot : ¬q < M := by rw [USize.lt_iff_toNat_lt]; omega
+    simp only [hnot, ↓reduceDIte]
+    exact ⟨hout, fun k ↦ by rw [ite_eq_right_of_eq_false _ _ (eq_false (by omega))]⟩
   | succ n ih =>
     intro q out hn hout
-    rw [assembleGo.eq_def, ite_eq_left (by omega)]
-    dsimp only
-    refine ⟨(ih (q + 1) _ (by omega) ?_).1, fun k ↦ ?_⟩
-    · simp only [Array.size_set!, hout]
-    rw [(ih (q + 1) _ (by omega) (by simp only [Array.size_set!, hout])).2 k]
-    by_cases hk : 16 * (q + 1) ≤ k ∧ k < 16 * M
+    have hq : q < M := by rw [USize.lt_iff_toNat_lt]; omega
+    have hq1 : (q + 1).toNat = q.toNat + 1 := Plan.usize_add_one q (by omega)
+    rw [assembleGo]
+    simp only [hq, ↓reduceDIte]
+    refine ⟨(ih (q + 1) _ (by rw [hq1]; omega) ?_).1, fun k ↦ ?_⟩
+    · simp only [size_setW, hout]
+    rw [(ih (q + 1) _ (by rw [hq1]; omega) (by simp only [size_setW, hout])).2 k, hq1]
+    by_cases hk : 16 * (q.toNat + 1) ≤ k ∧ k < 16 * M.toNat
     · rw [ite_eq_left_of_eq_true _ _ (eq_true hk), ite_eq_left_of_eq_true _ _ (eq_true (by omega))]
     rw [ite_eq_right_of_eq_false _ _ (eq_false hk)]
-    simp only [getD_set!, Array.size_set!, hout]
-    by_cases hr : 16 * q ≤ k ∧ k < 16 * q + 16
-    · obtain ⟨c, rfl, hc⟩ : ∃ c, k = 16 * q + c ∧ c < 16 := ⟨k - 16 * q, by omega, by omega⟩
+    have hrow (c : USize) (hc : c.toNat < 16) : (16 * q + c).toNat = 16 * q.toNat + c.toNat :=
+      toNat_rowIndex q c (16 * M.toNat) hc (by omega) hM
+    have hrow0 : (16 * q).toNat = 16 * q.toNat := by
+      simpa only [USize.add_zero, USize.reduceToNat, Nat.add_zero] using
+        hrow 0 (by simp only [USize.reduceToNat]; omega)
+    simp only [ByteWords.readWordU_eq]
+    simp only [getD_setW, size_setW, hout, hM]
+    have hqM : q.toNat < M.toNat := hq
+    have hbig : 4294967296 ≤ USize.size := by
+      cases System.Platform.numBits_eq <;> simp_all [USize.size]
+    have hoq (o : USize) (ho : o.toNat ≤ 240) : (o + q).toNat = o.toNat + q.toNat := by
+      rw [USize.toNat_add, hsize, Nat.mod_eq_of_lt (by omega)]
+    simp only [hrow 1 (by simp only [USize.reduceToNat]; omega),
+      hrow 2 (by simp only [USize.reduceToNat]; omega),
+      hrow 3 (by simp only [USize.reduceToNat]; omega),
+      hrow 4 (by simp only [USize.reduceToNat]; omega),
+      hrow 5 (by simp only [USize.reduceToNat]; omega),
+      hrow 6 (by simp only [USize.reduceToNat]; omega),
+      hrow 7 (by simp only [USize.reduceToNat]; omega),
+      hrow 8 (by simp only [USize.reduceToNat]; omega),
+      hrow 9 (by simp only [USize.reduceToNat]; omega),
+      hrow 10 (by simp only [USize.reduceToNat]; omega),
+      hrow 11 (by simp only [USize.reduceToNat]; omega),
+      hrow 12 (by simp only [USize.reduceToNat]; omega),
+      hrow 13 (by simp only [USize.reduceToNat]; omega),
+      hrow 14 (by simp only [USize.reduceToNat]; omega),
+      hrow 15 (by simp only [USize.reduceToNat]; omega)]
+    simp only [hoq 0 (by simp only [USize.reduceToNat]; omega),
+      hoq 16 (by simp only [USize.reduceToNat]; omega),
+      hoq 32 (by simp only [USize.reduceToNat]; omega),
+      hoq 48 (by simp only [USize.reduceToNat]; omega),
+      hoq 64 (by simp only [USize.reduceToNat]; omega),
+      hoq 80 (by simp only [USize.reduceToNat]; omega),
+      hoq 96 (by simp only [USize.reduceToNat]; omega),
+      hoq 112 (by simp only [USize.reduceToNat]; omega),
+      hoq 128 (by simp only [USize.reduceToNat]; omega),
+      hoq 144 (by simp only [USize.reduceToNat]; omega),
+      hoq 160 (by simp only [USize.reduceToNat]; omega),
+      hoq 176 (by simp only [USize.reduceToNat]; omega),
+      hoq 192 (by simp only [USize.reduceToNat]; omega),
+      hoq 208 (by simp only [USize.reduceToNat]; omega),
+      hoq 224 (by simp only [USize.reduceToNat]; omega),
+      hoq 240 (by simp only [USize.reduceToNat]; omega)]
+    simp only [USize.reduceToNat, Nat.zero_add, hrow0,
+      getElem_eq_getD _ _ _ ByteArray.empty]
+    by_cases hr : 16 * q.toNat ≤ k ∧ k < 16 * q.toNat + 16
+    · obtain ⟨c, rfl, hc⟩ : ∃ c, k = 16 * q.toNat + c ∧ c < 16 :=
+        ⟨k - 16 * q.toNat, by omega, by omega⟩
       rw [ite_eq_left_of_eq_true _ _
-          (eq_true (show 16 * q ≤ 16 * q + c ∧ 16 * q + c < 16 * M by omega)),
-        show (16 * q + c) % 16 = c by omega, show (16 * q + c) / 16 = q by omega]
-      have hlt : ∀ i, i < 16 → (16 * q + i < 16 * M) = True := fun i hi ↦ eq_true (by omega)
-      have hlt0 : (16 * q < 16 * M) = True := eq_true (by omega)
+          (eq_true (show 16 * q.toNat ≤ 16 * q.toNat + c ∧ 16 * q.toNat + c < 16 * M.toNat by
+            omega)),
+        show (16 * q.toNat + c) % 16 = c by omega, show (16 * q.toNat + c) / 16 = q.toNat by omega]
+      have hlt : ∀ i, i < 16 → (16 * q.toNat + i < 16 * M.toNat) = True :=
+        fun i hi ↦ eq_true (by omega)
+      have hlt0 : (16 * q.toNat < 16 * M.toNat) = True := eq_true (by omega)
       interval_cases c <;> simp (disch := decide) only [Nat.add_zero, hlt, hlt0, and_true,
-        Nat.reduceEqDiff, ↓reduceIte, Nat.add_eq_left, Nat.add_left_cancel_iff,
-        OfNat.ofNat_ne_zero] <;> rfl
-    · have hne : ∀ i, i < 16 → (16 * q + i = k) = False := fun i hi ↦ eq_false (by omega)
-      have hne0 : (16 * q = k) = False := eq_false (by omega)
+        Nat.reduceEqDiff, ↓reduceIte, Nat.add_eq_left, Nat.add_left_cancel_iff]
+      all_goals first | rfl | simp only [show NTT.Transform.bitRevNat 4 0 = 0 by decide,
+        Nat.mul_zero, Nat.zero_add]
+    · have hne : ∀ i, i < 16 → (16 * q.toNat + i = k) = False := fun i hi ↦ eq_false (by omega)
+      have hne0 : (16 * q.toNat = k) = False := eq_false (by omega)
       simp (disch := decide) only [hne, hne0, false_and, ↓reduceIte]
-      rw [ite_eq_right_of_eq_false _ _ (eq_false (show ¬(16 * q ≤ k ∧ k < 16 * M) by omega))]
+      rw [ite_eq_right_of_eq_false _ _
+        (eq_false (show ¬(16 * q.toNat ≤ k ∧ k < 16 * M.toNat) by omega))]
 
 theorem getD_extract [Zero α] (a : Array α) (i j k : Nat) (hk : k < j - i) (hj : j ≤ a.size) :
     (a.extract i j).getD k 0 = a.getD (i + k) 0 := by
@@ -623,12 +839,14 @@ theorem getD_map_range (F : Nat → α) (n k : Nat) (hk : k < n) (d : α) :
     ↓reduceIte, Option.map_some, Option.getD_some]
 
 
+
+
 /-- The column-parallel transform: the top two passes, the remaining passes on every block, and
 the bit-reversal permutation, optionally scaled. -/
-theorem transform_eq [Field R] [DecidableEq R] (tw : Array (Array R)) (logN S : Nat)
+theorem transform_eq [Field R] [DecidableEq R] [Word32Repr R] (tw : Array (Array R)) (logN S : Nat)
     (rest : List Nat) (scale : Bool) (f : R) (x : Array R) (h4 : 4 < logN) (h36 : logN ≤ 36)
     (hx : x.size = 2 ^ logN) (htw : ∀ s < logN, (tw.getD s #[]).size = 2 ^ s)
-    (hu : 2 ^ logN < USize.size) (hS : 0 < S) (hdiv : S ∣ 2 ^ (logN - 4))
+    (hu : 4 * 2 ^ logN + 1024 ≤ USize.size) (hS : 0 < S) (hdiv : S ∣ 2 ^ (logN - 4))
     (hrest : ∀ low ∈ rest, 4 * 2 ^ low ∣ 2 ^ (logN - 4)) :
     transform tw logN S rest scale f x = Array.ofFn (n := 2 ^ logN) fun i ↦
       scaleBy scale f ((Parallel.runPasses false tw rest (topPasses tw logN x)).getD
@@ -641,37 +859,43 @@ theorem transform_eq [Field R] [DecidableEq R] (tw : Array (Array R)) (logN S : 
   obtain ⟨cs, hcs⟩ := hdiv
   have hcs0 : 0 < cs := Nat.pos_of_ne_zero (by rintro rfl; omega)
   have hcsM : 2 ^ m / S = cs := by rw [hcs, Nat.mul_div_cancel_left _ hS]
+  have hu' : 2 ^ (m + 4) < USize.size := by omega
   have hY : (topPasses tw (m + 4) x).size = 16 * 2 ^ m := by
     rw [topPasses, Parallel.size_step, Parallel.size_step, hx, hp]
-  let cols := (Array.range S).map fun s ↦ columnTask x tw (m + 4) (2 ^ m) cs (s * cs)
+  let cols := (Array.range S).map fun s ↦ encode (columnTask x tw (m + 4) (2 ^ m) cs (s * cs)) 0
   have hcolsz : cols.size = S := by simp only [cols, Array.size_map, Array.size_range]
   have hcol (s : Nat) (hs : s < S) :
       (columnTask x tw (m + 4) (2 ^ m) cs (s * cs)).size = 16 * cs ∧
         ColAgree (columnTask x tw (m + 4) (2 ^ m) cs (s * cs)) (topPasses tw (m + 4) x) 16 cs
           (2 ^ m) (s * cs) := by
-    have := columnTask_col x tw (m + 4) cs (s * cs) (by omega) hx htw hu (by
+    have := columnTask_col x tw (m + 4) cs (s * cs) (by omega) hx htw hu' (by
       rw [hm4, hcs]
       have := Nat.mul_le_mul_right cs (show s + 1 ≤ S by omega)
       rw [Nat.add_mul, Nat.one_mul] at this
       omega)
     rwa [hm4] at this
   have hcolsg (s : Nat) (hs : s < S) :
-      cols.getD s #[] = columnTask x tw (m + 4) (2 ^ m) cs (s * cs) :=
+      cols.getD s ByteArray.empty = encode (columnTask x tw (m + 4) (2 ^ m) cs (s * cs)) 0 :=
     getD_map_range _ S s hs _
+  have hcs16 : 16 * cs ≤ 16 * 2 ^ m := by
+    have : cs ≤ 2 ^ m := by rw [hcs]; exact Nat.le_mul_of_pos_left _ hS
+    omega
+  have henc (s : Nat) (hs : s < S) :=
+    encode_spec (columnTask x tw (m + 4) (2 ^ m) cs (s * cs)) 0 (by rw [(hcol s hs).1]; omega)
   have hleafIn (l : Nat) (hl : l < 16) :
-      gatherLeaf cols cs l = (topPasses tw (m + 4) x).extract (l * 2 ^ m) ((l + 1) * 2 ^ m) := by
+      (gatherLeaf cols cs l : Array R) =
+        (topPasses tw (m + 4) x).extract (l * 2 ^ m) ((l + 1) * 2 ^ m) := by
     have hlM : (l + 1) * 2 ^ m ≤ 16 * 2 ^ m := Nat.mul_le_mul_right _ (by omega)
     have hlc : l * cs + cs ≤ 16 * cs := by
       have := Nat.mul_le_mul_right cs (show l + 1 ≤ 16 by omega)
       rw [Nat.add_mul, Nat.one_mul] at this; exact this
-    obtain ⟨hgs, hgv⟩ := gatherLeaf_spec cols cs l
+    obtain ⟨hgs, hgv⟩ := gatherLeaf_spec (α := R) cols cs l
       (fun s hs ↦ by
         rw [hcolsz] at hs
-        rw [hcolsg s hs, (hcol s hs).1]; exact hlc)
+        rw [hcolsg s hs, (henc s hs).1, (hcol s hs).1]; omega)
       (fun s hs ↦ by
         rw [hcolsz] at hs
-        rw [hcolsg s hs, (hcol s hs).1]
-        have : cs ≤ 2 ^ m := by rw [hcs]; exact Nat.le_mul_of_pos_left _ hS
+        rw [hcolsg s hs, (henc s hs).1, (hcol s hs).1]
         rw [hp] at hu; omega)
       (by rw [hcolsz, ← hcs]; rw [hp] at hu; omega)
     apply Packed.array_eq_of_getD _ _ 0 (by
@@ -683,29 +907,37 @@ theorem transform_eq [Field R] [DecidableEq R] (tw : Array (Array R)) (logN S : 
         rw [Nat.div_lt_iff_lt_mul hcs0, ← hcs]; exact hk
       rw [getD_extract _ _ _ _ (by rw [Nat.succ_mul]; omega) (by omega), hkd,
         hgv _ (by rw [hcolsz]; exact hks) _ (Nat.mod_lt _ hcs0), hcolsg _ hks]
+      have hlk : l * cs + k % cs < (columnTask x tw (m + 4) (2 ^ m) cs (k / cs * cs)).size := by
+        rw [(hcol _ hks).1]; have := Nat.mod_lt k hcs0; omega
+      have he := (henc _ hks).2 _ hlk
+      rw [Nat.zero_add] at he
+      rw [he, Word32Repr.ofWord_toWord]
       exact (hcol _ hks).2 l hl (k % cs) (Nat.mod_lt _ hcs0)
     · rw [getD_of_size_le _ _ (by rw [hgs, hcolsz, ← hcs]; omega),
         getD_of_size_le _ _ (by rw [Array.size_extract_of_le (by omega), Nat.succ_mul]; omega)]
   have hZ : (Parallel.runPasses false tw rest (topPasses tw (m + 4) x)).size = 16 * 2 ^ m := by
     rw [Parallel.size_runPasses, hY]
+  let L := fun l ↦ reverseLeaf m scale f (Parallel.runPasses false tw rest
+    (gatherLeaf cols cs l : Array R))
   have hleaf (l : Nat) (hl : l < 16) :
-      (leafTask cols tw rest m cs l scale f).size = 2 ^ m ∧ ∀ j < 2 ^ m,
-        (leafTask cols tw rest m cs l scale f).getD j 0 = scaleBy scale f
+      (L l).size = 2 ^ m ∧ ∀ j < 2 ^ m,
+        (L l).getD j 0 = scaleBy scale f
           ((Parallel.runPasses false tw rest (topPasses tw (m + 4) x)).getD
             (l * 2 ^ m + NTT.Transform.bitRevNat m j) 0) := by
     have hlM : (l + 1) * 2 ^ m ≤ 16 * 2 ^ m := Nat.mul_le_mul_right _ (by omega)
-    have hb : (Parallel.runPasses false tw rest (gatherLeaf cols cs l)).size = 2 ^ m := by
+    have hb : (Parallel.runPasses false tw rest (gatherLeaf cols cs l : Array R)).size =
+        2 ^ m := by
       rw [Parallel.size_runPasses, hleafIn l hl, Array.size_extract_of_le (by omega),
         Nat.succ_mul]; omega
     obtain ⟨hs, hv⟩ := reverseLeaf_spec _ m scale f (by omega) (by omega) hb
-      (lt_of_le_of_lt (Nat.pow_le_pow_right (by omega) (by omega)) hu)
+      (lt_of_le_of_lt (Nat.pow_le_pow_right (by omega) (by omega)) hu')
     refine ⟨hs, fun j hj ↦ ?_⟩
-    rw [leafTask, hv j hj, hleafIn l hl, runPasses_extract tw rest _ _ 16 l hY hl hrest,
+    rw [hv j hj, hleafIn l hl, runPasses_extract tw rest _ _ 16 l hY hl hrest,
       getD_extract _ _ _ _ (by rw [Nat.succ_mul]; have := NTT.Transform.bitRevNat_lt m j; omega)
         (by rw [hZ]; omega)]
   have hT : (((Array.range 16).map fun l ↦ (joinTasks ((Array.range S).map fun s ↦
-      Task.spawn fun _ ↦ columnTask x tw (m + 4) (2 ^ (m + 4 - 4)) (2 ^ (m + 4 - 4) / S)
-        (s * (2 ^ (m + 4 - 4) / S)))).bind fun cols ↦ Task.spawn fun _ ↦
+      Task.spawn fun _ ↦ encode (columnTask x tw (m + 4) (2 ^ (m + 4 - 4)) (2 ^ (m + 4 - 4) / S)
+        (s * (2 ^ (m + 4 - 4) / S))) 0)).bind fun cols ↦ Task.spawn fun _ ↦
           leafTask cols tw rest (m + 4 - 4) (2 ^ (m + 4 - 4) / S) l scale f).map Task.get) =
       (Array.range 16).map fun l ↦ leafTask cols tw rest m cs l scale f := by
     simp only [Array.map_map, hm4, hcsM]
@@ -714,22 +946,34 @@ theorem transform_eq [Field R] [DecidableEq R] (tw : Array (Array R)) (logN S : 
     change leafTask (joinTasks _).get tw rest m cs l scale f = _
     rw [joinTasks_get, Array.map_map]
     rfl
+  have hL (l : Nat) (hl : l < 16) := encode_spec (L l) (16 * l) (by rw [(hleaf l hl).1]; omega)
   unfold transform
   dsimp only
   rw [hT, hm4]
-  let V := fun l ↦ ((Array.range 16).map fun l ↦ leafTask cols tw rest m cs l scale f).getD l #[]
-  obtain ⟨has, hav⟩ := assembleGo_spec V (2 ^ m) (2 ^ m) 0 (Array.replicate (16 * 2 ^ m) 0)
-    (by omega) Array.size_replicate
-  have hV (l : Nat) (hl : l < 16) : V l = leafTask cols tw rest m cs l scale f :=
+  let r := (Array.range 16).map fun l ↦ leafTask cols tw rest m cs l scale f
+  have hr16 : r.size = 16 := by simp only [r, Array.size_map, Array.size_range]
+  have hrg (l : Nat) (hl : l < 16) : r.getD l ByteArray.empty = encode (L l) (16 * l) :=
     getD_map_range _ 16 l hl _
-  change assembleGo (V 0) (V 1) (V 2) (V 3) (V 4) (V 5) (V 6) (V 7) (V 8) (V 9) (V 10) (V 11)
-    (V 12) (V 13) (V 14) (V 15) 0 (2 ^ m) (Array.replicate (16 * 2 ^ m) 0) = _
+  have hrs (l : Nat) (hl : l < 16) : (r[l]'(by omega)).size = 4 * (16 * l + 2 ^ m) := by
+    rw [getElem_eq_getD _ _ _ ByteArray.empty, hrg l hl, (hL l hl).1, (hleaf l hl).1]
+  have hMu : 2 ^ m < USize.size := by omega
+  have hg : 2 ^ m < USize.size ∧ ∃ hr : r.size = 16, ∀ l (h : l < 16),
+      4 * (16 * l + 2 ^ m) ≤ (r[l]'(by omega)).size ∧ (r[l]'(by omega)).size < USize.size :=
+    ⟨hMu, hr16, fun l hl ↦ ⟨by rw [hrs l hl], by rw [hrs l hl]; omega⟩⟩
+  change assemble r (2 ^ m) = _
+  unfold assemble
+  rw [dite_eq_left_of_eq_true (eq_true hg)]
+  obtain ⟨has, hav⟩ := assembleGo_spec (α := R) r (USize.ofNatLT (2 ^ m) hg.1) hg.2.1 _
+    (by simp only [USize.toNat_ofNatLT]; omega) _ 0 (Array.replicate (16 * 2 ^ m) 0) rfl
+    (by simp only [Array.size_replicate, USize.toNat_ofNatLT])
+  simp only [USize.toNat_ofNatLT, USize.toNat_zero, Nat.mul_zero] at has hav
   apply Packed.array_eq_of_getD _ _ 0 (by rw [has, Array.size_ofFn, hp])
   intro k
   by_cases hk : k < 16 * 2 ^ m
   · have hb := NTT.Transform.bitRevNat_lt 4 (k % 16)
     rw [hav k, ite_eq_left_of_eq_true _ _ (eq_true ⟨Nat.zero_le _, hk⟩),
-      Packed.getD_ofFn_bounded _ _ (by rw [hp]; exact hk), hV _ hb,
+      Packed.getD_ofFn_bounded _ _ (by rw [hp]; exact hk), hrg _ hb,
+      (hL _ hb).2 _ (by rw [(hleaf _ hb).1]; omega), Word32Repr.ofWord_toWord,
       (hleaf _ hb).2 _ (by omega)]
     have hc := Packed.bitRevNat_concat m 4 (k / 16) (k % 16) (Nat.mod_lt _ (by decide))
     rw [show 2 ^ 4 * (k / 16) + k % 16 = k by omega] at hc

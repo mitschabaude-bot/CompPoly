@@ -193,3 +193,7 @@ multilinear, and those have the dense codec.
 For a variable-length type, give it `DelimitedCodec` instead, built from the list, pair, and
 vector codecs, with `Valid` stating what fits in the framing, and prove the one law from the
 laws of the parts.
+
+## Raw words for task transfer
+
+`Word32Repr R` (`CompPoly/Data/Bytes/Words.lean`) is not a codec of the value: it stores a carrier's raw 32-bit word, for example the Montgomery residue of `Native32.FastField`, with the single law `ofWord (toWord x) = x`. The parallel NTT uses it to hand field arrays between tasks as `ByteArray`s, which the runtime shares at constant cost, unlike arrays of boxed values. The same file provides the word layer: `wordAt` reads a little-endian word, `readWordU`, `readWord` and `writeWordU` access it with the core byte operations only, and `buffer` allocates by doubling copies.

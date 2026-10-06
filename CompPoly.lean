@@ -357,6 +357,7 @@ public import CompPoly.Univariate.NTTFast.FastMul
 public import CompPoly.Univariate.NTTFast.FastMulLow
 public import CompPoly.Univariate.NTTFast.Interpolation
 public import CompPoly.Univariate.NTTFast.Natural
+public import CompPoly.Univariate.NTTFast.NaturalParallel
 public import CompPoly.Univariate.NTTFast.Packed.Arithmetic
 public import CompPoly.Univariate.NTTFast.Packed.ArrayLemmas
 public import CompPoly.Univariate.NTTFast.Packed.Arrays
