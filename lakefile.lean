@@ -75,6 +75,3 @@ lean_exe axiomsweep where
   srcDir := "scripts"
   root := `AxiomSweep
   supportInterpreter := true
-lean_exe ScratchNTTPhases where
-  srcDir := "bench"
-  moreLeancArgs := #["-march=native"]
