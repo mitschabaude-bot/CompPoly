@@ -51,7 +51,8 @@ def main (args : List String) : IO UInt32 := do
     if workers == 0 then throw <| IO.userError "LEAN_NUM_THREADS must be positive"
     let logWorkers := workers.log2
     let variant := (← IO.getEnv "COMPPOLY_NTT_IMPL").getD "packed"
-    let depth := ((← IO.getEnv "NTT_DEPTH").bind String.toNat?).getD 4
+    let depth := ((← IO.getEnv "NTT_DEPTH").bind String.toNat?).getD
+      (CPolynomial.NTTFast.Packed.Plan.defaultDepth logN)
     have h32 : domain.logN ≤ 32 := by
       change logN ≤ 32
       have : KoalaBear.twoAdicity = 24 := rfl

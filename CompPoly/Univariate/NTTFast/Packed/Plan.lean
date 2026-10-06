@@ -65,22 +65,31 @@ theorem load_eq (P : Plan) (a : Array KoalaBear.Fast.Field) :
   · exact (loadNaturalArray_eq_self P.domain a ‹_›).symm
   · exact NTTFast.tabulate_eq _
 
+/-- Default parallel split depth: serial up to `2 ^ 12` elements, four leaves up to
+`2 ^ 14`, sixteen leaves above. Smaller trees avoid task overhead on small inputs. -/
+def defaultDepth (logN : Nat) : Nat :=
+  if logN ≤ 12 then 0 else if logN ≤ 14 then 2 else 4
+
 /-- Complete natural-order forward transform; `depth` bounds the parallel split tree. -/
-@[inline] def forward (P : Plan) (a : Array KoalaBear.Fast.Field) (depth : Nat := 4) :
+@[inline] def forward (P : Plan) (a : Array KoalaBear.Fast.Field)
+    (depth : Nat := defaultDepth P.domain.logN) :
     Array KoalaBear.Fast.Field :=
   Native.runFields P.forwardTwiddles P.domain.logN depth P.nInv.val (P.load a) false
 
 /-- Complete natural-order inverse, including normalization inside workers when possible. -/
-@[inline] def inverse (P : Plan) (a : Array KoalaBear.Fast.Field) (depth : Nat := 4) :
+@[inline] def inverse (P : Plan) (a : Array KoalaBear.Fast.Field)
+    (depth : Nat := defaultDepth P.domain.logN) :
     Array KoalaBear.Fast.Field :=
   Native.runFields P.inverseTwiddles P.domain.logN depth P.nInv.val (P.load a) true
 
 /-- Natural-order forward transform of `n` packed Montgomery words. -/
-@[inline] def forwardPacked (P : Plan) (a : ByteArray) (depth : Nat := 4) : ByteArray :=
+@[inline] def forwardPacked (P : Plan) (a : ByteArray)
+    (depth : Nat := defaultDepth P.domain.logN) : ByteArray :=
   Native.runPacked P.forwardTwiddles P.domain.logN depth P.nInv.val a false
 
 /-- Natural-order inverse transform of `n` packed Montgomery words, including normalization. -/
-@[inline] def inversePacked (P : Plan) (a : ByteArray) (depth : Nat := 4) : ByteArray :=
+@[inline] def inversePacked (P : Plan) (a : ByteArray)
+    (depth : Nat := defaultDepth P.domain.logN) : ByteArray :=
   Native.runPacked P.inverseTwiddles P.domain.logN depth P.nInv.val a true
 
 private theorem forwardSpec_load [Field R] (D : NTT.Domain R) (a : Array R) :

@@ -39,8 +39,8 @@ def run(args, common, allowed):
     rust = common.ROOT / "bench/rust/target/release/comppoly-field-bench"
     os.sched_setaffinity(0, set(cpus))
     runtime_env = dict(os.environ, LEAN_NUM_THREADS=str(workers), RAYON_NUM_THREADS=str(workers))
-    depth = int(runtime_env.get("NTT_DEPTH", "4"))
-    if depth < 0:
+    depth = runtime_env.get("NTT_DEPTH", "Plan.defaultDepth")
+    if depth != "Plan.defaultDepth" and int(depth) < 0:
         raise SystemExit("NTT_DEPTH must be nonnegative")
     rust_ntt = json.loads(subprocess.check_output([str(rust), "--ntt", "--info"], env=runtime_env, text=True))
     if rust_ntt["workers"] != workers:
