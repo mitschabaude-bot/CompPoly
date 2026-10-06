@@ -8,8 +8,6 @@ module
 public import Init
 import Mathlib.Tactic.SplitIfs
 
-universe u
-
 /-!
 # 32-bit words in byte arrays
 
@@ -24,6 +22,8 @@ stores its residue as is.
 -/
 
 @[expose] public section
+
+universe u
 
 namespace CompPoly
 
@@ -173,8 +173,10 @@ theorem wordAt_writeWordU (b : ByteArray) (k : USize) (v : UInt32)
       Nat.reduceEqDiff, Nat.succ_ne_zero]
     exact recombine v
   · rw [ite_eq_right_of_eq_false _ _ (eq_false hj),
-      byteAt_writeWordU_of_lt _ _ _ _ _ _ (by omega), byteAt_writeWordU_of_lt _ _ _ _ _ _ (by omega),
-      byteAt_writeWordU_of_lt _ _ _ _ _ _ (by omega), byteAt_writeWordU_of_lt _ _ _ _ _ _ (by omega)]
+      byteAt_writeWordU_of_lt _ _ _ _ _ _ (by omega),
+      byteAt_writeWordU_of_lt _ _ _ _ _ _ (by omega),
+      byteAt_writeWordU_of_lt _ _ _ _ _ _ (by omega),
+      byteAt_writeWordU_of_lt _ _ _ _ _ _ (by omega)]
 
 theorem size_copySlice_self (b : ByteArray) (len : Nat) (hl : len ≤ b.size) :
     (b.copySlice 0 b b.size len).size = b.size + len := by
