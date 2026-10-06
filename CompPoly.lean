@@ -342,6 +342,8 @@ public import CompPoly.Univariate.NTT.KoalaBear
 public import CompPoly.Univariate.NTT.Transform
 public import CompPoly.Univariate.NTTFast.Butterfly
 public import CompPoly.Univariate.NTTFast.ButterflyDIT
+public import CompPoly.Univariate.NTTFast.Columns
+public import CompPoly.Univariate.NTTFast.ColumnsCorrectness
 public import CompPoly.Univariate.NTTFast.Correctness
 public import CompPoly.Univariate.NTTFast.Correctness.Basic
 public import CompPoly.Univariate.NTTFast.Correctness.DIF
@@ -360,7 +362,6 @@ public import CompPoly.Univariate.NTTFast.Packed.ArrayLemmas
 public import CompPoly.Univariate.NTTFast.Packed.Arrays
 public import CompPoly.Univariate.NTTFast.Packed.BatchBuilders
 public import CompPoly.Univariate.NTTFast.Packed.BatchCorrectness
-public import CompPoly.Univariate.NTTFast.Packed.BitReverse
 public import CompPoly.Univariate.NTTFast.Packed.Builders
 public import CompPoly.Univariate.NTTFast.Packed.ButterflyLemmas
 public import CompPoly.Univariate.NTTFast.Packed.Correctness
@@ -416,6 +417,7 @@ public import CompPoly.Univariate.NTTFast.Packed.Twiddles
 public import CompPoly.Univariate.NTTFast.Parallel
 public import CompPoly.Univariate.NTTFast.Permutation
 public import CompPoly.Univariate.NTTFast.Plan
+public import CompPoly.Univariate.NTTFast.Reverse32
 public import CompPoly.Univariate.Quotient.Core
 public import CompPoly.Univariate.Quotient.Equiv
 public import CompPoly.Univariate.Raw

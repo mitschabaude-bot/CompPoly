@@ -1,0 +1,740 @@
+/-
+Copyright (c) 2026 CompPoly Contributors. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Gregor Mitscha-Baude
+-/
+module
+
+import all CompPoly.Univariate.NTTFast.Plan
+import all CompPoly.Univariate.NTTFast.Columns
+public import CompPoly.Univariate.NTTFast.Columns
+public import CompPoly.Univariate.NTTFast.Packed.Radix4Lemmas
+import Mathlib.Tactic.Ring
+import CompPoly.Univariate.NTTFast.Packed.ArrayLemmas
+import CompPoly.Univariate.NTTFast.Packed.TiledPermutation
+import all CompPoly.Univariate.NTTFast.Correctness.Basic
+
+/-! # Correctness of the column-parallel transform
+
+The copies are characterized by their entries. Each radix-four pass has a coordinate formula
+in row/column form, so the top two passes commute with gathering a column range: the column
+tasks compute exactly the gathered columns of the global passes.
+-/
+
+@[expose] public section
+namespace CompPoly.CPolynomial.NTTFast.Columns
+
+variable {α R : Type*}
+
+/-- An unchecked read is the entry at its index. -/
+theorem uget_eq_getD (a : Array α) (j : USize) (h : j.toNat < a.size) (d : α) (n : Nat)
+    (hn : j.toNat = n) : a.uget j h = a.getD n d := by
+  subst hn
+  simp only [Array.uget, Array.getD_eq_getD_getElem?, Array.getElem?_eq_getElem h,
+    Option.getD_some]
+
+/-- An unchecked write changes exactly its index. -/
+theorem getD_uset (a : Array α) (j : USize) (v : α) (h : j.toNat < a.size) (i : Nat) (d : α) :
+    (a.uset j v h).getD i d = if j.toNat = i then v else a.getD i d := by
+  simp only [Array.uset, Array.getD_eq_getD_getElem?, Array.getElem?_set]
+  split <;> rfl
+
+/-- The copy loop keeps the size and writes the remaining range. -/
+theorem copyGo_spec (src : Array α) (si di cnt : USize) (d : α) :
+    ∀ (m : Nat) (k : USize) (dst : Array α) (hk hs hd hu), cnt.toNat - k.toNat = m →
+      (copyGo src si di cnt k dst hk hs hd hu).size = dst.size ∧
+      ∀ i, (copyGo src si di cnt k dst hk hs hd hu).getD i d =
+        if di.toNat + k.toNat ≤ i ∧ i < di.toNat + cnt.toNat then
+          src.getD (si.toNat + (i - di.toNat)) d
+        else dst.getD i d := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  intro m
+  induction m with
+  | zero =>
+    intro k dst hk hs hd hu hm
+    have hk' := USize.le_iff_toNat_le.mp hk
+    rw [copyGo]
+    have hnot : ¬k < cnt := by rw [USize.lt_iff_toNat_lt]; omega
+    simp only [hnot, ↓reduceDIte, true_and]
+    intro i
+    rw [ite_eq_right_of_eq_false _ _ (eq_false (by omega))]
+  | succ m ih =>
+    intro k dst hk hs hd hu hm
+    have hk' := USize.le_iff_toNat_le.mp hk
+    have hlt : k < cnt := by rw [USize.lt_iff_toNat_lt]; omega
+    have hcs := cnt.toNat_lt_size
+    have hds := di.toNat_lt_size
+    have ha : (si + k).toNat = si.toNat + k.toNat := by
+      rw [USize.toNat_add]; exact Nat.mod_eq_of_lt (by omega)
+    have hb : (di + k).toNat = di.toNat + k.toNat := by
+      rw [USize.toNat_add]; exact Nat.mod_eq_of_lt (by omega)
+    have hk1 : (k + 1).toNat = k.toNat + 1 := Plan.usize_add_one k (by omega)
+    rw [copyGo]
+    simp only [hlt, ↓reduceDIte]
+    obtain ⟨h1, h2⟩ := ih (k + 1) _ _ _ _ _ (by rw [hk1]; omega)
+    refine ⟨by rw [h1, Array.size_uset], fun i ↦ ?_⟩
+    rw [h2 i, hk1, getD_uset, hb]
+    split_ifs <;> first
+      | rfl
+      | omega
+      | (rw [uget_eq_getD _ _ _ d _ ha]; congr 1; omega)
+
+/-- A guarded range copy writes exactly its range. -/
+theorem copyRange_getD (src : Array α) (si : Nat) (dst : Array α) (di cnt : Nat) (d : α)
+    (h : si + cnt ≤ src.size ∧ di + cnt ≤ dst.size ∧ src.size < USize.size ∧
+      dst.size < USize.size) (i : Nat) :
+    (copyRange src si dst di cnt).getD i d =
+      if di ≤ i ∧ i < di + cnt then src.getD (si + (i - di)) d else dst.getD i d := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  unfold copyRange
+  rw [dite_eq_left_of_eq_true (eq_true h)]
+  obtain ⟨_, h2⟩ := copyGo_spec src (USize.ofNatLT si (by omega)) (USize.ofNatLT di (by omega))
+    (USize.ofNatLT cnt (by omega)) d _ 0 dst (by simp only [USize.zero_le])
+    (by simp only [USize.toNat_ofNatLT]; omega) (by simp only [USize.toNat_ofNatLT]; omega)
+    ⟨h.2.2.1, h.2.2.2⟩ rfl
+  rw [h2 i]
+  simp only [USize.toNat_ofNatLT, USize.toNat_zero, Nat.add_zero]
+
+/-- The copy loop keeps the destination size. -/
+theorem size_copyGo (src : Array α) (si di cnt : USize) :
+    ∀ (m : Nat) (k : USize) (dst : Array α) (hk hs hd hu), cnt.toNat - k.toNat = m →
+      (copyGo src si di cnt k dst hk hs hd hu).size = dst.size := by
+  intro m
+  induction m with
+  | zero =>
+    intro k dst hk hs hd hu hm
+    have hk' := USize.le_iff_toNat_le.mp hk
+    rw [copyGo]
+    have hnot : ¬k < cnt := by rw [USize.lt_iff_toNat_lt]; omega
+    simp only [hnot, ↓reduceDIte]
+  | succ m ih =>
+    intro k dst hk hs hd hu hm
+    have hk' := USize.le_iff_toNat_le.mp hk
+    have hlt : k < cnt := by rw [USize.lt_iff_toNat_lt]; omega
+    have hk1 : (k + 1).toNat = k.toNat + 1 := Plan.usize_add_one k (by
+      have := cnt.toNat_lt_size; omega)
+    rw [copyGo]
+    simp only [hlt, ↓reduceDIte]
+    rw [ih (k + 1) _ _ _ _ _ (by rw [hk1]; omega), Array.size_uset]
+
+/-- A range copy keeps the destination size. -/
+@[simp] theorem size_copyRange (src : Array α) (si : Nat) (dst : Array α) (di cnt : Nat) :
+    (copyRange src si dst di cnt).size = dst.size := by
+  unfold copyRange
+  split
+  · exact size_copyGo src _ _ _ _ 0 dst _ _ _ _ rfl
+  · rfl
+
+/-- Copying range `k` of source `k` to row `k` of a fresh array, for every `k < r`. -/
+theorem foldl_copy_spec [Zero α] (src : Nat → Array α) (si : Nat → Nat) (cs r : Nat)
+    (hsrc : ∀ k < r, si k + cs ≤ (src k).size) (hu : ∀ k < r, (src k).size < USize.size)
+    (hr : r * cs < USize.size) :
+    ((List.range r).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
+        (Array.replicate (r * cs) 0)).size = r * cs ∧
+      ∀ k < r, ∀ c < cs,
+        ((List.range r).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
+          (Array.replicate (r * cs) 0)).getD (k * cs + c) 0 = (src k).getD (si k + c) 0 := by
+  suffices h : ∀ t ≤ r,
+      ((List.range t).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
+        (Array.replicate (r * cs) 0)).size = r * cs ∧
+      ∀ k < t, ∀ c < cs,
+        ((List.range t).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
+          (Array.replicate (r * cs) 0)).getD (k * cs + c) 0 = (src k).getD (si k + c) 0 by
+    exact h r (Nat.le_refl r)
+  intro t
+  induction t with
+  | zero => intro _; simp only [List.range_zero, List.foldl_nil, Array.size_replicate,
+      Nat.not_lt_zero, false_imp_iff, implies_true, and_self]
+  | succ t ih =>
+    intro ht
+    obtain ⟨hsz, hval⟩ := ih (by omega)
+    rw [List.range_succ, List.foldl_append, List.foldl_cons, List.foldl_nil]
+    have hcopy : t * cs + cs ≤ r * cs := by
+      have := Nat.mul_le_mul_right cs (show t + 1 ≤ r by omega)
+      rw [Nat.add_mul, Nat.one_mul] at this
+      exact this
+    have hg : si t + cs ≤ (src t).size ∧ t * cs + cs ≤
+        ((List.range t).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
+          (Array.replicate (r * cs) 0)).size ∧ (src t).size < USize.size ∧
+        ((List.range t).foldl (fun acc k ↦ copyRange (src k) (si k) acc (k * cs) cs)
+          (Array.replicate (r * cs) 0)).size < USize.size := by
+      rw [hsz]
+      exact ⟨hsrc t (by omega), hcopy, hu t (by omega), hr⟩
+    refine ⟨by rw [size_copyRange, hsz], fun k hk c hc ↦ ?_⟩
+    rw [copyRange_getD _ _ _ _ _ _ hg]
+    by_cases hkt : k = t
+    · subst k
+      rw [ite_eq_left (by omega), show t * cs + c - t * cs = c by omega]
+    · have hlt : k * cs + c < t * cs := by
+        have := Nat.mul_le_mul_right cs (show k + 1 ≤ t by omega)
+        rw [Nat.add_mul, Nat.one_mul] at this
+        omega
+      rw [ite_eq_right (by omega)]
+      exact hval k (by omega) c hc
+
+/-- Gathered rows have the requested shape and entries. -/
+theorem gatherRows_spec [Zero α] (src : Array α) (M j0 cs r : Nat)
+    (hsrc : ∀ k < r, k * M + j0 + cs ≤ src.size)
+    (hu : src.size < USize.size ∧ r * cs < USize.size) :
+    (gatherRows src M j0 cs r).size = r * cs ∧
+      ∀ k < r, ∀ c < cs, (gatherRows src M j0 cs r).getD (k * cs + c) 0 =
+        src.getD (k * M + (j0 + c)) 0 := by
+  obtain ⟨h1, h2⟩ := foldl_copy_spec (fun _ ↦ src) (fun k ↦ k * M + j0) cs r hsrc
+    (fun _ _ ↦ hu.1) hu.2
+  exact ⟨h1, fun k hk c hc ↦ by rw [← Nat.add_assoc]; exact h2 k hk c hc⟩
+
+/-- Row `l` of every column result, in column order. -/
+theorem gatherLeaf_spec [Zero α] (cols : Array (Array α)) (cs l : Nat)
+    (hsrc : ∀ s < cols.size, l * cs + cs ≤ (cols.getD s #[]).size)
+    (hu : ∀ s < cols.size, (cols.getD s #[]).size < USize.size)
+    (hr : cols.size * cs < USize.size) :
+    (gatherLeaf cols cs l).size = cols.size * cs ∧
+      ∀ s < cols.size, ∀ c < cs, (gatherLeaf cols cs l).getD (s * cs + c) 0 =
+        (cols.getD s #[]).getD (l * cs + c) 0 :=
+  foldl_copy_spec (fun s ↦ cols.getD s #[]) (fun _ ↦ l * cs) cs cols.size hsrc hu hr
+
+/-- Joining tasks keeps their results in order. -/
+theorem joinTasks_get (ts : Array (Task α)) : (joinTasks ts).get = ts.map Task.get := by
+  suffices h : ∀ (l : List (Task α)) (acc : Task (Array α)),
+      (l.foldl (fun acc t ↦ acc.bind (sync := true) fun xs ↦
+        t.map (sync := true) fun x ↦ xs.push x) acc).get = acc.get ++ (l.map Task.get).toArray by
+    rw [joinTasks, ← Array.foldl_toList, h]
+    apply Array.toList_inj.mp
+    simp
+  intro l
+  induction l with
+  | nil => intro acc; simp
+  | cons t l ih =>
+    intro acc
+    rw [List.foldl_cons, ih]
+    apply Array.toList_inj.mp
+    simp [Task.bind, Task.map]
+
+/-- Component `t` of a radix-four cell's outputs. -/
+def qsel (t : Nat) (o : R × R × R × R) : R :=
+  match t with
+  | 0 => o.1
+  | 1 => o.2.1
+  | 2 => o.2.2.1
+  | _ => o.2.2.2
+
+open Packed in
+/-- Output `t` at lane `o` of one block of radix-four cells. -/
+theorem inner_getD [Field R] (th tl : Array R) (q base : Nat) (a : Array R)
+    (hs : base + 4 * q ≤ a.size) (t o : Nat) (ht : t < 4) (ho : o < q) :
+    (Plan.butterflyDIFRadix4Inner th tl q 0 base (base + q) (base + 2 * q) (base + 3 * q)
+      a).getD (base + t * q + o) 0 =
+      qsel t (quadOutputs (th.getD o 0) (th.getD (o + q) 0) (tl.getD o 0) (a.getD (base + o) 0)
+        (a.getD (base + q + o) 0) (a.getD (base + 2 * q + o) 0) (a.getD (base + 3 * q + o) 0)) := by
+  rw [getD_butterflyDIFRadix4Inner _ _ _ _ _ _ _ _ _ (by omega) (by omega) (by omega)
+    (by omega)]
+  simp only [quadValue, quadAt, Nat.zero_add]
+  interval_cases t
+  · rw [ite_eq_left (by omega), show base + 0 * q + o - base = o by omega]
+    simp only [qsel, Nat.add_assoc]
+  · rw [ite_eq_right (by omega), ite_eq_left (by omega),
+      show base + 1 * q + o - (base + q) = o by omega]
+    simp only [qsel, Nat.add_assoc]
+  · rw [ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_left (by omega),
+      show base + 2 * q + o - (base + 2 * q) = o by omega]
+    simp only [qsel, Nat.add_assoc]
+  · rw [ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega),
+      ite_eq_left (by omega), show base + 3 * q + o - (base + 3 * q) = o by omega]
+    simp only [qsel, Nat.add_assoc]
+
+open Packed in
+/-- One block of radix-four cells leaves every entry outside the block unchanged. -/
+theorem inner_frame [Field R] (th tl : Array R) (q base : Nat) (a : Array R)
+    (hs : base + 4 * q ≤ a.size) (k : Nat) (hk : k < base ∨ base + 4 * q ≤ k) :
+    (Plan.butterflyDIFRadix4Inner th tl q 0 base (base + q) (base + 2 * q) (base + 3 * q)
+      a).getD k 0 = a.getD k 0 := by
+  rw [getD_butterflyDIFRadix4Inner _ _ _ _ _ _ _ _ _ (by omega) (by omega) (by omega)
+    (by omega)]
+  simp only [quadValue]
+  rw [ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega),
+    ite_eq_right (by omega)]
+
+open Packed in
+/-- Coordinates of a run of radix-four blocks of `4 * q` entries: output `t` at lane `o` of
+block `b ≥ block` is the cell of block `b`'s quarters; earlier blocks are unchanged. -/
+theorem blocks_getD [Field R] (th tl : Array R) (q blocks : Nat) :
+    ∀ (block : Nat) (a : Array R), a.size = blocks * (4 * q) →
+      (∀ b, block ≤ b → b < blocks → ∀ t < 4, ∀ o < q,
+        (Plan.butterflyDIFRadix4Blocks th tl (4 * q) q blocks block a).getD
+          (b * (4 * q) + t * q + o) 0 =
+        qsel t (quadOutputs (th.getD o 0) (th.getD (o + q) 0) (tl.getD o 0)
+          (a.getD (b * (4 * q) + o) 0) (a.getD (b * (4 * q) + q + o) 0)
+          (a.getD (b * (4 * q) + 2 * q + o) 0) (a.getD (b * (4 * q) + 3 * q + o) 0))) ∧
+      ∀ k < block * (4 * q),
+        (Plan.butterflyDIFRadix4Blocks th tl (4 * q) q blocks block a).getD k 0 = a.getD k 0 := by
+  intro block
+  induction h : blocks - block generalizing block with
+  | zero =>
+    intro a _
+    rw [Plan.butterflyDIFRadix4Blocks, ite_eq_right (by omega)]
+    exact ⟨fun b hb hb' ↦ absurd hb' (by omega), fun _ _ ↦ rfl⟩
+  | succ n ih =>
+    intro a ha
+    have hlt : block < blocks := by omega
+    rw [Plan.butterflyDIFRadix4Blocks, ite_eq_left hlt]
+    have hb1 : (block + 1) * (4 * q) ≤ blocks * (4 * q) := Nat.mul_le_mul_right _ hlt
+    have hb2 : (block + 1) * (4 * q) = block * (4 * q) + 4 * q := Nat.succ_mul _ _
+    have hsz : block * (4 * q) + 4 * q ≤ a.size := by omega
+    have hs' : (Plan.butterflyDIFRadix4Inner th tl q 0 (block * (4 * q))
+        (block * (4 * q) + q) (block * (4 * q) + 2 * q) (block * (4 * q) + 3 * q) a).size =
+        blocks * (4 * q) := by rw [Plan.size_butterflyDIFRadix4Inner, ha]
+    obtain ⟨ihA, ihB⟩ := ih (block + 1) (by omega) _ hs'
+    have hframe := inner_frame th tl q (block * (4 * q)) a hsz
+    refine ⟨fun b hb hb' t ht o ho ↦ ?_, fun k hk ↦ ?_⟩
+    · rcases Nat.eq_or_lt_of_le hb with rfl | hgt
+      · rw [ihB _ (by
+          have : t * q + o < 4 * q := by
+            have := Nat.mul_le_mul_right q (show t + 1 ≤ 4 by omega)
+            rw [Nat.succ_mul] at this; omega
+          omega)]
+        exact inner_getD th tl q _ a hsz t o ht ho
+      · have hge : (block + 1) * (4 * q) ≤ b * (4 * q) := Nat.mul_le_mul_right _ hgt
+        rw [ihA b hgt hb' t ht o ho]
+        rw [hframe _ (by omega), hframe _ (by omega), hframe _ (by omega), hframe _ (by omega)]
+    · rw [ihB k (by omega), hframe k (by omega)]
+
+open Packed in
+/-- The first top pass in row/column coordinates: sixteen rows of length `L`, entry
+`(4 u + v, col)` is output `u` of the cell on rows `v, v + 4, v + 8, v + 12`. -/
+theorem passA_getD [Field R] [DecidableEq R] (th tl Z : Array R) (L : Nat)
+    (hZ : Z.size = 16 * L) (u v col : Nat) (hu : u < 4) (hv : v < 4) (hc : col < L) :
+    (Plan.stageBlocksDIF th tl (4 * (4 * L)) (4 * L) 1 0 Z).getD ((4 * u + v) * L + col) 0 =
+      qsel u (quadOutputs (th.getD (v * L + col) 0) (th.getD ((v + 4) * L + col) 0)
+        (tl.getD (v * L + col) 0) (Z.getD (v * L + col) 0) (Z.getD ((v + 4) * L + col) 0)
+        (Z.getD ((v + 8) * L + col) 0) (Z.getD ((v + 12) * L + col) 0)) := by
+  rw [Plan.stageBlocksDIF_eq, Plan.checkedBlocks_eq]
+  have hv' : v * L + col < 4 * L := by
+    have := Nat.mul_le_mul_right L (show v + 1 ≤ 4 by omega)
+    rw [Nat.add_mul, Nat.one_mul] at this; omega
+  rw [show (4 * u + v) * L + col = 0 * (4 * (4 * L)) + u * (4 * L) + (v * L + col) by ring,
+    (blocks_getD th tl (4 * L) 1 0 Z (by omega)).1 0 le_rfl one_pos u hu _ hv']
+  rw [show v * L + col + 4 * L = (v + 4) * L + col by ring,
+    show 0 * (4 * (4 * L)) + (v * L + col) = v * L + col by ring,
+    show 0 * (4 * (4 * L)) + 4 * L + (v * L + col) = (v + 4) * L + col by ring,
+    show 0 * (4 * (4 * L)) + 2 * (4 * L) + (v * L + col) = (v + 8) * L + col by ring,
+    show 0 * (4 * (4 * L)) + 3 * (4 * L) + (v * L + col) = (v + 12) * L + col by ring]
+
+open Packed in
+/-- The second top pass in row/column coordinates: entry `(4 u + v, col)` is output `v` of
+the cell on rows `4 u, …, 4 u + 3`. -/
+theorem passB_getD [Field R] [DecidableEq R] (th tl Z : Array R) (L : Nat)
+    (hZ : Z.size = 16 * L) (u v col : Nat) (hu : u < 4) (hv : v < 4) (hc : col < L) :
+    (Plan.stageBlocksDIF th tl (4 * L) L 4 0 Z).getD ((4 * u + v) * L + col) 0 =
+      qsel v (quadOutputs (th.getD (0 * L + col) 0) (th.getD (1 * L + col) 0)
+        (tl.getD (0 * L + col) 0)
+        (Z.getD (4 * u * L + col) 0) (Z.getD ((4 * u + 1) * L + col) 0)
+        (Z.getD ((4 * u + 2) * L + col) 0) (Z.getD ((4 * u + 3) * L + col) 0)) := by
+  rw [Plan.stageBlocksDIF_eq, Plan.checkedBlocks_eq]
+  rw [show (4 * u + v) * L + col = u * (4 * L) + v * L + col by ring,
+    (blocks_getD th tl L 4 0 Z (by omega)).1 u (Nat.zero_le _) hu v hv col hc]
+  simp only [Nat.zero_mul, Nat.zero_add, Nat.one_mul]
+  rw [show col + L = L + col by ring,
+    show u * (4 * L) + col = 4 * u * L + col by ring,
+    show u * (4 * L) + L + col = (4 * u + 1) * L + col by ring,
+    show u * (4 * L) + 2 * L + col = (4 * u + 2) * L + col by ring,
+    show u * (4 * L) + 3 * L + col = (4 * u + 3) * L + col by ring]
+
+/-- `l` holds rows `0, …, rows - 1` of the `M`-column matrix `g`, restricted to the columns
+`j0, …, j0 + cs - 1`. -/
+def ColAgree [Zero α] (l g : Array α) (rows cs M j0 : Nat) : Prop :=
+  ∀ r < rows, ∀ c < cs, l.getD (r * cs + c) 0 = g.getD (r * M + (j0 + c)) 0
+
+/-- The first top pass commutes with restricting to a column range. -/
+theorem passA_col [Field R] [DecidableEq R] (thl tll Zl thg tlg Zg : Array R) (cs M j0 : Nat)
+    (hl : Zl.size = 16 * cs) (hg : Zg.size = 16 * M) (hj : j0 + cs ≤ M)
+    (hZ : ColAgree Zl Zg 16 cs M j0) (hth : ColAgree thl thg 8 cs M j0)
+    (htl : ColAgree tll tlg 4 cs M j0) :
+    ColAgree (Plan.stageBlocksDIF thl tll (4 * (4 * cs)) (4 * cs) 1 0 Zl)
+      (Plan.stageBlocksDIF thg tlg (4 * (4 * M)) (4 * M) 1 0 Zg) 16 cs M j0 := by
+  intro r hr c hc
+  obtain ⟨u, v, rfl, hu, hv⟩ : ∃ u v, r = 4 * u + v ∧ u < 4 ∧ v < 4 :=
+    ⟨r / 4, r % 4, by omega, by omega, by omega⟩
+  rw [passA_getD _ _ _ _ hl u v c hu hv hc, passA_getD _ _ _ _ hg u v (j0 + c) hu hv (by omega),
+    hZ v (by omega) c hc, hZ (v + 4) (by omega) c hc, hZ (v + 8) (by omega) c hc,
+    hZ (v + 12) (by omega) c hc, hth v (by omega) c hc, hth (v + 4) (by omega) c hc,
+    htl v (by omega) c hc]
+
+/-- The second top pass commutes with restricting to a column range. -/
+theorem passB_col [Field R] [DecidableEq R] (thl tll Zl thg tlg Zg : Array R) (cs M j0 : Nat)
+    (hl : Zl.size = 16 * cs) (hg : Zg.size = 16 * M) (hj : j0 + cs ≤ M)
+    (hZ : ColAgree Zl Zg 16 cs M j0) (hth : ColAgree thl thg 2 cs M j0)
+    (htl : ColAgree tll tlg 1 cs M j0) :
+    ColAgree (Plan.stageBlocksDIF thl tll (4 * cs) cs 4 0 Zl)
+      (Plan.stageBlocksDIF thg tlg (4 * M) M 4 0 Zg) 16 cs M j0 := by
+  intro r hr c hc
+  obtain ⟨u, v, rfl, hu, hv⟩ : ∃ u v, r = 4 * u + v ∧ u < 4 ∧ v < 4 :=
+    ⟨r / 4, r % 4, by omega, by omega, by omega⟩
+  rw [passB_getD _ _ _ _ hl u v c hu hv hc, passB_getD _ _ _ _ hg u v (j0 + c) hu hv (by omega),
+    hZ (4 * u) (by omega) c hc, hZ (4 * u + 1) (by omega) c hc, hZ (4 * u + 2) (by omega) c hc,
+    hZ (4 * u + 3) (by omega) c hc, hth 0 (by omega) c hc, hth 1 (by omega) c hc,
+    htl 0 (by omega) c hc]
+
+theorem size_stageBlocksDIF [Field R] [DecidableEq R] (th tl : Array R)
+    (blockSize quarter blocks block : Nat) (a : Array R) :
+    (Plan.stageBlocksDIF th tl blockSize quarter blocks block a).size = a.size := by
+  rw [Plan.stageBlocksDIF_eq, Plan.checkedBlocks_eq, Plan.size_butterflyDIFRadix4Blocks]
+
+/-- The top two passes of the whole transform, as a function of the input. -/
+def topPasses [Field R] [DecidableEq R] (tw : Array (Array R)) (logN : Nat) (x : Array R) :
+    Array R :=
+  Parallel.step false tw (logN - 4) (Parallel.step false tw (logN - 2) x)
+
+/-- A column task computes its column range of the top two passes. -/
+theorem columnTask_col [Field R] [DecidableEq R] (x : Array R) (tw : Array (Array R))
+    (logN cs j0 : Nat) (h4 : 4 ≤ logN) (hx : x.size = 2 ^ logN)
+    (htw : ∀ s < logN, (tw.getD s #[]).size = 2 ^ s) (hu : 2 ^ logN < USize.size)
+    (hj : j0 + cs ≤ 2 ^ (logN - 4)) :
+    (columnTask x tw logN (2 ^ (logN - 4)) cs j0).size = 16 * cs ∧
+      ColAgree (columnTask x tw logN (2 ^ (logN - 4)) cs j0) (topPasses tw logN x) 16 cs
+        (2 ^ (logN - 4)) j0 := by
+  obtain ⟨m, rfl⟩ : ∃ m, logN = m + 4 := ⟨logN - 4, by omega⟩
+  simp only [show m + 4 - 4 = m by omega] at hj ⊢
+  have hp (k : Nat) : 2 ^ (m + k) = 2 ^ k * 2 ^ m := by rw [Nat.pow_add, Nat.mul_comm]
+  have hM := Nat.two_pow_pos m
+  have hx' : x.size = 16 * 2 ^ m := by rw [hx, hp 4]; rfl
+  have hcs : 16 * cs ≤ 16 * 2 ^ m := by omega
+  have hrow (s k : Nat) (hs : s < m + 4) (hk : 2 ^ s = k * 2 ^ m) :
+      ∀ r < k, r * 2 ^ m + j0 + cs ≤ (tw.getD s #[]).size := by
+    intro r hr
+    rw [htw s hs, hk]
+    have := Nat.mul_le_mul_right (2 ^ m) (show r + 1 ≤ k by omega)
+    rw [Nat.add_mul, Nat.one_mul] at this
+    omega
+  have hts (s : Nat) (hs : s < m + 4) : (tw.getD s #[]).size < USize.size := by
+    rw [htw s hs]
+    exact lt_of_le_of_lt (Nat.pow_le_pow_right (by omega) (by omega)) hu
+  have hu16 (k : Nat) (hk : k ≤ 16) : k * cs < USize.size := by
+    have : k * cs ≤ 16 * cs := Nat.mul_le_mul_right _ hk
+    rw [hx] at hx'
+    omega
+  have hg (s k : Nat) (hs : s < m + 4) (hk : 2 ^ s = k * 2 ^ m) (hk16 : k ≤ 16) :=
+    gatherRows_spec (tw.getD s #[]) (2 ^ m) j0 cs k (hrow s k hs hk) ⟨hts s hs, hu16 k hk16⟩
+  obtain ⟨hs1, hv1⟩ := hg (m + 4 - 1) 8 (by omega)
+    (by rw [show m + 4 - 1 = m + 3 by omega, hp]; rfl) (by omega)
+  obtain ⟨hs2, hv2⟩ := hg (m + 4 - 2) 4 (by omega)
+    (by rw [show m + 4 - 2 = m + 2 by omega, hp]; rfl) (by omega)
+  obtain ⟨hs3, hv3⟩ := hg (m + 4 - 3) 2 (by omega)
+    (by rw [show m + 4 - 3 = m + 1 by omega, hp]; rfl) (by omega)
+  obtain ⟨hs4, hv4⟩ := hg (m + 4 - 4) 1 (by omega) (by rw [show m + 4 - 4 = m by omega]; omega)
+    (by omega)
+  obtain ⟨hsx, hvx⟩ := gatherRows_spec x (2 ^ m) j0 cs 16 (fun r hr ↦ by
+    have := Nat.mul_le_mul_right (2 ^ m) (show r + 1 ≤ 16 by omega)
+    rw [Nat.add_mul, Nat.one_mul] at this
+    omega) ⟨by omega, hu16 16 le_rfl⟩
+  have hA := passA_col _ _ _ _ _ _ cs (2 ^ m) j0 hsx hx' hj hvx hv1 hv2
+  have hB := passB_col _ _ _ _ _ _ cs (2 ^ m) j0 (by rw [size_stageBlocksDIF, hsx])
+    (by rw [size_stageBlocksDIF, hx']) hj hA hv3 hv4
+  refine ⟨by simp only [columnTask, size_stageBlocksDIF, hsx], ?_⟩
+  have e1 : m + 4 - 2 = m + 2 := by omega
+  have e2 : m + 4 - 4 = m := by omega
+  have hq1 : 2 ^ (m + 2) = 4 * 2 ^ m := by rw [hp]; rfl
+  have hd1 : x.size / (4 * 2 ^ (m + 2)) = 1 := by
+    rw [hx', hq1, show 4 * (4 * 2 ^ m) = 16 * 2 ^ m by ring]; exact Nat.div_self (by omega)
+  have hd2 : x.size / (4 * 2 ^ m) = 4 := by
+    rw [hx', show 16 * 2 ^ m = 4 * (4 * 2 ^ m) by ring]
+    exact Nat.mul_div_cancel _ (by omega)
+  unfold topPasses
+  rw [e1, e2]
+  unfold columnTask Parallel.step
+  simp only [Bool.false_eq_true, ↓reduceIte, size_stageBlocksDIF]
+  rw [hd2, hd1, show m + 2 + 1 = m + 4 - 1 by omega, show m + 1 = m + 4 - 3 by omega,
+    show m + 4 - 2 = m + 2 by omega, show m + 4 - 4 = m by omega, hq1]
+  rw [show 16 * cs = 4 * (4 * cs) by ring]
+  simp only [show m + 4 - 2 = m + 2 by omega, show m + 4 - 4 = m by omega] at hB
+  exact hB
+
+/-- The optional scaling of a reversed leaf. -/
+def scaleBy [Mul α] (scale : Bool) (f v : α) : α := if scale then f * v else v
+
+/-- Reversal steps store bit-reversed, optionally scaled entries from position `q` on. -/
+theorem reverseGo_spec [Zero α] [Mul α] (a : Array α) (m : Nat) (scale : Bool) (f : α)
+    (hm : 0 < m) (h32 : m ≤ 32) (ha : a.size = 2 ^ m) (hu : 2 ^ m < USize.size) :
+    ∀ (n : Nat) (q : USize) (out : Array α), (2 ^ m).toUSize.toNat - q.toNat = n →
+      out.size = 2 ^ m →
+      (reverseGo a (32 - m).toUInt32 scale f (2 ^ m).toUSize q out).size = 2 ^ m ∧
+        ∀ k, (reverseGo a (32 - m).toUInt32 scale f (2 ^ m).toUSize q out).getD k 0 =
+          if q.toNat ≤ k ∧ k < 2 ^ m then
+            scaleBy scale f (a.getD (NTT.Transform.bitRevNat m k) 0)
+          else out.getD k 0 := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  have hM : (2 ^ m).toUSize.toNat = 2 ^ m := USize.toNat_ofNat_of_lt' hu
+  intro n
+  induction n with
+  | zero =>
+    intro q out hn hout
+    rw [reverseGo, dite_eq_right_iff.mpr (fun h ↦ absurd h (by
+      rw [USize.lt_iff_toNat_lt]; omega))]
+    exact ⟨hout, fun k ↦ by rw [ite_eq_right (by omega)]⟩
+  | succ n ih =>
+    intro q out hn hout
+    have hq : q < (2 ^ m).toUSize := by rw [USize.lt_iff_toNat_lt]; omega
+    have hq1 : (q + 1).toNat = q.toNat + 1 := Plan.usize_add_one q (by omega)
+    have hr : (reverse32 q.toUInt32 >>> (32 - m).toUInt32).toUSize.toNat =
+        NTT.Transform.bitRevNat m q.toNat := by
+      rw [UInt32.toNat_toUSize, show q.toUInt32 = q.toNat.toUInt32 from UInt32.toFin_inj.mp rfl]
+      exact reverse32_shift_eq_bitRevNat m q.toNat hm h32
+    have hb : (reverse32 q.toUInt32 >>> (32 - m).toUInt32).toUSize.toNat < a.size ∧
+        q.toNat < out.size := by
+      rw [hr, ha, hout]
+      exact ⟨NTT.Transform.bitRevNat_lt _ _, by omega⟩
+    rw [reverseGo, dite_eq_left_of_eq_true (eq_true hq)]
+    dsimp only
+    rw [dite_eq_left_of_eq_true (eq_true hb)]
+    obtain ⟨hs', hv'⟩ := ih (q + 1) (out.uset q (if scale then
+        f * a.uget (reverse32 q.toUInt32 >>> (32 - m).toUInt32).toUSize hb.1 else
+        a.uget (reverse32 q.toUInt32 >>> (32 - m).toUInt32).toUSize hb.1) hb.2)
+      (by rw [hq1]; omega) (by rw [Array.size_uset, hout])
+    refine ⟨hs', fun k ↦ ?_⟩
+    rw [hv' k, hq1, getD_uset]
+    by_cases hk : k = q.toNat
+    · subst k
+      have hlt : q.toNat < 2 ^ m := by omega
+      simp only [show ¬(q.toNat + 1 ≤ q.toNat) by omega, false_and, ↓reduceIte, Nat.le_refl,
+        true_and, hlt, scaleBy]
+      rw [uget_eq_getD _ _ _ 0 _ hr]
+    · by_cases hk' : q.toNat + 1 ≤ k ∧ k < 2 ^ m
+      · rw [ite_eq_left hk', ite_eq_left (by omega)]
+      · rw [ite_eq_right hk', ite_eq_right (by omega), ite_eq_right (by omega)]
+
+/-- A reversed leaf: entry `k` is entry `bitrev k`, optionally scaled. -/
+theorem reverseLeaf_spec [Zero α] [Mul α] (a : Array α) (m : Nat) (scale : Bool) (f : α)
+    (hm : 0 < m) (h32 : m ≤ 32) (ha : a.size = 2 ^ m) (hu : 2 ^ m < USize.size) :
+    (reverseLeaf m scale f a).size = 2 ^ m ∧ ∀ k < 2 ^ m,
+      (reverseLeaf m scale f a).getD k 0 =
+        scaleBy scale f (a.getD (NTT.Transform.bitRevNat m k) 0) := by
+  obtain ⟨hs, hv⟩ := reverseGo_spec a m scale f hm h32 ha hu _ 0 (Array.replicate (2 ^ m) 0) rfl
+    Array.size_replicate
+  exact ⟨hs, fun k hk ↦ by
+    rw [reverseLeaf, hv k, ite_eq_left (by simp only [USize.toNat_zero]; omega)]⟩
+
+theorem getD_set! (a : Array α) (i : Nat) (v : α) (k : Nat) (d : α) :
+    (a.set! i v).getD k d = if i = k ∧ i < a.size then v else a.getD k d := by
+  simp only [Array.set!, Array.getD_eq_getD_getElem?, Array.getElem?_setIfInBounds]
+  by_cases h : i = k
+  · subst h
+    by_cases hi : i < a.size
+    · simp only [hi, and_self, ↓reduceIte, Option.getD_some]
+    · simp only [hi, and_false, ↓reduceIte, Option.getD_none,
+        Array.getElem?_eq_none (Nat.le_of_not_lt hi)]
+  · simp only [h, false_and, ↓reduceIte]
+
+/-- One assembly step stores the sixteen entries of row `q`. -/
+theorem assembleGo_spec [Zero α] (V : Nat → Array α) (M : Nat) :
+    ∀ (n q : Nat) (out : Array α), M - q = n → out.size = 16 * M →
+      (assembleGo (V 0) (V 1) (V 2) (V 3) (V 4) (V 5) (V 6) (V 7) (V 8) (V 9) (V 10) (V 11)
+        (V 12) (V 13) (V 14) (V 15) q M out).size = 16 * M ∧
+      ∀ k, (assembleGo (V 0) (V 1) (V 2) (V 3) (V 4) (V 5) (V 6) (V 7) (V 8) (V 9) (V 10)
+        (V 11) (V 12) (V 13) (V 14) (V 15) q M out).getD k 0 =
+        if 16 * q ≤ k ∧ k < 16 * M then (V (NTT.Transform.bitRevNat 4 (k % 16))).getD (k / 16) 0
+        else out.getD k 0 := by
+  intro n
+  induction n with
+  | zero =>
+    intro q out hn hout
+    rw [assembleGo.eq_def, ite_eq_right (by omega)]
+    exact ⟨hout, fun k ↦ by rw [ite_eq_right (by omega)]⟩
+  | succ n ih =>
+    intro q out hn hout
+    rw [assembleGo.eq_def, ite_eq_left (by omega)]
+    dsimp only
+    refine ⟨(ih (q + 1) _ (by omega) ?_).1, fun k ↦ ?_⟩
+    · simp only [Array.size_set!, hout]
+    rw [(ih (q + 1) _ (by omega) (by simp only [Array.size_set!, hout])).2 k]
+    by_cases hk : 16 * (q + 1) ≤ k ∧ k < 16 * M
+    · rw [ite_eq_left_of_eq_true _ _ (eq_true hk), ite_eq_left_of_eq_true _ _ (eq_true (by omega))]
+    rw [ite_eq_right_of_eq_false _ _ (eq_false hk)]
+    simp only [getD_set!, Array.size_set!, hout]
+    by_cases hr : 16 * q ≤ k ∧ k < 16 * q + 16
+    · obtain ⟨c, rfl, hc⟩ : ∃ c, k = 16 * q + c ∧ c < 16 := ⟨k - 16 * q, by omega, by omega⟩
+      rw [ite_eq_left_of_eq_true _ _
+          (eq_true (show 16 * q ≤ 16 * q + c ∧ 16 * q + c < 16 * M by omega)),
+        show (16 * q + c) % 16 = c by omega, show (16 * q + c) / 16 = q by omega]
+      have hlt : ∀ i, i < 16 → (16 * q + i < 16 * M) = True := fun i hi ↦ eq_true (by omega)
+      have hlt0 : (16 * q < 16 * M) = True := eq_true (by omega)
+      interval_cases c <;> simp (disch := decide) only [Nat.add_zero, hlt, hlt0, and_true,
+        Nat.reduceEqDiff, ↓reduceIte, Nat.add_eq_left, Nat.add_left_cancel_iff,
+        OfNat.ofNat_ne_zero] <;> rfl
+    · have hne : ∀ i, i < 16 → (16 * q + i = k) = False := fun i hi ↦ eq_false (by omega)
+      have hne0 : (16 * q = k) = False := eq_false (by omega)
+      simp (disch := decide) only [hne, hne0, false_and, ↓reduceIte]
+      rw [ite_eq_right_of_eq_false _ _ (eq_false (show ¬(16 * q ≤ k ∧ k < 16 * M) by omega))]
+
+theorem getD_extract [Zero α] (a : Array α) (i j k : Nat) (hk : k < j - i) (hj : j ≤ a.size) :
+    (a.extract i j).getD k 0 = a.getD (i + k) 0 := by
+  simp only [Array.getD_eq_getD_getElem?, Array.getElem?_extract, Nat.min_eq_left hj,
+    show k < j - i from hk, ↓reduceIte]
+
+/-- Later passes run independently on each aligned block of `M` entries. -/
+theorem runPasses_extract [Field R] [DecidableEq R] (tw : Array (Array R)) (rest : List Nat)
+    (Y : Array R) (M k l : Nat) (hY : Y.size = k * M) (hl : l < k)
+    (hrest : ∀ low ∈ rest, 4 * 2 ^ low ∣ M) :
+    Parallel.runPasses false tw rest (Y.extract (l * M) ((l + 1) * M)) =
+      (Parallel.runPasses false tw rest Y).extract (l * M) ((l + 1) * M) := by
+  have h1 : (l + 1) * M ≤ k * M := Nat.mul_le_mul_right _ hl
+  have h2 : l * M ≤ (l + 1) * M := Nat.mul_le_mul_right _ (Nat.le_succ l)
+  have hsplit : Y = Y.extract 0 (l * M) ++
+      (Y.extract (l * M) ((l + 1) * M) ++ Y.extract ((l + 1) * M) Y.size) := by
+    rw [Array.extract_append_extract, Nat.min_eq_left (by omega), Nat.max_eq_right (by omega),
+      Array.extract_append_extract, Nat.min_eq_left (by omega), Nat.max_eq_right (by omega)]
+    exact (Array.extract_eq_self_of_le (Nat.le_refl _)).symm
+  have hd (i j : Nat) (hij : i ≤ j) (hj : j ≤ Y.size) (hi : M ∣ i) (hj' : M ∣ j) :
+      ∀ low ∈ rest, 4 * 2 ^ low ∣ (Y.extract i j).size := by
+    intro low hlow
+    rw [Array.size_extract_of_le hj]
+    exact Nat.dvd_trans (hrest low hlow) (Nat.dvd_sub hj' hi)
+  conv_rhs => rw [hsplit]
+  rw [Parallel.runPasses_append, Parallel.runPasses_append]
+  · rw [Array.extract_append, Array.extract_append]
+    simp only [Parallel.size_runPasses, Array.size_extract_of_le (show l * M ≤ Y.size by omega),
+      Array.size_extract_of_le (show (l + 1) * M ≤ Y.size by omega), Nat.sub_zero, Nat.sub_self]
+    rw [show (l + 1) * M - l * M = M by rw [Nat.succ_mul]; omega]
+    have hA : (Parallel.runPasses false tw rest (Y.extract 0 (l * M))).extract (l * M)
+        ((l + 1) * M) = #[] := Array.extract_eq_empty_of_le (by
+      simp only [Parallel.size_runPasses, Array.size_extract]; omega)
+    have hB : (Parallel.runPasses false tw rest (Y.extract (l * M) ((l + 1) * M))).extract 0 M =
+        Parallel.runPasses false tw rest (Y.extract (l * M) ((l + 1) * M)) :=
+      Array.extract_eq_self_of_le (by
+        simp only [Parallel.size_runPasses, Array.size_extract]; rw [Nat.succ_mul]; omega)
+    rw [hA, hB, Nat.zero_sub, Array.extract_eq_empty_of_le
+      (as := Parallel.runPasses false tw rest (Y.extract ((l + 1) * M) Y.size)) (i := 0) (j := 0)
+      (Nat.min_le_left _ _), Array.empty_append, Array.append_empty]
+  · intro low hlow
+    exact ⟨hd _ _ h2 (by omega) (Nat.dvd_mul_left _ _) (Nat.dvd_mul_left _ _) low hlow,
+      hd _ _ (by omega) (le_refl _) (Nat.dvd_mul_left _ _) (by rw [hY]; exact Nat.dvd_mul_left _ _)
+        low hlow⟩
+  · intro low hlow
+    refine ⟨hd _ _ (Nat.zero_le _) (by omega) (Nat.dvd_zero _) (Nat.dvd_mul_left _ _) low hlow, ?_⟩
+    rw [Array.size_append]
+    exact Nat.dvd_add (hd _ _ h2 (by omega) (Nat.dvd_mul_left _ _) (Nat.dvd_mul_left _ _) low hlow)
+      (hd _ _ (by omega) (le_refl _) (Nat.dvd_mul_left _ _) (by rw [hY]; exact Nat.dvd_mul_left _ _)
+        low hlow)
+
+theorem getD_of_size_le [Zero α] (a : Array α) (k : Nat) (hk : a.size ≤ k) : a.getD k 0 = 0 := by
+  simp only [Array.getD_eq_getD_getElem?, Array.getElem?_eq_none hk, Option.getD_none]
+
+theorem getD_map_range (F : Nat → α) (n k : Nat) (hk : k < n) (d : α) :
+    ((Array.range n).map F).getD k d = F k := by
+  simp only [Array.getD_eq_getD_getElem?, Array.getElem?_map, Array.getElem?_range, hk,
+    ↓reduceIte, Option.map_some, Option.getD_some]
+
+
+/-- The column-parallel transform: the top two passes, the remaining passes on every block, and
+the bit-reversal permutation, optionally scaled. -/
+theorem transform_eq [Field R] [DecidableEq R] (tw : Array (Array R)) (logN S : Nat)
+    (rest : List Nat) (scale : Bool) (f : R) (x : Array R) (h4 : 4 < logN) (h36 : logN ≤ 36)
+    (hx : x.size = 2 ^ logN) (htw : ∀ s < logN, (tw.getD s #[]).size = 2 ^ s)
+    (hu : 2 ^ logN < USize.size) (hS : 0 < S) (hdiv : S ∣ 2 ^ (logN - 4))
+    (hrest : ∀ low ∈ rest, 4 * 2 ^ low ∣ 2 ^ (logN - 4)) :
+    transform tw logN S rest scale f x = Array.ofFn (n := 2 ^ logN) fun i ↦
+      scaleBy scale f ((Parallel.runPasses false tw rest (topPasses tw logN x)).getD
+        (NTT.Transform.bitRevNat logN i) 0) := by
+  obtain ⟨m, rfl⟩ : ∃ m, logN = m + 4 := ⟨logN - 4, by omega⟩
+  have hm4 : m + 4 - 4 = m := by omega
+  rw [hm4] at hdiv hrest
+  have hp : 2 ^ (m + 4) = 16 * 2 ^ m := by rw [Nat.pow_add, Nat.mul_comm]
+  have hM := Nat.two_pow_pos m
+  obtain ⟨cs, hcs⟩ := hdiv
+  have hcs0 : 0 < cs := Nat.pos_of_ne_zero (by rintro rfl; omega)
+  have hcsM : 2 ^ m / S = cs := by rw [hcs, Nat.mul_div_cancel_left _ hS]
+  have hY : (topPasses tw (m + 4) x).size = 16 * 2 ^ m := by
+    rw [topPasses, Parallel.size_step, Parallel.size_step, hx, hp]
+  let cols := (Array.range S).map fun s ↦ columnTask x tw (m + 4) (2 ^ m) cs (s * cs)
+  have hcolsz : cols.size = S := by simp only [cols, Array.size_map, Array.size_range]
+  have hcol (s : Nat) (hs : s < S) :
+      (columnTask x tw (m + 4) (2 ^ m) cs (s * cs)).size = 16 * cs ∧
+        ColAgree (columnTask x tw (m + 4) (2 ^ m) cs (s * cs)) (topPasses tw (m + 4) x) 16 cs
+          (2 ^ m) (s * cs) := by
+    have := columnTask_col x tw (m + 4) cs (s * cs) (by omega) hx htw hu (by
+      rw [hm4, hcs]
+      have := Nat.mul_le_mul_right cs (show s + 1 ≤ S by omega)
+      rw [Nat.add_mul, Nat.one_mul] at this
+      omega)
+    rwa [hm4] at this
+  have hcolsg (s : Nat) (hs : s < S) :
+      cols.getD s #[] = columnTask x tw (m + 4) (2 ^ m) cs (s * cs) :=
+    getD_map_range _ S s hs _
+  have hleafIn (l : Nat) (hl : l < 16) :
+      gatherLeaf cols cs l = (topPasses tw (m + 4) x).extract (l * 2 ^ m) ((l + 1) * 2 ^ m) := by
+    have hlM : (l + 1) * 2 ^ m ≤ 16 * 2 ^ m := Nat.mul_le_mul_right _ (by omega)
+    have hlc : l * cs + cs ≤ 16 * cs := by
+      have := Nat.mul_le_mul_right cs (show l + 1 ≤ 16 by omega)
+      rw [Nat.add_mul, Nat.one_mul] at this; exact this
+    obtain ⟨hgs, hgv⟩ := gatherLeaf_spec cols cs l
+      (fun s hs ↦ by
+        rw [hcolsz] at hs
+        rw [hcolsg s hs, (hcol s hs).1]; exact hlc)
+      (fun s hs ↦ by
+        rw [hcolsz] at hs
+        rw [hcolsg s hs, (hcol s hs).1]
+        have : cs ≤ 2 ^ m := by rw [hcs]; exact Nat.le_mul_of_pos_left _ hS
+        rw [hp] at hu; omega)
+      (by rw [hcolsz, ← hcs]; rw [hp] at hu; omega)
+    apply Packed.array_eq_of_getD _ _ 0 (by
+      rw [hgs, hcolsz, Array.size_extract_of_le (by omega), ← hcs, Nat.succ_mul]; omega)
+    intro k
+    by_cases hk : k < 2 ^ m
+    · have hkd : k = k / cs * cs + k % cs := (Nat.div_add_mod' k cs).symm
+      have hks : k / cs < S := by
+        rw [Nat.div_lt_iff_lt_mul hcs0, ← hcs]; exact hk
+      rw [getD_extract _ _ _ _ (by rw [Nat.succ_mul]; omega) (by omega), hkd,
+        hgv _ (by rw [hcolsz]; exact hks) _ (Nat.mod_lt _ hcs0), hcolsg _ hks]
+      exact (hcol _ hks).2 l hl (k % cs) (Nat.mod_lt _ hcs0)
+    · rw [getD_of_size_le _ _ (by rw [hgs, hcolsz, ← hcs]; omega),
+        getD_of_size_le _ _ (by rw [Array.size_extract_of_le (by omega), Nat.succ_mul]; omega)]
+  have hZ : (Parallel.runPasses false tw rest (topPasses tw (m + 4) x)).size = 16 * 2 ^ m := by
+    rw [Parallel.size_runPasses, hY]
+  have hleaf (l : Nat) (hl : l < 16) :
+      (leafTask cols tw rest m cs l scale f).size = 2 ^ m ∧ ∀ j < 2 ^ m,
+        (leafTask cols tw rest m cs l scale f).getD j 0 = scaleBy scale f
+          ((Parallel.runPasses false tw rest (topPasses tw (m + 4) x)).getD
+            (l * 2 ^ m + NTT.Transform.bitRevNat m j) 0) := by
+    have hlM : (l + 1) * 2 ^ m ≤ 16 * 2 ^ m := Nat.mul_le_mul_right _ (by omega)
+    have hb : (Parallel.runPasses false tw rest (gatherLeaf cols cs l)).size = 2 ^ m := by
+      rw [Parallel.size_runPasses, hleafIn l hl, Array.size_extract_of_le (by omega),
+        Nat.succ_mul]; omega
+    obtain ⟨hs, hv⟩ := reverseLeaf_spec _ m scale f (by omega) (by omega) hb
+      (lt_of_le_of_lt (Nat.pow_le_pow_right (by omega) (by omega)) hu)
+    refine ⟨hs, fun j hj ↦ ?_⟩
+    rw [leafTask, hv j hj, hleafIn l hl, runPasses_extract tw rest _ _ 16 l hY hl hrest,
+      getD_extract _ _ _ _ (by rw [Nat.succ_mul]; have := NTT.Transform.bitRevNat_lt m j; omega)
+        (by rw [hZ]; omega)]
+  have hT : (((Array.range 16).map fun l ↦ (joinTasks ((Array.range S).map fun s ↦
+      Task.spawn fun _ ↦ columnTask x tw (m + 4) (2 ^ (m + 4 - 4)) (2 ^ (m + 4 - 4) / S)
+        (s * (2 ^ (m + 4 - 4) / S)))).bind fun cols ↦ Task.spawn fun _ ↦
+          leafTask cols tw rest (m + 4 - 4) (2 ^ (m + 4 - 4) / S) l scale f).map Task.get) =
+      (Array.range 16).map fun l ↦ leafTask cols tw rest m cs l scale f := by
+    simp only [Array.map_map, hm4, hcsM]
+    congr 1
+    funext l
+    change leafTask (joinTasks _).get tw rest m cs l scale f = _
+    rw [joinTasks_get, Array.map_map]
+    rfl
+  unfold transform
+  dsimp only
+  rw [hT, hm4]
+  let V := fun l ↦ ((Array.range 16).map fun l ↦ leafTask cols tw rest m cs l scale f).getD l #[]
+  obtain ⟨has, hav⟩ := assembleGo_spec V (2 ^ m) (2 ^ m) 0 (Array.replicate (16 * 2 ^ m) 0)
+    (by omega) Array.size_replicate
+  have hV (l : Nat) (hl : l < 16) : V l = leafTask cols tw rest m cs l scale f :=
+    getD_map_range _ 16 l hl _
+  change assembleGo (V 0) (V 1) (V 2) (V 3) (V 4) (V 5) (V 6) (V 7) (V 8) (V 9) (V 10) (V 11)
+    (V 12) (V 13) (V 14) (V 15) 0 (2 ^ m) (Array.replicate (16 * 2 ^ m) 0) = _
+  apply Packed.array_eq_of_getD _ _ 0 (by rw [has, Array.size_ofFn, hp])
+  intro k
+  by_cases hk : k < 16 * 2 ^ m
+  · have hb := NTT.Transform.bitRevNat_lt 4 (k % 16)
+    rw [hav k, ite_eq_left_of_eq_true _ _ (eq_true ⟨Nat.zero_le _, hk⟩),
+      Packed.getD_ofFn_bounded _ _ (by rw [hp]; exact hk), hV _ hb,
+      (hleaf _ hb).2 _ (by omega)]
+    have hc := Packed.bitRevNat_concat m 4 (k / 16) (k % 16) (Nat.mod_lt _ (by decide))
+    rw [show 2 ^ 4 * (k / 16) + k % 16 = k by omega] at hc
+    rw [hc, Nat.mul_comm (2 ^ m)]
+  · rw [getD_of_size_le _ _ (by rw [has]; omega),
+      getD_of_size_le _ _ (by rw [Array.size_ofFn, hp]; omega)]
+
+end CompPoly.CPolynomial.NTTFast.Columns

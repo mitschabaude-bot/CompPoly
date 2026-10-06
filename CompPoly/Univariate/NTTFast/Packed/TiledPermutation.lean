@@ -5,7 +5,7 @@ Authors: Gregor Mitscha-Baude
 -/
 module
 
-public import CompPoly.Univariate.NTTFast.Packed.BitReverse
+public import CompPoly.Univariate.NTTFast.Reverse32
 import Mathlib.Tactic.Ring
 
 /-! # Bit-reversal identities used by the tiled output scatter -/
@@ -19,7 +19,7 @@ theorem bitRevNat_concat (high low x y : Nat) (hy : y < 2 ^ low) :
       2 ^ high * NTT.Transform.bitRevNat low y + NTT.Transform.bitRevNat high x := by
   apply Nat.eq_of_testBit_eq
   intro k
-  rw [Native.bitRevNat_testBit,
+  rw [bitRevNat_testBit,
     Nat.testBit_two_pow_mul_add _ (NTT.Transform.bitRevNat_lt high x)]
   by_cases hk : k < high
   · have hsum : k < high + low := by omega
@@ -27,15 +27,15 @@ theorem bitRevNat_concat (high low x y : Nat) (hy : y < 2 ^ low) :
     have he : high + low - 1 - k - low = high - 1 - k := by omega
     rw [ite_eq_left hsum, ite_eq_left hk,
       Nat.testBit_two_pow_mul_add x hy, ite_eq_right hindex,
-      Native.bitRevNat_testBit, ite_eq_left hk, he]
+      bitRevNat_testBit, ite_eq_left hk, he]
   · by_cases hsum : k < high + low
     · have hindex : high + low - 1 - k < low := by omega
       have hbit : k - high < low := by omega
       have he : high + low - 1 - k = low - 1 - (k - high) := by omega
       rw [ite_eq_left hsum, ite_eq_right hk, Nat.testBit_two_pow_mul_add x hy,
-        ite_eq_left hindex, Native.bitRevNat_testBit, ite_eq_left hbit, he]
+        ite_eq_left hindex, bitRevNat_testBit, ite_eq_left hbit, he]
     · have hbit : ¬k - high < low := by omega
-      rw [ite_eq_right hsum, ite_eq_right hk, Native.bitRevNat_testBit, ite_eq_right hbit]
+      rw [ite_eq_right hsum, ite_eq_right hk, bitRevNat_testBit, ite_eq_right hbit]
 
 /-- A tiled decoder lane is precisely the full transform's reversed input index. -/
 theorem bitRevNat_tile (logN m d lane : Nat) (hlog : 6 ≤ logN)

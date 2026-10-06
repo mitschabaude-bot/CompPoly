@@ -127,13 +127,15 @@ structure NaturalPlan (R : Type*) [Field R] where
   order : Array Nat
   order_eq : order = Array.ofFn (fun i : plan.domain.Idx ↦
     NTT.Transform.bitRevNat plan.domain.logN i.val)
+  wellFormed : Plan.WellFormed plan
 
 namespace NaturalPlan
 variable {R : Type*} [Field R]
 
 /-- Prepare the twiddles and permutation once, outside repeated transforms. -/
 def ofDomain (D : NTT.Domain R) : NaturalPlan R :=
-  ⟨Plan.ofDomain D, Array.ofFn (fun i : D.Idx ↦ NTT.Transform.bitRevNat D.logN i.val), rfl⟩
+  ⟨Plan.ofDomain D, Array.ofFn (fun i : D.Idx ↦ NTT.Transform.bitRevNat D.logN i.val), rfl,
+    Plan.ofDomain_wellFormed D⟩
 
 /-- The cached index table has one entry per domain element. -/
 @[simp] theorem order_size (P : NaturalPlan R) : P.order.size = P.plan.domain.n := by

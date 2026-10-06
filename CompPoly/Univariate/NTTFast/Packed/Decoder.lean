@@ -6,7 +6,7 @@ Authors: Gregor Mitscha-Baude
 module
 
 import all CompPoly.Univariate.NTTFast.Packed.Native
-public import CompPoly.Univariate.NTTFast.Packed.BitReverse
+public import CompPoly.Univariate.NTTFast.Reverse32
 public import CompPoly.Univariate.NTTFast.Packed.TaskSpec
 
 /-! # Natural-order semantics of packed output decoding -/
@@ -24,14 +24,14 @@ def decodedFields (logN : Nat) (a : Array KoalaBear.Fast.Field)
 /-- The thirty-two-bit index calculation agrees with bit reversal on every bounded transform
   index. -/
 theorem Native.reverse_index (logN i : Nat) (hlog : logN ≤ 32) (hi : i < 2 ^ logN) :
-    (Native.reverse32 i.toUInt32 >>> (32 - logN).toUInt32).toNat =
+    (reverse32 i.toUInt32 >>> (32 - logN).toUInt32).toNat =
       NTT.Transform.bitRevNat logN i := by
   by_cases hz : logN = 0
   · subst logN
     have he : i = 0 := by simp only [Nat.pow_zero] at hi; omega
     subst i
     decide
-  · exact Native.reverse32_shift_eq_bitRevNat logN i (by omega) hlog
+  · exact reverse32_shift_eq_bitRevNat logN i (by omega) hlog
 
 /-- Ordinary packed output conversion computes exactly reversed indexing and optional scaling. -/
 theorem Native.decode_packFields (logN : Nat) (a : Array KoalaBear.Fast.Field)
@@ -40,9 +40,9 @@ theorem Native.decode_packFields (logN : Nat) (a : Array KoalaBear.Fast.Field)
     Native.decode logN (packFields a) factor.val inverse = decodedFields logN a factor inverse := by
   change tabulate (fun i : Fin (2 ^ logN) ↦
     ofWord (if inverse then mul factor.val
-      (Native.read (packFields a) (Native.reverse32 i.val.toUInt32 >>> (32 - logN).toUInt32).toNat)
+      (Native.read (packFields a) (reverse32 i.val.toUInt32 >>> (32 - logN).toUInt32).toNat)
     else Native.read (packFields a)
-      (Native.reverse32 i.val.toUInt32 >>> (32 - logN).toUInt32).toNat)) = _
+      (reverse32 i.val.toUInt32 >>> (32 - logN).toUInt32).toNat)) = _
   rw [tabulate_eq]
   unfold decodedFields
   apply congrArg Array.ofFn

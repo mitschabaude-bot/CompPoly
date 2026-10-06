@@ -7,6 +7,7 @@ module
 public import CompPoly.Univariate.NTTFast.Packed.Arithmetic
 public import CompPoly.Univariate.NTTFast.Packed.Storage
 public import CompPoly.Univariate.NTTFast.Natural
+public import CompPoly.Univariate.NTTFast.Reverse32
 /-! # Packed native-storage KoalaBear FFT kernels
 All arithmetic and scheduling are Lean. The two explicit externs replace only packed
 word reads and batch writes/appends; their Lean definitions specify those storage operations.
@@ -1277,16 +1278,6 @@ def splitInputTask (tw : Array ByteArray) (logN : Nat)
   let right := (Task.spawn fun _ ↦ splitInputRight a w half).bind
     (sync := true) fun hi ↦ splitTask tw (logN - 1) hi nInv normalize (depth - 1)
   left.bind (sync := true) fun lo ↦ right.map (sync := true) fun hi ↦ lo ++ hi
-@[inline] def reverse32 (x : UInt32) : UInt32 :=
-  let x : UInt32 := ((x >>> (1 : UInt32)) &&& (0x55555555 : UInt32)) ||| ((x &&& (0x55555555 :
-    UInt32)) <<< (1 : UInt32))
-  let x : UInt32 := ((x >>> (2 : UInt32)) &&& (0x33333333 : UInt32)) ||| ((x &&& (0x33333333 :
-    UInt32)) <<< (2 : UInt32))
-  let x : UInt32 := ((x >>> (4 : UInt32)) &&& (0x0f0f0f0f : UInt32)) ||| ((x &&& (0x0f0f0f0f :
-    UInt32)) <<< (4 : UInt32))
-  let x : UInt32 := ((x >>> (8 : UInt32)) &&& (0x00ff00ff : UInt32)) ||| ((x &&& (0x00ff00ff :
-    UInt32)) <<< (8 : UInt32))
-  (x >>> (16 : UInt32)) ||| (x <<< (16 : UInt32))
 @[inline] def readWord (b : @& ByteArray) (i : USize) : UInt32 :=
   readRaw b i 0 true (by intro h; cases h)
 @[inline] def fieldOfRaw (x : UInt32) : KoalaBear.Fast.Field := ofWord x

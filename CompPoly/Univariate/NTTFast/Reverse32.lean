@@ -5,14 +5,25 @@ Authors: Gregor Mitscha-Baude
 -/
 module
 
-import all CompPoly.Univariate.NTTFast.Packed.Native
-public import CompPoly.Univariate.NTTFast.Packed.Native
+public import CompPoly.Univariate.NTT.Transform
 import Mathlib.Tactic.IntervalCases
 
-/-! # Bit-permutation semantics of the native output decoder -/
+/-! # Thirty-two-bit word reversal for bit-reversed indexing -/
 
 @[expose] public section
-namespace CompPoly.CPolynomial.NTTFast.Packed.Native
+namespace CompPoly.CPolynomial.NTTFast
+
+/-- Reverse the thirty-two bits of a word. -/
+@[inline] def reverse32 (x : UInt32) : UInt32 :=
+  let x : UInt32 := ((x >>> (1 : UInt32)) &&& (0x55555555 : UInt32)) ||| ((x &&& (0x55555555 :
+    UInt32)) <<< (1 : UInt32))
+  let x : UInt32 := ((x >>> (2 : UInt32)) &&& (0x33333333 : UInt32)) ||| ((x &&& (0x33333333 :
+    UInt32)) <<< (2 : UInt32))
+  let x : UInt32 := ((x >>> (4 : UInt32)) &&& (0x0f0f0f0f : UInt32)) ||| ((x &&& (0x0f0f0f0f :
+    UInt32)) <<< (4 : UInt32))
+  let x : UInt32 := ((x >>> (8 : UInt32)) &&& (0x00ff00ff : UInt32)) ||| ((x &&& (0x00ff00ff :
+    UInt32)) <<< (8 : UInt32))
+  (x >>> (16 : UInt32)) ||| (x <<< (16 : UInt32))
 
 /-- The mask-and-shift word permutation reverses exactly thirty-two bits. -/
 theorem reverse32_toBitVec (x : UInt32) : (reverse32 x).toBitVec = x.toBitVec.reverse := by
@@ -87,4 +98,4 @@ theorem reverse32_shift_eq_bitRevNat (bits i : Nat) (hb : 0 < bits) (h32 : bits 
   · have ht : ¬32 - bits + k < 32 := by omega
     simp only [ht, hk, decide_false, Bool.false_and, ite_false]
 
-end CompPoly.CPolynomial.NTTFast.Packed.Native
+end CompPoly.CPolynomial.NTTFast

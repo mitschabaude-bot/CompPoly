@@ -6,7 +6,7 @@ Authors: Gregor Mitscha-Baude
 module
 
 public import CompPolyBench.Univariate.Common
-public import CompPoly.Univariate.NTTFast.Parallel
+public import CompPoly.Univariate.NTTFast.NaturalParallel
 public import CompPoly.Univariate.NTTFast.Packed.Plan
 
 /-! # Natural-order KoalaBear NTT benchmarks against optimized Plonky3 -/
