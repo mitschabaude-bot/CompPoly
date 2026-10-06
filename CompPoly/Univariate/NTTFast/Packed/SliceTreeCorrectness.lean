@@ -9,7 +9,7 @@ import all CompPoly.Univariate.NTTFast.Packed.Native
 import all CompPoly.Univariate.NTTFast.Packed.SliceTree
 public import CompPoly.Univariate.NTTFast.Packed.SliceTree
 public import CompPoly.Univariate.NTTFast.Packed.Rows
-public import CompPoly.Univariate.NTTFast.Packed.TaskSpec
+public import CompPoly.Univariate.NTTFast.Packed.Correctness
 public import CompPoly.Univariate.NTTFast.Packed.KernelRefinement
 public import CompPoly.Univariate.NTTFast.Packed.SplitRefinement
 
@@ -56,6 +56,12 @@ theorem joinTasks_get (ts : Array (Task α)) : (joinTasks ts).get = ts.map Task.
     intro acc
     rw [List.foldl_cons, ih]
     simp [Task.bind, Task.map]
+
+/-- Parallel post-processing maps every leaf. -/
+theorem postLeaves_get (post : ByteArray → ByteArray) (leaves : Array ByteArray) :
+    (postLeaves post leaves).get = leaves.map post := by
+  rw [postLeaves, joinTasks_get, Array.map_map]
+  rfl
 
 /-- One sum batch of two packed field arrays. -/
 theorem pairLeft_packFields (A B out : Array KoalaBear.Fast.Field) (ia ib : USize) (h) :
@@ -425,20 +431,22 @@ theorem levelOut_snd (W : Array KoalaBear.Fast.Field) (half m c : Nat)
   simp only [levelOut, slicesOf, Array.map_map]
   rfl
 
-/-- The sliced task tree assembles to the same leaves as the binary split tree. -/
-theorem sliceChunks_assemble (twF : Array (Array KoalaBear.Fast.Field)) (nInv : UInt32)
-    (normalize : Bool) (P : Nat) :
+/-- The sliced task tree computes the leaves of the binary split tree, post-processed. -/
+theorem sliceChunks_eq (twF : Array (Array KoalaBear.Fast.Field)) (nInv : UInt32)
+    (normalize : Bool) (P : Nat) (post : ByteArray → ByteArray) :
     ∀ (depth logN k s : Nat) (g : Nat → KoalaBear.Fast.Field), k * s = 2 ^ logN → 0 < k →
       (∀ L < logN, (twF.getD L #[]).size = 2 ^ L) → 4 * 2 ^ logN < USize.size →
-      assembleChunks 0 (sliceChunks (twF.map packFields) logN ((slicesOf k s g).map packFields)
-        nInv normalize P depth).get =
-      assembleChunks 0 (splitChunks (twF.map packFields) logN
-        (packFields (Array.ofFn (n := 2 ^ logN) fun i ↦ g i)) nInv normalize depth).get := by
+      (sliceChunks (twF.map packFields) logN ((slicesOf k s g).map packFields)
+        nInv normalize P post depth).get =
+      (splitChunks (twF.map packFields) logN
+        (packFields (Array.ofFn (n := 2 ^ logN) fun i ↦ g i)) nInv normalize depth).get.map
+          post := by
   intro depth
   induction depth with
   | zero =>
     intro logN k s g hks _ _ _
-    simp only [sliceChunks, splitChunks, Task.spawn, assemble_slicesOf _ k s _ g hks]
+    simp only [sliceChunks, splitChunks, Task.spawn, assemble_slicesOf _ k s _ g hks,
+      Array.map_singleton]
   | succ depth ih =>
     intro logN k s g hks hk htw hu
     rw [sliceChunks]
@@ -483,10 +491,9 @@ theorem sliceChunks_assemble (twF : Array (Array KoalaBear.Fast.Field)) (nInv : 
       simp only [Task.bind, Task.map, joinTasks_get, hlevel, levelOut_fst, levelOut_snd]
       have htw' : ∀ L < logN - 1, (twF.getD L #[]).size = 2 ^ L := fun L hL ↦ htw L (by omega)
       have hu' : 4 * 2 ^ (logN - 1) < USize.size := by omega
-      rw [assembleChunks_append, ih (logN - 1) m c _ hmc hm htw' hu',
-        ih (logN - 1) m c _ hmc hm htw' hu', splitChunks]
+      rw [ih (logN - 1) m c _ hmc hm htw' hu', ih (logN - 1) m c _ hmc hm htw' hu', splitChunks]
       simp only [hlog, ↓reduceIte, Task.bind, Task.map, Task.spawn, getD_map_packFields]
-      rw [assembleChunks_append]
+      rw [Array.map_append]
       have hX : (packFields (Array.ofFn (n := 2 ^ logN) fun i ↦ g i)).size < USize.size := by
         rw [size_packFields, Array.size_ofFn]; exact hu
       have hWs : (packFields (twF.getD (logN - 1) #[])).size < USize.size := by
@@ -517,7 +524,7 @@ theorem sliceChunks_assemble (twF : Array (Array KoalaBear.Fast.Field)) (nInv : 
         refine congrArg Array.ofFn (funext fun i ↦ ?_)
         rw [hg1 i, hg2 i]
       rw [hL, hR]
-    · rw [joinSlices_slicesOf _ k s _ g hks]
+    · simp only [Task.bind, postLeaves_get, joinSlices_slicesOf _ k s _ g hks]
 
 /-- One input chunk over a field array. -/
 theorem pairInputGo_blocks (W a : Array KoalaBear.Fast.Field) (half c q : Nat) (hc : 16 ∣ c)
@@ -565,13 +572,13 @@ theorem slicesOf_one (a : Array KoalaBear.Fast.Field) (n : Nat) (ha : a.size = n
   simp only [Array.map_singleton, Function.comp_apply, Nat.zero_mul, Nat.zero_add,
     ofFn_getD a n ha]
 
-/-- The sliced input tree assembles to the same leaves as the binary input tree. -/
-theorem sliceInputChunks_assemble (twF : Array (Array KoalaBear.Fast.Field))
+/-- The sliced input tree computes the leaves of the binary input tree, post-processed. -/
+theorem sliceInputChunks_eq (twF : Array (Array KoalaBear.Fast.Field))
     (a : Array KoalaBear.Fast.Field) (logN depth P : Nat) (nInv : UInt32) (normalize : Bool)
-    (ha : a.size = 2 ^ logN) (htw : ∀ L < logN, (twF.getD L #[]).size = 2 ^ L)
-    (hu : 4 * 2 ^ logN < USize.size) :
-    assembleChunks 0 (sliceInputChunks (twF.map packFields) logN a nInv normalize P depth).get =
-      assembleChunks 0 (splitInputChunks (twF.map packFields) logN a nInv normalize depth).get := by
+    (post : ByteArray → ByteArray) (ha : a.size = 2 ^ logN)
+    (htw : ∀ L < logN, (twF.getD L #[]).size = 2 ^ L) (hu : 4 * 2 ^ logN < USize.size) :
+    (sliceInputChunks (twF.map packFields) logN a nInv normalize P post depth).get =
+      (splitInputChunks (twF.map packFields) logN a nInv normalize depth).get.map post := by
   unfold sliceInputChunks
   dsimp only
   split
@@ -610,13 +617,12 @@ theorem sliceInputChunks_assemble (twF : Array (Array KoalaBear.Fast.Field))
     simp only [Task.bind, Task.map, joinTasks_get, hchunks, levelOut_fst, levelOut_snd]
     have htw' : ∀ L < logN - 1, (twF.getD L #[]).size = 2 ^ L := fun L hL ↦ htw L (by omega)
     have hu' : 4 * 2 ^ (logN - 1) < USize.size := by omega
-    rw [assembleChunks_append, sliceChunks_assemble twF nInv normalize P _ (logN - 1) P _ _ hPc
-        (by omega) htw' hu',
-      sliceChunks_assemble twF nInv normalize P _ (logN - 1) P _ _ hPc (by omega) htw' hu']
+    rw [sliceChunks_eq twF nInv normalize P post _ (logN - 1) P _ _ hPc (by omega) htw' hu',
+      sliceChunks_eq twF nInv normalize P post _ (logN - 1) P _ _ hPc (by omega) htw' hu']
     unfold splitInputChunks
     have hnot : ¬(depth = 0 ∨ logN < 6) := by omega
     simp only [hnot, ↓reduceIte, Task.bind, Task.map, Task.spawn, getD_map_packFields]
-    rw [assembleChunks_append]
+    rw [Array.map_append]
     have hX : (packFields a).size < USize.size := by rw [size_packFields, ha]; exact hu
     have hWs : (packFields (twF.getD (logN - 1) #[])).size < USize.size := by
       rw [size_packFields]; exact hWu
@@ -636,7 +642,176 @@ theorem sliceInputChunks_assemble (twF : Array (Array KoalaBear.Fast.Field))
       refine congrArg Array.ofFn (funext fun i ↦ ?_)
       rw [Nat.add_comm (i.val)]
     rw [hL, hR]
-  · rfl
+  · simp only [Task.bind, postLeaves_get]
 
 end Native
+
+/-- Blocks of a concatenation of two equally blocked arrays. -/
+theorem extract_append_blocks (SL SR : Array α) (M m l : Nat) (hL : SL.size = m * M)
+    (hR : SR.size = m * M) (hl : l < 2 * m) :
+    (SL ++ SR).extract (l * M) ((l + 1) * M) =
+      if l < m then SL.extract (l * M) ((l + 1) * M)
+      else SR.extract ((l - m) * M) ((l - m + 1) * M) := by
+  have hl1 : (l + 1) * M ≤ 2 * m * M := Nat.mul_le_mul_right M (by omega)
+  split
+  · rename_i hlm
+    have hle : (l + 1) * M ≤ m * M := Nat.mul_le_mul_right M (by omega)
+    apply Array.ext (by simp only [Array.size_extract, Array.size_append, hL, hR]; omega)
+    intro i h1 h2
+    simp only [Array.size_extract, Array.size_append, hL, hR] at h1
+    have hmin := Nat.min_le_left ((l + 1) * M) (m * M + m * M)
+    rw [Array.getElem_extract, Array.getElem_extract,
+      Array.getElem_append_left (by rw [hL]; omega)]
+  · rename_i hlm
+    have hge : m * M ≤ l * M := Nat.mul_le_mul_right M (by omega)
+    have hsub : (l - m) * M = l * M - m * M := Nat.sub_mul l m M
+    have hsub1 : (l - m + 1) * M = (l + 1) * M - m * M := by
+      rw [show l - m + 1 = l + 1 - m by omega, Nat.sub_mul]
+    apply Array.ext (by
+      simp only [Array.size_extract, Array.size_append, hL, hR]
+      rw [hsub, hsub1]
+      omega)
+    intro i h1 h2
+    simp only [Array.size_extract, Array.size_append, hL, hR] at h1
+    rw [Array.getElem_extract, Array.getElem_extract,
+      Array.getElem_append_right (by rw [hL]; omega)]
+    congr 1
+    rw [hL, hsub]
+    omega
+
+/-- Joining the leaf blocks of two equally blocked halves. -/
+theorem ofFn_blocks_append (SL SR : Array α) (M d : Nat) (hL : SL.size = 2 ^ d * M)
+    (hR : SR.size = 2 ^ d * M) (f : Array α → β) :
+    (Array.ofFn (n := 2 ^ d) fun l ↦ f (SL.extract (l * M) ((l + 1) * M))) ++
+      (Array.ofFn (n := 2 ^ d) fun l ↦ f (SR.extract (l * M) ((l + 1) * M))) =
+      Array.ofFn (n := 2 ^ (d + 1)) fun l ↦ f ((SL ++ SR).extract (l * M) ((l + 1) * M)) := by
+  have hp : 2 ^ (d + 1) = 2 * 2 ^ d := by rw [Nat.pow_succ]; ring
+  apply Array.ext (by simp only [Array.size_append, Array.size_ofFn]; omega)
+  intro i h1 h2
+  simp only [Array.size_append, Array.size_ofFn] at h1
+  rw [Array.getElem_ofFn, extract_append_blocks SL SR M (2 ^ d) i hL hR (by omega)]
+  by_cases hi : i < 2 ^ d
+  · rw [Array.getElem_append_left (by rw [Array.size_ofFn]; exact hi), Array.getElem_ofFn]
+    simp only [hi, ↓reduceIte]
+  · rw [Array.getElem_append_right (by rw [Array.size_ofFn]; omega), Array.getElem_ofFn]
+    simp only [hi, ↓reduceIte, Array.size_ofFn]
+
+/-- Every leaf of the binary split tree holds its block of the mathematical DIF output. -/
+theorem Native.splitChunks_leaves (D : NTT.Domain KoalaBear.Fast.Field)
+    (tw : Array (Array KoalaBear.Fast.Field)) (a : Array KoalaBear.Fast.Field)
+    (factor : KoalaBear.Fast.Field) (normalize : Bool) (depth : Nat)
+    (ht : TwiddlesFor D tw) (hs : a.size = D.n) (hu : 4 * D.n < USize.size)
+    (hn : ValidLeafNormalization D.logN depth normalize) (hd : depth ≤ D.logN) :
+    (Native.splitChunks (tw.map packFields) D.logN (packFields a) factor.val normalize
+      depth).get = Array.ofFn (n := 2 ^ depth) fun l ↦
+        packFields ((normalizedDifSpec D a factor normalize).extract
+          (l * 2 ^ (D.logN - depth)) ((l + 1) * 2 ^ (D.logN - depth))) := by
+  induction depth generalizing D a with
+  | zero =>
+    simp only [Native.splitChunks, Task.spawn]
+    rw [Native.stages_difSpec D tw a factor normalize ht hs hu
+      (by intro h; simpa only [Nat.sub_zero] using hn h)]
+    apply Array.ext (by simp only [List.size_toArray, List.length_cons, List.length_nil,
+      Nat.zero_add, Array.size_ofFn, Nat.pow_zero])
+    intro i h1 _
+    have hi : i = 0 := by
+      simp only [List.size_toArray, List.length_cons, List.length_nil] at h1
+      omega
+    subst hi
+    simp only [Array.getElem_ofFn, Nat.zero_mul, Nat.zero_add, Nat.one_mul, Nat.sub_zero]
+    have hsz := size_normalizedDifSpec D a factor normalize
+    change packFields _ = packFields _
+    congr 1
+    rw [show 2 ^ D.logN = (normalizedDifSpec D a factor normalize).size from hsz.symm]
+    simp only [normalizedDifSpec]
+    split <;> exact Array.extract_size.symm
+  | succ depth ih =>
+    have hlog : 0 < D.logN := by omega
+    rw [Native.splitChunks]
+    simp only [show D.logN ≠ 0 by omega, ↓reduceIte, Task.bind, Task.map, Task.spawn]
+    rw [Native.splitLeft_correct D hlog tw a ht hs hu,
+      Native.splitRight_correct D hlog tw a ht hs hu]
+    have ht' := TwiddlesFor.half D hlog tw ht
+    have hu' : 4 * (halfDomain D hlog).n < USize.size := by
+      have hh := halfDomain_size D hlog
+      omega
+    have hn' : ValidLeafNormalization (halfDomain D hlog).logN depth normalize := by
+      intro h
+      have he : (halfDomain D hlog).logN - depth = D.logN - (depth + 1) := by
+        change D.logN - 1 - depth = D.logN - (depth + 1)
+        omega
+      rw [he]
+      exact hn h
+    have hl : (splitFieldsLeft D a).size = (halfDomain D hlog).n := Array.size_ofFn
+    have hr : (splitFieldsRight D a).size = (halfDomain D hlog).n := Array.size_ofFn
+    have hd' : depth ≤ (halfDomain D hlog).logN := by change depth ≤ D.logN - 1; omega
+    change (Native.splitChunks _ (halfDomain D hlog).logN _ _ _ depth).get ++
+      (Native.splitChunks _ (halfDomain D hlog).logN _ _ _ depth).get = _
+    rw [ih (halfDomain D hlog) (splitFieldsLeft D a) ht' hl hu' hn' hd',
+      ih (halfDomain D hlog) (splitFieldsRight D a) ht' hr hu' hn' hd']
+    have he : (halfDomain D hlog).logN - depth = D.logN - (depth + 1) := by
+      change D.logN - 1 - depth = D.logN - (depth + 1)
+      omega
+    have hsz : ∀ x, (normalizedDifSpec (halfDomain D hlog) x factor normalize).size =
+        2 ^ depth * 2 ^ (D.logN - (depth + 1)) := by
+      intro x
+      rw [size_normalizedDifSpec]
+      change 2 ^ (D.logN - 1) = _
+      rw [← Nat.pow_add]
+      congr 1
+      omega
+    rw [he, ofFn_blocks_append _ _ _ depth (hsz _) (hsz _), normalizedDifSpec_split]
+/-- Every leaf of the binary input tree holds its block of the mathematical DIF output. -/
+theorem Native.splitInputChunks_leaves (D : NTT.Domain KoalaBear.Fast.Field)
+    (tw : Array (Array KoalaBear.Fast.Field)) (a : Array KoalaBear.Fast.Field)
+    (factor : KoalaBear.Fast.Field) (normalize : Bool) (depth : Nat)
+    (ht : TwiddlesFor D tw) (hs : a.size = D.n) (hu : 4 * D.n < USize.size)
+    (hn : ValidLeafNormalization D.logN depth normalize) (hd : depth ≤ D.logN) :
+    (Native.splitInputChunks (tw.map packFields) D.logN a factor.val normalize depth).get =
+      Array.ofFn (n := 2 ^ depth) fun l ↦
+        packFields ((normalizedDifSpec D a factor normalize).extract
+          (l * 2 ^ (D.logN - depth)) ((l + 1) * 2 ^ (D.logN - depth))) := by
+  rw [Native.splitInputChunks]
+  split
+  · rw [Native.encode_eq]
+    exact Native.splitChunks_leaves D tw a factor normalize depth ht hs hu hn hd
+  · rename_i hsplit
+    obtain ⟨d, rfl⟩ : ∃ d, depth = d + 1 := ⟨depth - 1, by omega⟩
+    have hlog : 0 < D.logN := by omega
+    simp only [Task.bind, Task.map, Task.spawn, Nat.add_sub_cancel]
+    rw [Native.splitInputLeft_correct D hlog tw a ht hs hu,
+      Native.splitInputRight_correct D hlog tw a ht hs hu]
+    have ht' := TwiddlesFor.half D hlog tw ht
+    have hu' : 4 * (halfDomain D hlog).n < USize.size := by
+      have hh := halfDomain_size D hlog
+      omega
+    have hn' : ValidLeafNormalization (halfDomain D hlog).logN d normalize := by
+      intro h
+      have he : (halfDomain D hlog).logN - d = D.logN - (d + 1) := by
+        change D.logN - 1 - d = D.logN - (d + 1)
+        omega
+      rw [he]
+      exact hn h
+    have hl : (splitFieldsLeft D a).size = (halfDomain D hlog).n := Array.size_ofFn
+    have hr : (splitFieldsRight D a).size = (halfDomain D hlog).n := Array.size_ofFn
+    have hd' : d ≤ (halfDomain D hlog).logN := by change d ≤ D.logN - 1; omega
+    change (Native.splitChunks _ (halfDomain D hlog).logN _ _ _ d).get ++
+      (Native.splitChunks _ (halfDomain D hlog).logN _ _ _ d).get = _
+    rw [Native.splitChunks_leaves (halfDomain D hlog) tw (splitFieldsLeft D a) factor normalize d
+        ht' hl hu' hn' hd',
+      Native.splitChunks_leaves (halfDomain D hlog) tw (splitFieldsRight D a) factor normalize d
+        ht' hr hu' hn' hd']
+    have he : (halfDomain D hlog).logN - d = D.logN - (d + 1) := by
+      change D.logN - 1 - d = D.logN - (d + 1)
+      omega
+    have hsz : ∀ x, (normalizedDifSpec (halfDomain D hlog) x factor normalize).size =
+        2 ^ d * 2 ^ (D.logN - (d + 1)) := by
+      intro x
+      rw [size_normalizedDifSpec]
+      change 2 ^ (D.logN - 1) = _
+      rw [← Nat.pow_add]
+      congr 1
+      omega
+    rw [he, ofFn_blocks_append _ _ _ d (hsz _) (hsz _), normalizedDifSpec_split]
+
 end CompPoly.CPolynomial.NTTFast.Packed

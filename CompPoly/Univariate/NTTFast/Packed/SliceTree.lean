@@ -250,6 +250,11 @@ def joinTasks (ts : Array (Task α)) : Task (Array α) :=
   ts.foldl (fun acc t ↦ acc.bind (sync := true) fun xs ↦ t.map (sync := true) fun x ↦ xs.push x)
     (.pure #[])
 
+/-- Post-process leaves in parallel tasks. -/
+def postLeaves (post : ByteArray → ByteArray) (leaves : Array ByteArray) :
+    Task (Array ByteArray) :=
+  joinTasks (leaves.map fun b ↦ Task.spawn fun _ ↦ post b)
+
 /-- Whether a node of `2 ^ logN` words held as `k` slices splits into chunk tasks: a single
 buffer splits into `P` chunks of whole batches, an even number of slices into slice pairs. -/
 def sliceShape (logN k P : Nat) : Bool :=
@@ -278,23 +283,26 @@ def sliceSplit (w : ByteArray) (logN : Nat) (slices : Array ByteArray) (P : Nat)
 def joinSlices (capacity : Nat) (slices : Array ByteArray) : ByteArray :=
   if slices.size == 1 then slices.getD 0 .empty else assembleChunks capacity slices
 
-/-- The task tree over a node held as slices; returns the transformed leaves in order. -/
+/-- The task tree over a node held as slices; returns the transformed leaves in order, each
+post-processed by `post` inside its leaf task. -/
 def sliceChunks (tw : Array ByteArray) (logN : Nat) (slices : Array ByteArray) (nInv : UInt32)
-    (normalize : Bool) (P : Nat) : Nat → Task (Array ByteArray)
+    (normalize : Bool) (P : Nat) (post : ByteArray → ByteArray) : Nat → Task (Array ByteArray)
   | 0 => Task.spawn fun _ ↦
-    #[stages logN tw (assembleChunks (4 * 2 ^ logN) slices) nInv normalize]
+    #[post (stages logN tw (assembleChunks (4 * 2 ^ logN) slices) nInv normalize)]
   | depth + 1 =>
     if sliceShape logN slices.size P then
       let chunks := sliceSplit (tw.getD (logN - 1) .empty) logN slices P
       (joinTasks chunks).bind (sync := true) fun rs ↦
-        let left := sliceChunks tw (logN - 1) (rs.map (·.1)) nInv normalize P depth
-        let right := sliceChunks tw (logN - 1) (rs.map (·.2)) nInv normalize P depth
+        let left := sliceChunks tw (logN - 1) (rs.map (·.1)) nInv normalize P post depth
+        let right := sliceChunks tw (logN - 1) (rs.map (·.2)) nInv normalize P post depth
         left.bind (sync := true) fun lo ↦ right.map (sync := true) fun hi ↦ lo ++ hi
-    else splitChunks tw logN (joinSlices (4 * 2 ^ logN) slices) nInv normalize (depth + 1)
+    else (splitChunks tw logN (joinSlices (4 * 2 ^ logN) slices) nInv normalize
+      (depth + 1)).bind (sync := true) (postLeaves post)
 
 /-- The sliced task tree of a field array: the first level reads the field array directly. -/
 def sliceInputChunks (tw : Array ByteArray) (logN : Nat) (a : Array KoalaBear.Fast.Field)
-    (nInv : UInt32) (normalize : Bool) (P depth : Nat) : Task (Array ByteArray) :=
+    (nInv : UInt32) (normalize : Bool) (P : Nat) (post : ByteArray → ByteArray) (depth : Nat) :
+    Task (Array ByteArray) :=
   let half := 2 ^ (logN - 1)
   if depth ≠ 0 ∧ 6 ≤ logN ∧ P ≠ 0 ∧ half % (16 * P) = 0 then
     let w := tw.getD (logN - 1) .empty
@@ -303,9 +311,9 @@ def sliceInputChunks (tw : Array ByteArray) (logN : Nat) (a : Array KoalaBear.Fa
       pairInputGo a w (cs / 16) (q * cs) (half + q * cs) (q * cs)
         (.emptyWithCapacity (4 * cs)) (.emptyWithCapacity (4 * cs + 1))
     (joinTasks chunks).bind (sync := true) fun rs ↦
-      let left := sliceChunks tw (logN - 1) (rs.map (·.1)) nInv normalize P (depth - 1)
-      let right := sliceChunks tw (logN - 1) (rs.map (·.2)) nInv normalize P (depth - 1)
+      let left := sliceChunks tw (logN - 1) (rs.map (·.1)) nInv normalize P post (depth - 1)
+      let right := sliceChunks tw (logN - 1) (rs.map (·.2)) nInv normalize P post (depth - 1)
       left.bind (sync := true) fun lo ↦ right.map (sync := true) fun hi ↦ lo ++ hi
-  else splitInputChunks tw logN a nInv normalize depth
+  else (splitInputChunks tw logN a nInv normalize depth).bind (sync := true) (postLeaves post)
 
 end CompPoly.CPolynomial.NTTFast.Packed.Native

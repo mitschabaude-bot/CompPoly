@@ -24,35 +24,41 @@ namespace CompPoly.CPolynomial.NTTFast.Packed.Native
 @[inline] def scaleWord (factor : UInt32) (scale : Bool) (x : UInt32) : UInt32 :=
   if scale then mul factor x else x
 
-/-- Read a leaf word at its locally bit-reversed position. -/
-@[inline] def revWord (b : @& ByteArray) (base : USize) (shift factor : UInt32) (scale : Bool)
-    (q : USize) : UInt32 :=
-  scaleWord factor scale (readWord b (base + (reverse32 q.toUInt32 >>> shift).toUSize))
+/-- Word offset `k * st`. -/
+@[inline] def strideOff (k : Nat) (st : USize) : USize := k.toUSize * st
 
-/-- Append sixteen consecutive locally reversed leaf words. -/
-@[noinline] def leafRevStep (b : @& ByteArray) (base : USize) (shift factor : UInt32)
-    (scale : Bool) (q : USize) (out : ByteArray) : ByteArray :=
-  storeWords out 0 16 true (revWord b base shift factor scale q)
-    (revWord b base shift factor scale (q + 1)) (revWord b base shift factor scale (q + 2))
-    (revWord b base shift factor scale (q + 3)) (revWord b base shift factor scale (q + 4))
-    (revWord b base shift factor scale (q + 5)) (revWord b base shift factor scale (q + 6))
-    (revWord b base shift factor scale (q + 7)) (revWord b base shift factor scale (q + 8))
-    (revWord b base shift factor scale (q + 9)) (revWord b base shift factor scale (q + 10))
-    (revWord b base shift factor scale (q + 11)) (revWord b base shift factor scale (q + 12))
-    (revWord b base shift factor scale (q + 13)) (revWord b base shift factor scale (q + 14))
-    (revWord b base shift factor scale (q + 15))
+/-- Append sixteen consecutive locally reversed words from local index `q`, a multiple of
+sixteen: their positions are `bitrev q + bitrev₄ u * st` with one reversal per batch. -/
+@[noinline] def leafRevStep (b : @& ByteArray) (shift factor : UInt32) (scale : Bool)
+    (st q : USize) (out : ByteArray) : ByteArray :=
+  let r := (reverse32 q.toUInt32 >>> shift).toUSize
+  storeWords out 0 16 true (scaleWord factor scale (readWord b (r + strideOff 0 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 8 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 4 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 12 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 2 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 10 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 6 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 14 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 1 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 9 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 5 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 13 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 3 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 11 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 7 st)))
+    (scaleWord factor scale (readWord b (r + strideOff 15 st)))
 
 /-- Append `count` batches of sixteen locally reversed words, starting at local index `q`. -/
-def leafRevGo (b : @& ByteArray) (base : USize) (shift factor : UInt32) (scale : Bool) :
+def leafRevGo (b : @& ByteArray) (shift factor : UInt32) (scale : Bool) (st : USize) :
     Nat → USize → ByteArray → ByteArray
   | 0, _, out => out
   | count + 1, q, out =>
-    leafRevGo b base shift factor scale count (q + 16)
-      (leafRevStep b base shift factor scale q out)
+    leafRevGo b shift factor scale st count (q + 16) (leafRevStep b shift factor scale st q out)
 
-/-- Leaf `l` of sixteen `2 ^ logM`-word leaves of `b`, in locally bit-reversed order. -/
-def leafRev (b : @& ByteArray) (logM l : Nat) (factor : UInt32) (scale : Bool) : ByteArray :=
-  leafRevGo b (l * 2 ^ logM).toUSize (32 - logM).toUInt32 factor scale (2 ^ logM / 16) 0
+/-- A `2 ^ logM`-word leaf in locally bit-reversed order, optionally scaled, `4 ≤ logM`. -/
+def leafRev (b : @& ByteArray) (logM : Nat) (factor : UInt32) (scale : Bool) : ByteArray :=
+  leafRevGo b (32 - logM).toUInt32 factor scale (2 ^ (logM - 4)).toUSize (2 ^ logM / 16) 0
     (ByteArray.emptyWithCapacity (4 * 2 ^ logM))
 
 /-- Sixteen consecutive words of one buffer. -/
@@ -155,13 +161,10 @@ def interleaveRange (r : @& Array ByteArray) (q count : Nat) : ByteArray :=
     (r.getD 3 .empty) (r.getD 11 .empty) (r.getD 7 .empty) (r.getD 15 .empty)
     count q.toUSize (ByteArray.emptyWithCapacity (1024 * count))
 
-/-- Natural-order packed words of a bit-reversed `2 ^ logN`-word buffer, `8 ≤ logN`.
-Leaf reversal and interleaving each use sixteen tasks; the joins copy bytes. -/
-def natural (b : ByteArray) (logN : Nat) (factor : UInt32) (scale : Bool) : ByteArray :=
-  let logM := logN - 4
-  let r := (Array.range 16).map fun l ↦ Task.spawn fun _ ↦ leafRev b logM l factor scale
-  let r := r.map Task.get
-  let count := 2 ^ logM / 256
+/-- Natural-order packed words from sixteen locally reversed leaves of `2 ^ (logN - 4)` words,
+`12 ≤ logN`. Sixteen interleave tasks run in parallel; the join copies bytes. -/
+def naturalLeaves (r : Array ByteArray) (logN : Nat) : ByteArray :=
+  let count := 2 ^ (logN - 4) / 256
   let blocks := (Array.range 16).map fun t ↦ Task.spawn fun _ ↦
     interleaveRange r (16 * count * t) count
   blocks.foldl (fun acc t ↦ acc ++ t.get) (ByteArray.emptyWithCapacity (4 * 2 ^ logN))
@@ -198,19 +201,22 @@ def sliceCount (logN depth : Nat) : Nat :=
 def runPacked (tw : Array ByteArray) (logN depth : Nat) (nInv : UInt32) (a : ByteArray)
     (inverse : Bool) : ByteArray :=
   let normalize := inverse && logN - depth ≥ 4 && (logN - depth) % 2 == 0
-  let b := assembleChunks (4 * 2 ^ logN)
-    (sliceChunks tw logN #[a] nInv normalize (sliceCount logN depth) depth).get
-  if naturalShape logN depth then natural b logN nInv (inverse && !normalize)
-  else encode (decodeTiled logN b nInv (inverse && !normalize))
+  let scale := inverse && !normalize
+  if naturalShape logN depth then
+    naturalLeaves (sliceChunks tw logN #[a] nInv normalize (sliceCount logN depth)
+      (fun b ↦ leafRev b (logN - 4) nInv scale) depth).get logN
+  else
+    encode (decodeTiled logN (assembleChunks (4 * 2 ^ logN)
+      (sliceChunks tw logN #[a] nInv normalize (sliceCount logN depth) id depth).get) nInv scale)
 
 /-- Complete transform of a field array; natural-order field output. -/
 def runFields (tw : Array ByteArray) (logN depth : Nat) (nInv : UInt32)
     (a : Array KoalaBear.Fast.Field) (inverse : Bool) : Array KoalaBear.Fast.Field :=
   if naturalShape logN depth then
     let normalize := inverse && logN - depth ≥ 4 && (logN - depth) % 2 == 0
-    let b := assembleChunks (4 * 2 ^ logN)
-      (sliceInputChunks tw logN a nInv normalize (sliceCount logN depth) depth).get
-    unpack (natural b logN nInv (inverse && !normalize)) (2 ^ logN)
+    let scale := inverse && !normalize
+    unpack (naturalLeaves (sliceInputChunks tw logN a nInv normalize (sliceCount logN depth)
+      (fun b ↦ leafRev b (logN - 4) nInv scale) depth).get logN) (2 ^ logN)
   else run tw logN depth nInv a inverse
 
 end CompPoly.CPolynomial.NTTFast.Packed.Native

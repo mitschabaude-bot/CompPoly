@@ -767,3 +767,7 @@ One fused pass with two outputs took 0.62 ms per split level at 2^20 serially, a
 | 16 | inverse | 6.71 → 5.58 ms (strict) | 10.29 → 9.57 ms (strict) |
 
 The field-array API gains less because its sequential decode is unchanged. At 2^16 the binary tree remains (all paired rows overlapped).
+
+### Leaf-local reversal (2026-10-06)
+
+Each leaf task now also reverses its own leaf (`leafRev`, one `reverse32` per sixteen words with strided reads), so the reordering no longer waits for all leaves, assembles a buffer or spawns a second task wave; `naturalLeaves` interleaves the reversed leaves directly. `sliceChunks` and `sliceInputChunks` take the leaf post-processing function, and their theorems became array equalities: the leaves equal the `splitChunks` leaves, post-processed. `splitChunks_leaves` and `splitInputChunks_leaves` characterize every leaf as its packed block of the DIF output, which `naturalLeaves_packFields` decodes. Where the tree falls back to `splitChunks`, the post-processing runs as parallel tasks after the leaves. Five to seven paired rounds against the sliced-tree commit, one million points, eight workers: packed I/O 5.38 → 4.92 ms forward and 5.43 → 4.80 ms inverse, the field-array API 9.15 → 8.35 and 9.30 → 8.50 ms, all with strict separation; 2^16 rows were unchanged. A radix-2 leaf kernel, which keeps fewer values live than the radix-four `step16`, was slower (0.70 against 0.56 ms per 2^16 leaf), so the arithmetic kernels are unchanged.
