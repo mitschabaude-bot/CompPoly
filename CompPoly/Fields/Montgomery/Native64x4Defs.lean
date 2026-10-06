@@ -227,13 +227,17 @@ subtraction of the modulus, and never happens for a modulus below `2 ^ 255`. -/
   if t.t4 != 0 then ⟨d0, d1, d2, d3⟩ else if bo == 0 then ⟨d0, d1, d2, d3⟩
   else ⟨t.t0, t.t1, t.t2, t.t3⟩
 
-/-- CIOS Montgomery multiplication: four rounds followed by one conditional subtraction. -/
-@[inline] def mul (q : Limbs4) (negInv : UInt64) (a b : Limbs4) : Limbs4 :=
+/-- Four CIOS Montgomery rounds, retaining the carry limb and omitting normalization. -/
+@[inline] def mulUnreduced (q : Limbs4) (negInv : UInt64) (a b : Limbs4) : State5 :=
   let t := mulRound q negInv a b.l0 State5.zero
   let t := mulRound q negInv a b.l1 t
   let t := mulRound q negInv a b.l2 t
   let t := mulRound q negInv a b.l3 t
-  condSubWide q t
+  t
+
+/-- CIOS Montgomery multiplication followed by one conditional subtraction. -/
+@[inline] def mul (q : Limbs4) (negInv : UInt64) (a b : Limbs4) : Limbs4 :=
+  condSubWide q (mulUnreduced q negInv a b)
 
 /-- Accumulate a precomputed low/high product, preserving the full carry word. -/
 @[inline] def macWords (t lo hi c : UInt64) : UInt64 × UInt64 :=
