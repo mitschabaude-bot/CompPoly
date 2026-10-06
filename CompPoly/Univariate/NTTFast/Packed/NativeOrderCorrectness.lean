@@ -8,7 +8,9 @@ module
 import all CompPoly.Univariate.NTTFast.Packed.Native
 import all CompPoly.Univariate.NTTFast.Packed.NativeOrder
 public import CompPoly.Univariate.NTTFast.Packed.NativeOrder
+public import CompPoly.Univariate.NTTFast.Packed.Rows
 public import CompPoly.Univariate.NTTFast.Packed.Correctness
+public import CompPoly.Univariate.NTTFast.Packed.SliceTreeCorrectness
 
 /-! # Correctness of the parallel natural-order output
 
@@ -20,72 +22,6 @@ tile, leaf-reversal and join proofs reduce to index arithmetic.
 @[expose] public section
 open CompPoly
 namespace CompPoly.CPolynomial.NTTFast.Packed
-
-/-- Sixteen values of a function as an array literal. -/
-def lit16 (g : Nat → α) : Array α :=
-  #[g 0, g 1, g 2, g 3, g 4, g 5, g 6, g 7, g 8, g 9, g 10, g 11, g 12, g 13, g 14, g 15]
-
-@[simp] theorem size_lit16 (g : Nat → α) : (lit16 g).size = 16 := rfl
-
-theorem getD_lit16 (g : Nat → α) (c : Nat) (hc : c < 16) (d : α) :
-    (lit16 g).getD c d = g c := by
-  interval_cases c <;> rfl
-
-/-- Concatenated sixteen-entry rows; row `j` holds `g j 0, …, g j 15`. -/
-def rows (g : Nat → Nat → α) : Nat → Array α
-  | 0 => #[]
-  | k + 1 => rows g k ++ lit16 (g k)
-
-@[simp] theorem size_rows (g : Nat → Nat → α) (k : Nat) : (rows g k).size = 16 * k := by
-  induction k with
-  | zero => rfl
-  | succ k ih =>
-    simp only [rows, Array.size_append, ih, size_lit16]
-    omega
-
-theorem getD_append_eq (a b : Array α) (i : Nat) (d : α) :
-    (a ++ b).getD i d = if i < a.size then a.getD i d else b.getD (i - a.size) d := by
-  simp only [Array.getD_eq_getD_getElem?]
-  split
-  · rw [Array.getElem?_append_left ‹_›]
-  · rw [Array.getElem?_append_right (by omega)]
-
-theorem getD_rows (g : Nat → Nat → α) (k i : Nat) (hi : i < 16 * k) (d : α) :
-    (rows g k).getD i d = g (i / 16) (i % 16) := by
-  induction k with
-  | zero => omega
-  | succ k ih =>
-    simp only [rows]
-    rw [getD_append_eq, size_rows]
-    split
-    · exact ih ‹_›
-    · rw [getD_lit16 _ _ (by omega)]
-      have h1 : i / 16 = k := by omega
-      have h2 : i % 16 = i - 16 * k := by omega
-      rw [h1, h2]
-
-theorem rows_add (g : Nat → Nat → α) (a b : Nat) :
-    rows g (a + b) = rows g a ++ rows (fun j ↦ g (a + j)) b := by
-  induction b with
-  | zero => simp only [Nat.add_zero, rows, Array.append_empty]
-  | succ b ih =>
-    rw [← Nat.add_assoc, rows, ih, rows, Array.append_assoc]
-
-theorem rows_congr (g g' : Nat → Nat → α) (k : Nat) (h : ∀ j c, c < 16 → g j c = g' j c) :
-    rows g k = rows g' k := by
-  induction k with
-  | zero => rfl
-  | succ k ih =>
-    simp only [rows, ih, lit16]
-    rw [h k 0 (by decide), h k 1 (by decide), h k 2 (by decide), h k 3 (by decide),
-      h k 4 (by decide), h k 5 (by decide), h k 6 (by decide), h k 7 (by decide),
-      h k 8 (by decide), h k 9 (by decide), h k 10 (by decide), h k 11 (by decide),
-      h k 12 (by decide), h k 13 (by decide), h k 14 (by decide), h k 15 (by decide)]
-
-theorem getD_map_range (F : Nat → α) (n k : Nat) (hk : k < n) (d : α) :
-    ((Array.range n).map F).getD k d = F k := by
-  simp only [Array.getD_eq_getD_getElem?, Array.getElem?_map, Array.getElem?_range, hk,
-    ↓reduceIte, Option.map_some, Option.getD_some]
 
 namespace Native
 
@@ -171,9 +107,6 @@ theorem transposeStep_pack (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v1
     show (16 : UInt8).toNat = 16 from rfl]
   simp only [rows, lit16, Array.append_assoc, Array.empty_append]
   rfl
-
-/-- Pack an empty array, whatever capacity was reserved. -/
-theorem emptyWithCapacity_eq_pack (k : Nat) : ByteArray.emptyWithCapacity k = pack #[] := rfl
 
 /-- Adding a small numeral to a machine index that cannot wrap. -/
 theorem usize_add_numeral (q : USize) (k : Nat) (hk : k < 4294967296)
@@ -521,18 +454,22 @@ theorem Native.runPacked_dft (D : NTT.Domain KoalaBear.Fast.Field)
     rw [size_packFields, hsize]
     exact hu
   have hb : Native.assembleChunks (4 * 2 ^ D.logN)
-      (Native.splitChunks (tw.map packFields) D.logN (packFields a) factor.val normalize
-        depth).get = packFields (normalizedDifSpec D a factor normalize) := by
-    rw [Native.assembleChunks_capacity, Native.splitChunks_eq,
+      (Native.sliceChunks (tw.map packFields) D.logN #[packFields a] factor.val normalize
+        (Native.sliceCount D.logN depth) depth).get =
+          packFields (normalizedDifSpec D a factor normalize) := by
+    rw [Native.assembleChunks_capacity, ← Native.slicesOf_one a D.n hs,
+      Native.sliceChunks_assemble tw _ _ _ _ D.logN 1 D.n _ (Nat.one_mul _) (by decide)
+        (TwiddlesFor.invariants D tw ht).1 hu]
+    rw [Native.ofFn_getD a (2 ^ D.logN) hs, Native.splitChunks_eq,
       Native.splitTask_correct D tw a factor normalize depth ht hs hu hn]
   unfold Native.runPacked
   change (if Native.naturalShape D.logN depth then
-    Native.natural (Native.assembleChunks (4 * 2 ^ D.logN) (Native.splitChunks
-      (tw.map packFields) D.logN (packFields a) factor.val normalize depth).get) D.logN factor.val
-      (inverse && !normalize)
+    Native.natural (Native.assembleChunks (4 * 2 ^ D.logN) (Native.sliceChunks
+      (tw.map packFields) D.logN #[packFields a] factor.val normalize
+        (Native.sliceCount D.logN depth) depth).get) D.logN factor.val (inverse && !normalize)
     else Native.encode (Native.decodeTiled D.logN (Native.assembleChunks (4 * 2 ^ D.logN)
-      (Native.splitChunks (tw.map packFields) D.logN (packFields a) factor.val normalize
-        depth).get) factor.val (inverse && !normalize))) = _
+      (Native.sliceChunks (tw.map packFields) D.logN #[packFields a] factor.val normalize
+        (Native.sliceCount D.logN depth) depth).get) factor.val (inverse && !normalize))) = _
   rw [hb]
   split
   · rename_i hshape
@@ -570,9 +507,11 @@ theorem Native.runFields_dft (D : NTT.Domain KoalaBear.Fast.Field)
       exact hu
     have hdec := decodedFields_normalizedDifSpec D a factor normalize inverse hi
     change Native.unpack (Native.natural (Native.assembleChunks (4 * 2 ^ D.logN)
-      (Native.splitInputChunks (tw.map packFields) D.logN a factor.val normalize depth).get)
-        D.logN factor.val (inverse && !normalize)) (2 ^ D.logN) = _
-    rw [Native.assembleChunks_capacity, Native.splitInputChunks_eq,
+      (Native.sliceInputChunks (tw.map packFields) D.logN a factor.val normalize
+        (Native.sliceCount D.logN depth) depth).get) D.logN factor.val (inverse && !normalize))
+        (2 ^ D.logN) = _
+    rw [Native.assembleChunks_capacity, Native.sliceInputChunks_assemble tw a D.logN depth _ _ _ hs
+        (TwiddlesFor.invariants D tw ht).1 hu, Native.splitInputChunks_eq,
       Native.splitInputTask_correct D tw a factor normalize depth ht hs hu hn,
       Native.natural_packFields _ _ factor _ hshape.1.2 h32 hsize hpu, hdec]
     have hd : (if inverse then (NTT.Forward.forwardSpec D a).map (fun x ↦ factor * x)

@@ -35,7 +35,8 @@ lean_lib CompPoly where
 /-- CPU-targeted packed FFT kernels; the proof artifacts remain platform independent. -/
 lean_lib CompPolyPackedNative where
   roots := #[`CompPoly.Univariate.NTTFast.Packed.Native,
-    `CompPoly.Univariate.NTTFast.Packed.NativeOrder]
+    `CompPoly.Univariate.NTTFast.Packed.NativeOrder,
+    `CompPoly.Univariate.NTTFast.Packed.SliceTree]
   platformIndependent := true
   moreLeancArgs := #["-march=native"]
 
@@ -74,3 +75,6 @@ lean_exe axiomsweep where
   srcDir := "scripts"
   root := `AxiomSweep
   supportInterpreter := true
+lean_exe ScratchNTTPhases where
+  srcDir := "bench"
+  moreLeancArgs := #["-march=native"]

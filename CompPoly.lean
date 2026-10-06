@@ -394,8 +394,11 @@ public import CompPoly.Univariate.NTTFast.Packed.QuadCells
 public import CompPoly.Univariate.NTTFast.Packed.Radix4Lemmas
 public import CompPoly.Univariate.NTTFast.Packed.RecursiveFormula
 public import CompPoly.Univariate.NTTFast.Packed.RecursiveOrdering
+public import CompPoly.Univariate.NTTFast.Packed.Rows
 public import CompPoly.Univariate.NTTFast.Packed.Scaling
 public import CompPoly.Univariate.NTTFast.Packed.Scatter
+public import CompPoly.Univariate.NTTFast.Packed.SliceTree
+public import CompPoly.Univariate.NTTFast.Packed.SliceTreeCorrectness
 public import CompPoly.Univariate.NTTFast.Packed.SplitCorrectness
 public import CompPoly.Univariate.NTTFast.Packed.SplitRefinement
 public import CompPoly.Univariate.NTTFast.Packed.StageCorrectness

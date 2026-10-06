@@ -5,7 +5,7 @@ Authors: Gregor Mitscha-Baude
 -/
 module
 
-public import CompPoly.Univariate.NTTFast.Packed.Native
+public import CompPoly.Univariate.NTTFast.Packed.SliceTree
 
 /-! # Parallel natural-order output for the packed FFT
 
@@ -189,11 +189,17 @@ def unpack (b : @& ByteArray) (n : Nat) : Array KoalaBear.Fast.Field :=
 def naturalShape (logN depth : Nat) : Bool :=
   depth == 4 && 12 ≤ logN && logN ≤ 28
 
+/-- Chunk tasks per split level: sliced trees from `2 ^ 18` elements, where every leaf then
+receives one slice; `0` keeps the binary split tree for smaller transforms. -/
+def sliceCount (logN depth : Nat) : Nat :=
+  if 18 ≤ logN then 2 ^ (depth - 1) else 0
+
 /-- Complete transform of a packed buffer; packed natural-order output. -/
 def runPacked (tw : Array ByteArray) (logN depth : Nat) (nInv : UInt32) (a : ByteArray)
     (inverse : Bool) : ByteArray :=
   let normalize := inverse && logN - depth ≥ 4 && (logN - depth) % 2 == 0
-  let b := assembleChunks (4 * 2 ^ logN) (splitChunks tw logN a nInv normalize depth).get
+  let b := assembleChunks (4 * 2 ^ logN)
+    (sliceChunks tw logN #[a] nInv normalize (sliceCount logN depth) depth).get
   if naturalShape logN depth then natural b logN nInv (inverse && !normalize)
   else encode (decodeTiled logN b nInv (inverse && !normalize))
 
@@ -202,7 +208,8 @@ def runFields (tw : Array ByteArray) (logN depth : Nat) (nInv : UInt32)
     (a : Array KoalaBear.Fast.Field) (inverse : Bool) : Array KoalaBear.Fast.Field :=
   if naturalShape logN depth then
     let normalize := inverse && logN - depth ≥ 4 && (logN - depth) % 2 == 0
-    let b := assembleChunks (4 * 2 ^ logN) (splitInputChunks tw logN a nInv normalize depth).get
+    let b := assembleChunks (4 * 2 ^ logN)
+      (sliceInputChunks tw logN a nInv normalize (sliceCount logN depth) depth).get
     unpack (natural b logN nInv (inverse && !normalize)) (2 ^ logN)
   else run tw logN depth nInv a inverse
 
