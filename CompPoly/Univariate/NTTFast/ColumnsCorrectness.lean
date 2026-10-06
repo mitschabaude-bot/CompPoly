@@ -599,66 +599,74 @@ theorem columnTask_col [Field R] [DecidableEq R] (x : Array R) (tw : Array (Arra
 /-- The optional scaling of a reversed leaf. -/
 def scaleBy [Mul α] (scale : Bool) (f v : α) : α := if scale then f * v else v
 
-/-- Reversal steps store bit-reversed, optionally scaled entries from position `q` on. -/
-theorem reverseGo_spec [Zero α] [Mul α] (a : Array α) (m : Nat) (scale : Bool) (f : α)
-    (hm : 0 < m) (h32 : m ≤ 32) (ha : a.size = 2 ^ m) (hu : 2 ^ m < USize.size) :
-    ∀ (n : Nat) (q : USize) (out : Array α), (2 ^ m).toUSize.toNat - q.toNat = n →
-      out.size = 2 ^ m →
-      (reverseGo a (32 - m).toUInt32 scale f (2 ^ m).toUSize q out).size = 2 ^ m ∧
-        ∀ k, (reverseGo a (32 - m).toUInt32 scale f (2 ^ m).toUSize q out).getD k 0 =
-          if q.toNat ≤ k ∧ k < 2 ^ m then
-            scaleBy scale f (a.getD (NTT.Transform.bitRevNat m k) 0)
-          else out.getD k 0 := by
+/-- Reversal steps store bit-reversed, optionally scaled words from position `q` on. -/
+theorem reverseEncodeGo_spec [Zero α] [Mul α] [Word32Repr α] (a : Array α) (m : Nat)
+    (scale : Bool) (f : α) (hm : 0 < m) (h32 : m ≤ 32) (ha : a.size = 2 ^ m) (off M : USize)
+    (hM : M.toNat = 2 ^ m) :
+    ∀ (n : Nat) (q : USize) (out : ByteArray) (hd hu), M.toNat - q.toNat = n →
+      (reverseEncodeGo a (32 - m).toUInt32 scale f off M q out hd hu).size = out.size ∧
+        ∀ k, ByteWords.wordAt (reverseEncodeGo a (32 - m).toUInt32 scale f off M q out hd hu) k =
+          if off.toNat + q.toNat ≤ k ∧ k < off.toNat + 2 ^ m then
+            Word32Repr.toWord (scaleBy scale f
+              (a.getD (NTT.Transform.bitRevNat m (k - off.toNat)) 0))
+          else ByteWords.wordAt out k := by
   have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
-  have hM : (2 ^ m).toUSize.toNat = 2 ^ m := USize.toNat_ofNat_of_lt' hu
   intro n
   induction n with
   | zero =>
-    intro q out hn hout
-    rw [reverseGo, dite_eq_right_iff.mpr (fun h ↦ absurd h (by
+    intro q out hd hu hn
+    rw [reverseEncodeGo, dite_eq_right_iff.mpr (fun h ↦ absurd h (by
       rw [USize.lt_iff_toNat_lt]; omega))]
-    exact ⟨hout, fun k ↦ by rw [ite_eq_right (by omega)]⟩
+    exact ⟨rfl, fun k ↦ by rw [ite_eq_right (by omega)]⟩
   | succ n ih =>
-    intro q out hn hout
-    have hq : q < (2 ^ m).toUSize := by rw [USize.lt_iff_toNat_lt]; omega
+    intro q out hd hu hn
+    have hq : q < M := by rw [USize.lt_iff_toNat_lt]; omega
+    have hMs := M.toNat_lt_size
     have hq1 : (q + 1).toNat = q.toNat + 1 := Plan.usize_add_one q (by omega)
+    have ho : (off + q).toNat = off.toNat + q.toNat := by
+      rw [USize.toNat_add]; exact Nat.mod_eq_of_lt (by omega)
     have hr : (reverse32 q.toUInt32 >>> (32 - m).toUInt32).toUSize.toNat =
         NTT.Transform.bitRevNat m q.toNat := by
       rw [UInt32.toNat_toUSize, show q.toUInt32 = q.toNat.toUInt32 from UInt32.toFin_inj.mp rfl]
       exact reverse32_shift_eq_bitRevNat m q.toNat hm h32
-    have hb : (reverse32 q.toUInt32 >>> (32 - m).toUInt32).toUSize.toNat < a.size ∧
-        q.toNat < out.size := by
-      rw [hr, ha, hout]
-      exact ⟨NTT.Transform.bitRevNat_lt _ _, by omega⟩
-    rw [reverseGo, dite_eq_left_of_eq_true (eq_true hq)]
+    have hb : (reverse32 q.toUInt32 >>> (32 - m).toUInt32).toUSize.toNat < a.size := by
+      rw [hr, ha]; exact NTT.Transform.bitRevNat_lt _ _
+    rw [reverseEncodeGo, dite_eq_left_of_eq_true (eq_true hq)]
     dsimp only
     rw [dite_eq_left_of_eq_true (eq_true hb)]
-    obtain ⟨hs', hv'⟩ := ih (q + 1) (out.uset q (if scale then
-        f * a.uget (reverse32 q.toUInt32 >>> (32 - m).toUInt32).toUSize hb.1 else
-        a.uget (reverse32 q.toUInt32 >>> (32 - m).toUInt32).toUSize hb.1) hb.2)
-      (by rw [hq1]; omega) (by rw [Array.size_uset, hout])
-    refine ⟨hs', fun k ↦ ?_⟩
-    rw [hv' k, hq1, getD_uset]
-    by_cases hk : k = q.toNat
+    obtain ⟨hs', hv'⟩ := ih (q + 1) _ _ _ (by rw [hq1]; omega)
+    refine ⟨by rw [hs', ByteWords.size_writeWordU], fun k ↦ ?_⟩
+    rw [hv' k, hq1, ByteWords.wordAt_writeWordU, ho]
+    by_cases hk : k = off.toNat + q.toNat
     · subst k
-      have hlt : q.toNat < 2 ^ m := by omega
-      simp only [show ¬(q.toNat + 1 ≤ q.toNat) by omega, false_and, ↓reduceIte, Nat.le_refl,
-        true_and, hlt, scaleBy]
+      simp only [show ¬(off.toNat + (q.toNat + 1) ≤ off.toNat + q.toNat) by omega, false_and,
+        ↓reduceIte, Nat.le_refl, true_and, show off.toNat + q.toNat < off.toNat + 2 ^ m by omega,
+        Nat.add_sub_cancel_left, scaleBy]
       rw [uget_eq_getD _ _ _ 0 _ hr]
-    · by_cases hk' : q.toNat + 1 ≤ k ∧ k < 2 ^ m
+    · by_cases hk' : off.toNat + (q.toNat + 1) ≤ k ∧ k < off.toNat + 2 ^ m
       · rw [ite_eq_left hk', ite_eq_left (by omega)]
-      · rw [ite_eq_right hk', ite_eq_right (by omega), ite_eq_right (by omega)]
+      · rw [ite_eq_right hk', ite_eq_right hk, ite_eq_right (by omega)]
 
-/-- A reversed leaf: entry `k` is entry `bitrev k`, optionally scaled. -/
-theorem reverseLeaf_spec [Zero α] [Mul α] (a : Array α) (m : Nat) (scale : Bool) (f : α)
-    (hm : 0 < m) (h32 : m ≤ 32) (ha : a.size = 2 ^ m) (hu : 2 ^ m < USize.size) :
-    (reverseLeaf m scale f a).size = 2 ^ m ∧ ∀ k < 2 ^ m,
-      (reverseLeaf m scale f a).getD k 0 =
-        scaleBy scale f (a.getD (NTT.Transform.bitRevNat m k) 0) := by
-  obtain ⟨hs, hv⟩ := reverseGo_spec a m scale f hm h32 ha hu _ 0 (Array.replicate (2 ^ m) 0) rfl
-    Array.size_replicate
-  exact ⟨hs, fun k hk ↦ by
-    rw [reverseLeaf, hv k, ite_eq_left (by simp only [USize.toNat_zero]; omega)]⟩
+/-- A reversed leaf: word `off + k` is entry `bitrev k`, optionally scaled. -/
+theorem reverseEncode_spec [Zero α] [Mul α] [Word32Repr α] (a : Array α) (m : Nat)
+    (scale : Bool) (f : α) (off : Nat) (hm : 0 < m) (h32 : m ≤ 32) (ha : a.size = 2 ^ m)
+    (hu : 4 * (off + 2 ^ m) < USize.size) :
+    (reverseEncode m scale f a off).size = 4 * (off + 2 ^ m) ∧ ∀ k < 2 ^ m,
+      ByteWords.wordAt (reverseEncode m scale f a off) (off + k) =
+        Word32Repr.toWord (scaleBy scale f (a.getD (NTT.Transform.bitRevNat m k) 0)) := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  have h2 := Nat.two_pow_pos m
+  unfold reverseEncode
+  rw [dite_eq_left_of_eq_true (eq_true hu)]
+  obtain ⟨hs, hv⟩ := reverseEncodeGo_spec a m scale f hm h32 ha (USize.ofNatLT off (by omega))
+    (USize.ofNatLT (2 ^ m) (by omega)) (by simp only [USize.toNat_ofNatLT]) _ 0
+    (ByteWords.buffer (4 * (off + 2 ^ m)))
+    (by simp only [USize.toNat_ofNatLT, ByteWords.size_buffer]; omega)
+    (by simp only [ByteWords.size_buffer]; exact hu) rfl
+  refine ⟨by rw [hs, ByteWords.size_buffer], fun k hk ↦ ?_⟩
+  rw [hv]
+  simp only [USize.toNat_ofNatLT, USize.toNat_zero, Nat.add_zero]
+  rw [ite_eq_left_of_eq_true _ _ (eq_true (by omega)), Nat.add_sub_cancel_left]
 
 theorem getD_set! (a : Array α) (i : Nat) (v : α) (k : Nat) (d : α) :
     (a.set! i v).getD k d = if i = k ∧ i < a.size then v else a.getD k d := by
@@ -917,24 +925,18 @@ theorem transform_eq [Field R] [DecidableEq R] [Word32Repr R] (tw : Array (Array
         getD_of_size_le _ _ (by rw [Array.size_extract_of_le (by omega), Nat.succ_mul]; omega)]
   have hZ : (Parallel.runPasses false tw rest (topPasses tw (m + 4) x)).size = 16 * 2 ^ m := by
     rw [Parallel.size_runPasses, hY]
-  let L := fun l ↦ reverseLeaf m scale f (Parallel.runPasses false tw rest
-    (gatherLeaf cols cs l : Array R))
+  let L := fun l ↦ Parallel.runPasses false tw rest (gatherLeaf cols cs l : Array R)
   have hleaf (l : Nat) (hl : l < 16) :
-      (L l).size = 2 ^ m ∧ ∀ j < 2 ^ m,
-        (L l).getD j 0 = scaleBy scale f
-          ((Parallel.runPasses false tw rest (topPasses tw (m + 4) x)).getD
-            (l * 2 ^ m + NTT.Transform.bitRevNat m j) 0) := by
+      (L l).size = 2 ^ m ∧ ∀ i < 2 ^ m, (L l).getD i 0 =
+        (Parallel.runPasses false tw rest (topPasses tw (m + 4) x)).getD (l * 2 ^ m + i) 0 := by
     have hlM : (l + 1) * 2 ^ m ≤ 16 * 2 ^ m := Nat.mul_le_mul_right _ (by omega)
-    have hb : (Parallel.runPasses false tw rest (gatherLeaf cols cs l : Array R)).size =
-        2 ^ m := by
+    refine ⟨?_, fun i hi ↦ ?_⟩
+    · simp only [L]
       rw [Parallel.size_runPasses, hleafIn l hl, Array.size_extract_of_le (by omega),
         Nat.succ_mul]; omega
-    obtain ⟨hs, hv⟩ := reverseLeaf_spec _ m scale f (by omega) (by omega) hb
-      (lt_of_le_of_lt (Nat.pow_le_pow_right (by omega) (by omega)) hu')
-    refine ⟨hs, fun j hj ↦ ?_⟩
-    rw [hv j hj, hleafIn l hl, runPasses_extract tw rest _ _ 16 l hY hl hrest,
-      getD_extract _ _ _ _ (by rw [Nat.succ_mul]; have := NTT.Transform.bitRevNat_lt m j; omega)
-        (by rw [hZ]; omega)]
+    · simp only [L]
+      rw [hleafIn l hl, runPasses_extract tw rest _ _ 16 l hY hl hrest,
+        getD_extract _ _ _ _ (by rw [Nat.succ_mul]; omega) (by rw [hZ]; omega)]
   have hT : (((Array.range 16).map fun l ↦ (joinTasks ((Array.range S).map fun s ↦
       Task.spawn fun _ ↦ encode (columnTask x tw (m + 4) (2 ^ (m + 4 - 4)) (2 ^ (m + 4 - 4) / S)
         (s * (2 ^ (m + 4 - 4) / S))) 0)).bind fun cols ↦ Task.spawn fun _ ↦
@@ -946,24 +948,28 @@ theorem transform_eq [Field R] [DecidableEq R] [Word32Repr R] (tw : Array (Array
     change leafTask (joinTasks _).get tw rest m cs l scale f = _
     rw [joinTasks_get, Array.map_map]
     rfl
-  have hL (l : Nat) (hl : l < 16) := encode_spec (L l) (16 * l) (by rw [(hleaf l hl).1]; omega)
+  have hL (l : Nat) (hl : l < 16) := reverseEncode_spec (L l) m scale f (16 * l) (by omega)
+    (by omega) (hleaf l hl).1 (by omega)
   unfold transform
   dsimp only
   rw [hT, hm4]
   let r := (Array.range 16).map fun l ↦ leafTask cols tw rest m cs l scale f
   have hr16 : r.size = 16 := by simp only [r, Array.size_map, Array.size_range]
-  have hrg (l : Nat) (hl : l < 16) : r.getD l ByteArray.empty = encode (L l) (16 * l) :=
+  have hrg (l : Nat) (hl : l < 16) :
+      r.getD l ByteArray.empty = reverseEncode m scale f (L l) (16 * l) :=
     getD_map_range _ 16 l hl _
-  have hrs (l : Nat) (hl : l < 16) : (r[l]'(by omega)).size = 4 * (16 * l + 2 ^ m) := by
-    rw [getElem_eq_getD _ _ _ ByteArray.empty, hrg l hl, (hL l hl).1, (hleaf l hl).1]
   have hMu : 2 ^ m < USize.size := by omega
-  have hg : 2 ^ m < USize.size ∧ ∃ hr : r.size = 16, ∀ l (h : l < 16),
-      4 * (16 * l + 2 ^ m) ≤ (r[l]'(by omega)).size ∧ (r[l]'(by omega)).size < USize.size :=
-    ⟨hMu, hr16, fun l hl ↦ ⟨by rw [hrs l hl], by rw [hrs l hl]; omega⟩⟩
-  change assemble r (2 ^ m) = _
+  have hall : (List.range 16).all (fun l ↦ decide (4 * (16 * l + 2 ^ m) ≤
+      (r.getD l ByteArray.empty).size ∧ (r.getD l ByteArray.empty).size < USize.size)) = true :=
+    List.all_eq_true.mpr fun l hl ↦ by
+      have hl' := List.mem_range.mp hl
+      rw [hrg l hl', (hL l hl').1]
+      exact decide_eq_true ⟨Nat.le_refl _, by omega⟩
+  change assemble r (2 ^ m) (Array.replicate (16 * 2 ^ m) 0) = _
   unfold assemble
-  rw [dite_eq_left_of_eq_true (eq_true hg)]
-  obtain ⟨has, hav⟩ := assembleGo_spec (α := R) r (USize.ofNatLT (2 ^ m) hg.1) hg.2.1 _
+  rw [dite_eq_left_of_eq_true (eq_true hMu), dite_eq_left_of_eq_true (eq_true hr16),
+    dite_eq_left_of_eq_true (eq_true hall)]
+  obtain ⟨has, hav⟩ := assembleGo_spec (α := R) r (USize.ofNatLT (2 ^ m) hMu) hr16 _
     (by simp only [USize.toNat_ofNatLT]; omega) _ 0 (Array.replicate (16 * 2 ^ m) 0) rfl
     (by simp only [Array.size_replicate, USize.toNat_ofNatLT])
   simp only [USize.toNat_ofNatLT, USize.toNat_zero, Nat.mul_zero] at has hav
@@ -973,8 +979,8 @@ theorem transform_eq [Field R] [DecidableEq R] [Word32Repr R] (tw : Array (Array
   · have hb := NTT.Transform.bitRevNat_lt 4 (k % 16)
     rw [hav k, ite_eq_left_of_eq_true _ _ (eq_true ⟨Nat.zero_le _, hk⟩),
       Packed.getD_ofFn_bounded _ _ (by rw [hp]; exact hk), hrg _ hb,
-      (hL _ hb).2 _ (by rw [(hleaf _ hb).1]; omega), Word32Repr.ofWord_toWord,
-      (hleaf _ hb).2 _ (by omega)]
+      (hL _ hb).2 _ (by omega), Word32Repr.ofWord_toWord,
+      (hleaf _ hb).2 _ (NTT.Transform.bitRevNat_lt _ _)]
     have hc := Packed.bitRevNat_concat m 4 (k / 16) (k % 16) (Nat.mod_lt _ (by decide))
     rw [show 2 ^ 4 * (k / 16) + k % 16 = k by omega] at hc
     rw [hc, Nat.mul_comm (2 ^ m)]

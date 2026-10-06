@@ -172,36 +172,51 @@ theorem toNat_usize_le (a : Array α) : a.usize.toNat ≤ a.size := by
     a.uset i v (Nat.lt_of_lt_of_le (USize.lt_iff_toNat_lt.mp h) (toNat_usize_le a))
   else a
 
-/-- Store entries `q, …, M - 1` of the bit-reversed `a`, optionally scaled by `f`. -/
-def reverseGo [Mul α] (a : @& Array α) (shift : UInt32) (scale : Bool) (f : α) (M q : USize)
-    (out : Array α) : Array α :=
+open ByteWords in
+/-- Store entries `q, …, M - 1` of the bit-reversed `a`, optionally scaled by `f`, as words
+`off + q, …` of `out`. -/
+def reverseEncodeGo [Mul α] [Word32Repr α] (a : @& Array α) (shift : UInt32) (scale : Bool)
+    (f : α) (off M q : USize) (out : ByteArray) (hd : 4 * (off.toNat + M.toNat) ≤ out.size)
+    (hu : out.size < USize.size) : ByteArray :=
   if hq : q < M then
-    have hM := M.toNat_lt_size
-    have hq1 : (q + 1).toNat = q.toNat + 1 := Plan.usize_add_one q (by
-      have : q.toNat < M.toNat := hq
-      omega)
+    have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+    have hqM : q.toNat < M.toNat := hq
+    have ho : (off + q).toNat = off.toNat + q.toNat := by
+      rw [USize.toNat_add]; exact Nat.mod_eq_of_lt (by omega)
     let j := (reverse32 q.toUInt32 >>> shift).toUSize
-    if h : j.toNat < a.size ∧ q.toNat < out.size then
-      let v := a.uget j h.1
-      reverseGo a shift scale f M (q + 1) (out.uset q (if scale then f * v else v) h.2)
+    if h : j.toNat < a.size then
+      let v := a.uget j h
+      reverseEncodeGo a shift scale f off M (q + 1)
+        (writeWordU out (off + q) (Word32Repr.toWord (if scale then f * v else v)) (by omega) hu)
+        (by simp only [size_writeWordU]; exact hd) (by simp only [size_writeWordU]; exact hu)
     else out
   else out
 termination_by M.toNat - q.toNat
 decreasing_by
   have : q.toNat < M.toNat := hq
+  have : (q + 1).toNat = q.toNat + 1 := Plan.usize_add_one q (by
+    have := M.toNat_lt_size; omega)
   omega
 
-/-- A `2 ^ m`-entry array in bit-reversed order, optionally scaled by `f`. -/
-def reverseLeaf [Zero α] [Mul α] (m : Nat) (scale : Bool) (f : α) (a : @& Array α) :
-    Array α :=
-  reverseGo a (32 - m).toUInt32 scale f (2 ^ m).toUSize 0 (Array.replicate (2 ^ m) 0)
+/-- A `2 ^ m`-entry array in bit-reversed order, optionally scaled by `f`, as words after
+`off` padding words. -/
+def reverseEncode [Mul α] [Word32Repr α] (m : Nat) (scale : Bool) (f : α) (a : @& Array α)
+    (off : Nat) : ByteArray :=
+  let out := ByteWords.buffer (4 * (off + 2 ^ m))
+  if h : 4 * (off + 2 ^ m) < USize.size then
+    have := Nat.two_pow_pos m
+    reverseEncodeGo a (32 - m).toUInt32 scale f (USize.ofNatLT off (by omega))
+      (USize.ofNatLT (2 ^ m) (by omega)) 0 out
+      (by simp only [USize.toNat_ofNatLT, out, ByteWords.size_buffer]; omega)
+      (by simp only [out, ByteWords.size_buffer]; exact h)
+  else out
 
 /-- Leaf `l`: collect its row, run the remaining passes and reverse its bit order, and store
 it after `16 l` padding words. -/
 @[specialize] def leafTask [Field R] [DecidableEq R] [Word32Repr R] (cols : @& Array ByteArray)
     (tw : @& Array (Array R)) (rest : List Nat) (m cs l : Nat) (scale : Bool) (f : R) :
     ByteArray :=
-  encode (reverseLeaf m scale f (Parallel.runPasses false tw rest (gatherLeaf cols cs l))) (16 * l)
+  reverseEncode m scale f (Parallel.runPasses false tw rest (gatherLeaf cols cs l)) (16 * l)
 
 /-- Word `o + q` of a stored leaf is in range. -/
 theorem leafIndex (M q o : USize) (hq : q < M) (s : Nat)
@@ -277,13 +292,20 @@ decreasing_by
     have := M.toNat_lt_size; omega)
   omega
 
-/-- Interleave sixteen stored `M`-entry leaves into natural order. -/
-def assemble [Zero α] [Word32Repr α] (r : @& Array ByteArray) (M : Nat) : Array α :=
-  if h : M < USize.size ∧ ∃ hr : r.size = 16, ∀ l (h : l < 16),
-      4 * (16 * l + M) ≤ (r[l]'(by omega)).size ∧ (r[l]'(by omega)).size < USize.size then
-    assembleGo r (USize.ofNatLT M h.1) h.2.1 (by simpa only [USize.toNat_ofNatLT] using h.2.2) 0
-      (Array.replicate (16 * M) 0)
-  else Array.replicate (16 * M) 0
+/-- Interleave sixteen stored `M`-entry leaves into natural order, writing into `out`. -/
+def assemble [Word32Repr α] (r : @& Array ByteArray) (M : Nat) (out : Array α) : Array α :=
+  if hM : M < USize.size then
+    if hr : r.size = 16 then
+      if hb : (List.range 16).all (fun l ↦ decide (4 * (16 * l + M) ≤
+          (r.getD l ByteArray.empty).size ∧ (r.getD l ByteArray.empty).size < USize.size)) then
+        assembleGo r (USize.ofNatLT M hM) hr (fun l h ↦ by
+          have := of_decide_eq_true (List.all_eq_true.mp hb l (List.mem_range.mpr h))
+          simp only [Array.getD_eq_getD_getElem?, Array.getElem?_eq_getElem (show l < r.size by
+            omega), Option.getD_some] at this
+          simpa only [USize.toNat_ofNatLT] using this) 0 out
+      else out
+    else out
+  else out
 
 /-- Wait for every task without blocking a worker; results keep the task order. -/
 def joinTasks (ts : Array (Task α)) : Task (Array α) :=
@@ -301,6 +323,8 @@ optionally scaled by `f`; `rest` are the passes of a `2 ^ (logN - 4)`-entry leaf
   let all := joinTasks cols
   let leaves := (Array.range 16).map fun l ↦ all.bind fun cols ↦ Task.spawn fun _ ↦
     leafTask cols tw rest (logN - 4) cs l scale f
-  assemble (leaves.map Task.get) M
+  -- allocated while the tasks run
+  let out := Array.replicate (16 * M) 0
+  assemble (leaves.map Task.get) M out
 
 end CompPoly.CPolynomial.NTTFast.Columns
