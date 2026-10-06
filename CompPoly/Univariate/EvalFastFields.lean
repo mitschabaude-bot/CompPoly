@@ -230,18 +230,11 @@ namespace BN254.Fast
 
 open Montgomery.Native64x4
 
-/-- Montgomery product with its final conditional subtraction omitted. -/
-@[inline] def evalProductRaw (q : Limbs4) (ni : UInt64) (x acc : Limbs4) : Limbs4 :=
-  let t := mulRound q ni x acc.l0 State5.zero
-  let t := mulRound q ni x acc.l1 t
-  let t := mulRound q ni x acc.l2 t
-  let t := mulRound q ni x acc.l3 t
-  t.toLimbs4
-
 /-- Four Montgomery rounds without final normalization. The point stays canonical. -/
 @[inline]
 def evalProduct (x : ScalarField) (acc : Limbs4) : Limbs4 :=
-  evalProductRaw instMont64x4Field.modulusLimbs instMont64x4Field.montgomeryNegInv x.val acc
+  (mulUnreduced instMont64x4Field.modulusLimbs
+    instMont64x4Field.montgomeryNegInv x.val acc).toLimbs4
 
 /-- The product is below `2p`; adding a canonical coefficient stays below `3p < 2^256`. -/
 @[inline]
@@ -252,32 +245,21 @@ def evalStep (x a : ScalarField) (acc : Limbs4) : Limbs4 :=
 private theorem product_spec_raw (q : Limbs4) (ni : UInt64) (x acc : Limbs4)
     (hn : ni.toNat * q.toNat % 2^64 = 2^64-1) (hx : x.toNat < q.toNat)
     (hq : 2 * q.toNat < 2^256) :
-    (evalProductRaw q ni x acc).toNat < 2 * q.toNat ∧
-    2^256 * (evalProductRaw q ni x acc).toNat ≡ x.toNat * acc.toNat [MOD q.toNat] := by
-  obtain ⟨L1, m0, hm0, r0⟩ := mulRound_spec q x ni acc.l0 State5.zero hn hx
-    (by rw [State5.zero_toNat]; omega)
-  obtain ⟨L2, m1, hm1, r1⟩ := mulRound_spec q x ni acc.l1 _ hn hx L1
-  obtain ⟨L3, m2, hm2, r2⟩ := mulRound_spec q x ni acc.l2 _ hn hx L2
-  obtain ⟨L4, m3, hm3, r3⟩ := mulRound_spec q x ni acc.l3 _ hn hx L3
-  rw [State5.zero_toNat] at r0
-  have hfold := fold4 r0 r1 r2 r3
-  rw [← mul_sum4, ← sum4_mul, ← Limbs4.toNat] at hfold
-  let t := mulRound q ni x acc.l3
-    (mulRound q ni x acc.l2 (mulRound q ni x acc.l1
-      (mulRound q ni x acc.l0 State5.zero)))
+    ((mulUnreduced q ni x acc).toLimbs4).toNat < 2 * q.toNat ∧
+    2^256 * ((mulUnreduced q ni x acc).toLimbs4).toNat ≡ x.toNat * acc.toNat [MOD q.toNat] := by
+  have h := mulUnreduced_spec q ni x acc hn hx
+  let t := mulUnreduced q ni x acc
   have ht : t.t4.toNat = 0 := by
-    change t.toNat < 2 * q.toNat at L4
-    unfold State5.toNat at L4
+    have hb := h.1
+    change t.toNat < 2 * q.toNat at hb
+    unfold State5.toNat at hb
     omega
-  have he : t.toNat = (evalProductRaw q ni x acc).toNat := by
+  have he : t.toNat = t.toLimbs4.toNat := by
     change t.toLimbs4.toNat + 2^256 * t.t4.toNat = t.toLimbs4.toNat
     rw [ht, Nat.mul_zero, Nat.add_zero]
-  change t.toNat < 2 * q.toNat at L4
-  change 2^256 * t.toNat = _ at hfold
-  rw [he] at L4 hfold
-  refine ⟨L4, ?_⟩
-  change (2^256 * (evalProductRaw q ni x acc).toNat) % q.toNat = _
-  rw [hfold, Nat.add_mul_mod_self_right]
+  change t.toNat < 2 * q.toNat ∧ 2^256 * t.toNat ≡ x.toNat * acc.toNat [MOD q.toNat] at h
+  rw [he] at h
+  exact h
 
 private theorem product_spec (x : ScalarField) (acc : Limbs4) :
     (evalProduct x acc).toNat < 2 * scalarFieldSize ∧
@@ -286,7 +268,7 @@ private theorem product_spec (x : ScalarField) (acc : Limbs4) :
     instMont64x4Field.montgomeryNegInv x.val acc Mont64x4Field.negInv_mul_q
     (by rw [Mont64x4Field.q_toNat]; exact x.property)
     (by rw [Mont64x4Field.q_toNat]; decide)
-  simpa only [Mont64x4Field.q_toNat, evalProductRaw, evalProduct] using h
+  simpa only [Mont64x4Field.q_toNat, evalProduct] using h
 
 private theorem step_nat (x a : ScalarField) (acc : Limbs4) :
     (evalStep x a acc).toNat = (evalProduct x acc).toNat + a.val.toNat := by
@@ -381,7 +363,7 @@ def evalScalarLoop (q : Limbs4) (ni : UInt64) (p : Array ScalarField) (x : Scala
       have := USize.lt_iff_toNat_lt.mp h
       omega)
     let (r0, r1, r2, r3, _) :=
-      addLimbs (evalProductRaw q ni x.val ⟨a0, a1, a2, a3⟩) a.val
+      addLimbs (mulUnreduced q ni x.val ⟨a0, a1, a2, a3⟩).toLimbs4 a.val
     let r : Limbs4 := ⟨r0, r1, r2, r3⟩
     evalScalarLoop q ni p x stop j (by
       dsimp only [j]
