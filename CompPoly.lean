@@ -71,6 +71,7 @@ public import CompPoly.Data.Bytes.Delimited
 public import CompPoly.Data.Bytes.LittleEndian
 public import CompPoly.Data.Bytes.UInt32
 public import CompPoly.Data.Bytes.Vector
+public import CompPoly.Data.Bytes.Words
 public import CompPoly.Data.Classes.CanonicalNat
 public import CompPoly.Data.Classes.DCast
 public import CompPoly.Data.Classes.HasSize
