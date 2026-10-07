@@ -694,8 +694,8 @@ theorem blocks_spec (evals : ByteArray) (ω s : Field) (z : Ext4) (width hi k ro
     have hbB : b ≤ blockRows := hb ▸ Nat.min_le_left _ _
     have hrb : row + b ≤ hi := by have := Nat.min_le_right blockRows (hi - row); have := h.1; omega
     have hus := USize.le_size
-    have hbt : b.toUSize.toNat = b := toUSize_toNat_of_lt b 257 (by
-      simp only [blockRows] at hbB; omega) (by omega)
+    have hbt : b.toUSize.toNat = b := toUSize_toNat_of_lt b (blockRows + 1) (by
+      omega) (by simp only [blockRows]; omega)
     have hWs : 4 * W.size < USize.size := by rw [hW]; simp only [blockRows]; omega
     obtain ⟨W1, eq1, hs1, -, rows1⟩ := forward_spec ω z.c0 (Ext4.normK0 z) (Ext4.normK1 z)
       (z.c2 + z.c2) b 0 x 1 W (by rw [USize.toNat_zero, hW]; omega) hWs

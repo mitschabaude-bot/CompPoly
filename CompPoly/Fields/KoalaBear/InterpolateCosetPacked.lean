@@ -101,7 +101,7 @@ namespace InterpolatePacked
 abbrev Acc : Type := LazyAcc KoalaBear.fieldSize
 
 /-- Rows per block. -/
-def blockRows : ℕ := 256
+def blockRows : ℕ := 512
 
 /-- A stored residue; a word from the modulus up reads as zero. -/
 @[inline] def wordField (x : UInt32) : Field :=
@@ -326,8 +326,8 @@ def blocks (evals : @& ByteArray) (ω z0 k0 k1 z2x2 : Field) (width hi : ℕ) :
     let b := min blockRows (hi - row)
     have hb : b ≤ blockRows := Nat.min_le_left _ _
     have hu := USize.le_size
-    have hbt : b.toUSize.toNat = b := toUSize_toNat_of_lt b 257 (by
-      simp only [blockRows] at hb; omega) (by omega)
+    have hbt : b.toUSize.toNat = b := toUSize_toNat_of_lt b (blockRows + 1) (by
+      omega) (by simp only [blockRows]; omega)
     let f := forward ω z0 k0 k1 z2x2 b 0 x 1 buf
     let buf := backward z0 b b.toUSize f.2.1⁻¹ f.1 (by
       rw [size_forward, h.2.2.2, hbt]; simp only [blockRows] at hb ⊢
