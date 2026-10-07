@@ -71,7 +71,7 @@ def main (args : List String) : IO UInt32 := do
         digestIterations := 2, digestClass := direction }
     let fields (method : String)
         (perform : Array KoalaBear.Fast.Field → Array KoalaBear.Fast.Field) :=
-      runTimedSpec (spec method "Array") .medium
+      runTimedSpec (spec method "Array") .large
         (fun i ↦ perform inputs[i % 2]!)
         (checksumArray checksumKoalaBearFast)
         (sink := arraySampleSink (fun x ↦ x.toNat.toUInt64))
@@ -87,7 +87,7 @@ def main (args : List String) : IO UInt32 := do
         let word (b : ByteArray) (i : Nat) : UInt64 :=
           (CPolynomial.NTTFast.Packed.Native.read b i).toUInt64
         runTimedSpec (spec "proved packed parallel radix-4, packed words in and out" "ByteArray")
-          .medium
+          .large
           (fun i ↦ if direction == "forward" then plan.forwardPacked words[i % 2]! depth
             else plan.inversePacked words[i % 2]! depth)
           (fun b ↦ checksumArray checksumKoalaBearFast
