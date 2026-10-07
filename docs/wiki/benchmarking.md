@@ -374,7 +374,7 @@ Recorded so they are not rediscovered. The audit and plan live in
 
 ## Fields against Rust
 
-`python3 scripts/bench-fields.py --suite all --cpu 0` compares selected Lean groups with pinned Rust libraries. `--suite small-prime` covers KoalaBear, Mersenne31, and Goldilocks against Plonky3; `--suite large-prime` covers BN254 scalar add/mul latency and throughput, plus inv/exp latency, against arkworks. `--suite binary` covers 8-, 64-, and 128-bit Fan–Paar tower mul latency/throughput and square/inv latency against pinned Binius. `all` selects the 36 scalar cases and the one-polynomial evaluation suite. The default suite is `small-prime`. Choose an available logical CPU with `--cpu` for scalar workloads; use `--cpus` for polynomial workloads. Lean and Rust are measured sequentially.
+`python3 scripts/bench-fields.py --suite all --cpu 0` compares selected Lean groups with pinned Rust libraries. `--suite small-prime` covers KoalaBear, Mersenne31, and Goldilocks against Plonky3; `--suite large-prime` covers BN254 scalar add/mul latency and throughput, plus inv/exp latency, against arkworks. `--suite binary` covers 8-, 64-, and 128-bit Fan–Paar tower mul latency/throughput and square/inv latency against pinned Binius. `all` selects the 36 scalar cases and the NTT suite. The default suite is `small-prime`. Choose an available logical CPU with `--cpu` for scalar workloads; use `--cpus` for the NTT. Lean and Rust are measured sequentially.
 
 The driver exports fixed-width little-endian coordinate byte inputs with an explicit basis from Lean and checks cross-language result digests and operation counts before timing. BN254 is explicitly matched to arkworks `Fr` by its modulus. Input decoding and canonical result checks are outside timing. See [the benchmark README](../../bench/README.md#rust-field-comparison) for field correspondence, pinned versions, and workload details.
 
@@ -513,21 +513,7 @@ Multiplication throughput regressed; a second five-pair run confirmed 1.180 → 
 
 A separate five-pair Lean/Rust run on clean `770f992` passed all 24 result checks. Goldilocks measured 0.99× Rust's time for add latency, 1.28× for mul latency, 0.44× for inversion, and 0.87× for exponentiation; throughput ratios were 0.59× for add and 1.45× for mul. All timings include the same operations and use the same inputs in both languages. Local artifacts are in `bench/out/goldilocks-pr392-20260930/` and A/B runs `bench/out/ab/260930-135904/` and `bench/out/ab/260930-140026/`.
 
-## Parallel evaluation at one point
-
-`python3 scripts/bench-fields.py --suite poly-eval --cpus 1,2,3,4` compares single-core `CPolynomial.evalHorner` and multicore `CPolynomial.evalFast` against matched Rust algorithms, for one polynomial at one point. The suite uses 2^12, 2^16 and 2^20 coefficients over KoalaBear, Goldilocks, BN254 scalar and the 128-bit binary tower. It is included in `--suite all` and its validation-only CI gate. The benchmark defaults to one worker per physical core, without SMT siblings; `--cpus` overrides the selection. `evalFast` defaults to sixteen blocks (`logWorkers = 4`).
-
-`CompPoly/Univariate/EvalFast.lean` implements a task dependency tree over zero-copy array ranges. A semiring-level proof equates it to `evalHorner` and `eval`. All leaf arithmetic, partition boundaries and power schedules match Rust. See [the benchmark operator guide](../../bench/README.md#one-polynomial-at-one-point) for timing boundaries, worker selection and fixture format. This suite does not measure many-polynomial evaluation, multipoint evaluation or FFTs.
-
-### Lazy polynomial-evaluation leaves
-
-`CompPoly.Univariate.EvalFastFields` installs proved `EvalKernel` instances for KoalaBear, Goldilocks and BN254 scalar. Parallel leaves defer normalization using field-specific bounds, then return canonical values for the shared power/join tree. Both languages implement the same leaf arithmetic; Rust's parallel evaluator uses custom lazy kernels with Plonky3/arkworks carriers. The sequential `evalHorner` baseline and binary-field leaves are unchanged. See the [polynomial benchmark instructions](../../bench/README.md#one-polynomial-at-one-point) for the execution model and timing boundaries.
-
-BN254's lazy leaf uses scalar accumulator parameters and machine-word indices. Its modulus stays a parameter across a `@[noinline]` loop boundary so Clang can recognize the widening-product pattern in Montgomery reduction. Keep this boundary when refactoring; check generated machine code and paired measurements before embedding constants or inlining the loop. This changes code generation, not the arithmetic schedule shared with Rust.
-
-The BN254 leaf reuses `Native64x4.mulUnreduced` and its shared range/congruence theorem from the field-arithmetic layer. The modulus bound proves the retained fifth limb is zero before taking four limbs. The leaf keeps its scalar accumulator and its out-of-line loop with dynamic modulus parameters; final normalization still occurs only at the leaf boundary.
-
-### Optimized Plonky3 NTT comparison
+## Optimized Plonky3 NTT comparison
 
 `python3 scripts/bench-fields.py --suite ntt` compares the proved KoalaBear `NTTFast.NaturalPlan` forward/inverse transforms against the existing optimized `p3_dft::Radix2DFTSmallBatch` API, at 2^12, 2^16 and 2^20 elements. Plonky3 uses native packed arithmetic and its parallel feature. The default budget is one worker per available physical core, at most sixteen, without SMT siblings (`--cpus` overrides it; `--cpu` selects one worker). Both sides receive the same CPU allocation; the existing Lean plan remains sequential. Plans are outside timing. Input copying, ordering conversions and inverse normalization are timed. Both APIs use natural-order arrays and the same root; Lean's bit-reversal adapter is therefore part of the measured cost. Different algorithms and arithmetic schedules are allowed in this library comparison, replacing the original custom scalar Rust baseline. This suite is included in `--suite all` and CI validation. See [the operator guide](../../bench/README.md#koalabear-ntt-against-optimized-plonky3) for fixtures, validation and timing boundaries.
 
@@ -799,8 +785,6 @@ On the eight-core Ryzen, sixteen workers only add SMT siblings, so they measure 
 | 8 | 4.17 / 4.11 | 7.69 / 7.82 | 9.65 / 10.22 | 3.31 / 3.18 |
 
 Plonky3 and packed I/O Lean stop gaining at four workers. CPUs 0–3 share one L3 complex; eight workers span both, so the plateau is probably memory and cross-complex traffic rather than arithmetic, though this was not isolated. The externless plan, about 1.5 ns per element and layer in scalar code, keeps scaling to eight. Single-threaded, packed I/O Lean is 1.6–1.7× Plonky3 and externless Lean 3.2–3.6×; this per-core gap, not the eight-worker ratio, is the remaining work. Local reports are under ignored `bench/out/ntt-20261007-014257/`, `-014452/` and `-014637/`, reproduced with `--cpus 0`, `--cpus 0,1,2,3` and `--cpus 0,1,2,3,4,5,6,7`.
-
-The polynomial-evaluation driver now also defaults to physical cores. One normal-driver run per worker count at `26fe36f`, 2^20 coefficients, milliseconds, Lean evalFast / Rust parallel: KoalaBear 1.89 / 0.89 at four workers and 0.97 / 0.46 at eight; Goldilocks 1.73 / 0.84 and 0.90 / 0.87; BN254 scalar 10.83 / 4.32 and 7.32 / 4.35; binary tower 31.14 / 33.06 and 20.02 / 25.77. Rust's Goldilocks and BN254 times did not improve from four to eight workers in this run. Lean evalFast gains only about 4× from eight physical cores on the small prime fields, while the earlier sixteen-worker runs with SMT siblings were about twice as fast for Lean (KoalaBear 0.53 ms); its Horner leaves appear latency-bound, though this was not isolated. Local reports are under ignored `bench/out/poly-eval-20261007-015127/` and `-015533/`.
 
 ### Fused final layers and leaf reversal (2026-10-07)
 

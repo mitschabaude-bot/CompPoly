@@ -10,7 +10,6 @@ import statistics
 import subprocess
 import time
 import tomllib
-import bench_poly_eval
 import bench_ntt
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,7 +38,7 @@ def command(args, cwd=ROOT):
 
 BUILD_RECORD = ROOT / ".lake/build/field-bench-build.json"
 EXECUTABLES = (".lake/build/bin/CompPolyBench", ".lake/build/bin/CompPolyFieldFixtures",
-               ".lake/build/bin/CompPolyEvalBench", ".lake/build/bin/CompPolyNTTBench",
+               ".lake/build/bin/CompPolyNTTBench",
                "bench/rust/target/release/comppoly-field-bench")
 
 
@@ -93,7 +92,7 @@ def prepare_build(skip):
         return record
     # A failed/interrupted build must not leave a valid-looking old record.
     BUILD_RECORD.unlink(missing_ok=True)
-    subprocess.run(["lake", "build", "CompPolyBench", "CompPolyFieldFixtures", "CompPolyEvalBench", "CompPolyNTTBench"], cwd=ROOT, check=True)
+    subprocess.run(["lake", "build", "CompPolyBench", "CompPolyFieldFixtures", "CompPolyNTTBench"], cwd=ROOT, check=True)
     subprocess.run(["cargo", "build", "--release", "--locked", "-j", "1"], cwd=ROOT / "bench/rust", check=True)
     if build_context() != context:
         raise SystemExit("Sources or build settings changed during the build; rerun before measuring.")
@@ -169,11 +168,11 @@ def report(out, measurements, manifest, fields, expected):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--suite", choices=[*SUITES, "poly-eval", "ntt", "all"], default="small-prime")
+    parser.add_argument("--suite", choices=[*SUITES, "ntt", "all"], default="small-prime")
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--skip-build", action="store_true", help="reuse executables only if recorded build metadata and hashes match")
     parser.add_argument("--cpu", type=int, help="logical CPU; default: first allowed CPU")
-    parser.add_argument("--cpus", help="distinct logical CPU IDs for polynomial evaluation and NTT (one worker each; SMT allowed), e.g. 8,9,10,11")
+    parser.add_argument("--cpus", help="distinct logical CPU IDs for the NTT (one worker each; SMT allowed), e.g. 8,9,10,11")
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--out-dir", type=Path)
     args = parser.parse_args()
@@ -183,10 +182,6 @@ def main():
     if args.suite == "ntt":
         import sys
         bench_ntt.run(args, sys.modules[__name__], allowed)
-        return
-    if args.suite == "poly-eval":
-        import sys
-        bench_poly_eval.run(args, sys.modules[__name__], allowed)
         return
     fields, groups, expected = selection(args.suite)
     cpu = min(allowed) if args.cpu is None else args.cpu
@@ -276,10 +271,6 @@ def main():
 def run_remaining_suites(args, allowed, out):
     import copy
     import sys
-    poly_args = copy.copy(args)
-    poly_args.out_dir = out / "poly-eval"
-    poly_args.skip_build = True
-    bench_poly_eval.run(poly_args, sys.modules[__name__], allowed)
     ntt_args = copy.copy(args)
     ntt_args.out_dir = out / "ntt"
     ntt_args.skip_build = True
