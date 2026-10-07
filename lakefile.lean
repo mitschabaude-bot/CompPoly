@@ -65,6 +65,11 @@ lean_exe CompPolyNTTBench where
   -- Match the Rust benchmark's native CPU targeting; library artifacts remain portable.
   moreLeancArgs := #["-march=native"]
 
+/-- KoalaBear coset interpolation runner for the Plonky3 `interpolate_coset` comparison. -/
+lean_exe CompPolyInterpolateBench where
+  srcDir := "bench"
+  moreLeancArgs := #["-march=native"]
+
 /-- Kernel-level axiom / `sorry` accounting with a committed regression baseline
 (`scripts/axiom_baseline.json`). Runtime-imports the built CompPoly oleans, so run it
 after `lake build`. See `scripts/AxiomSweep.lean`. -/

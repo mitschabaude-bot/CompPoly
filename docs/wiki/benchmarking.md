@@ -804,3 +804,7 @@ The leaves' radix-four passes got the same treatment: `inner16` checks the range
 ### Warmup for parallel transforms (2026-10-07)
 
 With the `schedutil` governor, idle worker cores take a few hundred milliseconds of load before their clocks rise from 2.2 to about 4.1 GHz, and the medium preset's 50 ms warmup often ended before that. The NTT suite now uses the large budget, 200 ms of warmup and 50 samples, on both sides (`BenchPreset.large` in Lean, `harness::LARGE` in Rust). Five alternating rounds at `f4bb734`, million-point forward / inverse, milliseconds: packed I/O Lean 9.96 / 10.53 against Plonky3 9.29 / 9.00 on one worker and 2.92 / 3.01 against 2.89 / 2.81 on four, as before; on eight workers 2.93 / 2.95 against 3.30 / 3.17 (was 3.48 / 3.45), and the externless plan 7.89 / 7.98 (was 9.81 / 9.78).
+
+### Coset interpolation against Plonky3 (2026-10-07)
+
+`python3 scripts/bench-fields.py --suite interpolate` compares `KoalaBear.Fast.interpolateCoset` with Plonky3's `p3_interpolation::interpolate_coset` over the quartic extension; see [the benchmark operator guide](../../bench/README.md#koalabear-coset-interpolation-against-plonky3). The first measurement times the proved reference, which is sequential and works on lists of boxed extension elements, against parallel Plonky3 on eight workers. Three alternating rounds, milliseconds per call, Lean / Plonky3: 2^12 rows 0.67 / 0.20 (one column) and 1.78 / 0.16 (sixteen columns), 2^16 rows 12.0 / 0.93 and 28.3 / 0.63, 2^20 rows 249 / 8.05 and 531 / 9.15.

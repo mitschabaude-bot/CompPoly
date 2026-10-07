@@ -329,7 +329,8 @@ Run `python3 scripts/bench-fields.py --suite all --cpu 0` from the repository ro
 | `large-prime` | BN254 scalar field: add/mul latency and throughput, inv/exp latency | arkworks 0.5.0 (`ark_bn254::Fr`) |
 | `binary` | 8-, 64-, 128-bit Fan–Paar towers: mul latency/throughput, square/inv latency | Binius 0.2.0, pinned Git revision |
 | `ntt` | KoalaBear forward and inverse NTT; 2^12, 2^16, 2^20 elements | Plonky3 0.4.2 (`p3-dft`, parallel feature) |
-| `all` | The 36 scalar cases plus the NTT suite | All three libraries |
+| `interpolate` | KoalaBear coset values evaluated at a degree-4 extension point; 2^12, 2^16, 2^20 rows × 1 and 16 columns | Plonky3 0.4.2 (`p3-interpolation`, parallel feature) |
+| `all` | The 36 scalar cases plus the NTT and coset interpolation suites | All three libraries |
 
 One Cargo project under `bench/rust/` shares the measurement and chain harness. Library-specific modules decode inputs and supply canonical checksums and cheap result sinks. Rust nightly-2026-02-26 is pinned for Binius’s x86 support, and Cargo.lock pins dependencies. The driver defaults `RUSTFLAGS` to `-C target-cpu=native` and records its value and the host instruction features; CI builds with the same flag. CI validates all selected suites on every PR; it does not gate on relative speed. Tables show fast Lean against Rust. Prime-field reference implementations still participate in validation and runs, but are omitted from the tables. Binary rows time only the verified fast Lean implementation and Binius; their cross-language result agreement is checked before timing.
 
@@ -393,3 +394,14 @@ Import `CompPoly.Univariate.NTTFast.Packed.Plan`. Construct `NTTFast.Packed.Plan
 The direct executable defaults to the packed field-array variant. Set `COMPPOLY_NTT_IMPL=packed-io` for packed words in and out, or `externless` for the ordinary field-array variant; `LEAN_NUM_THREADS` sets its worker budget. `NTT_DEPTH` overrides the packed task-tree depth, which otherwise follows `Plan.defaultDepth`. The comparison driver runs all variants automatically, with the same fixtures and CPU allocation as Rust; packed inputs are encoded outside timing, as Rust's raw inputs are.
 
 The packed path trusts two inline C storage replacements (`Native.readRaw`, `Native.storeWords`) to match their Lean definitions on little-endian hosts. They contain no field arithmetic or scheduling. Compiled storage agreement checks run in `lake exe CompPolyNativeSmoke`, covering shared input preservation, growth, partial batches, unaligned stores and invalid ranges. The logical refinement proofs are kernel checked without `native_decide`, `sorry`, `implemented_by` or new `csimp` substitutions.
+
+## KoalaBear coset interpolation against Plonky3
+
+```bash
+python3 scripts/bench-fields.py --suite interpolate
+python3 scripts/bench-fields.py --suite interpolate --validate-only
+```
+
+This suite compares `KoalaBear.Fast.interpolateCoset` with Plonky3's stock `p3_interpolation::interpolate_coset` (0.4.2) over `BinomialExtensionField<KoalaBear, 4>`. Each call takes a row-major `2^logN × width` matrix whose columns hold values of polynomials on the coset `s · ⟨ω⟩`, and returns every column's polynomial evaluated at a point of the quartic extension, by the barycentric formula `(zⁿ - sⁿ) / (n sⁿ) · ∑ᵢ xᵢ / (z - xᵢ) · p(xᵢ)`. `toSpec_interpolateCoset` proves the Lean result equal to `aeval z` of each column's polynomial. Both sides compute the coset nodes, the batch inversion of `z - xᵢ` and the weights inside every call; Plonky3 uses its parallel feature and native SIMD.
+
+Each fixture holds the subgroup root, the shift (KoalaBear's multiplicative generator `3`), two extension points that alternate between iterations, and the matrix, as canonical little-endian 32-bit words. The root must equal Lean's certified root and Plonky3's two-adic generator. `CompPolyInterpolateBench` and `comppoly-field-bench --interpolate` read the same fixture; full output digests agree before timing, including single-row and narrow matrices. Workers follow the same physical-core selection as the NTT suite, and every invocation warms up for 200 ms.

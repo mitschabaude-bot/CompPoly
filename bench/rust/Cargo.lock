@@ -260,7 +260,9 @@ dependencies = [
  "p3-dft",
  "p3-field",
  "p3-goldilocks",
+ "p3-interpolation",
  "p3-koala-bear",
+ "p3-matrix",
  "p3-mersenne-31",
  "rayon",
  "serde",
@@ -558,6 +560,18 @@ dependencies = [
  "paste",
  "rand 0.9.5",
  "serde",
+]
+
+[[package]]
+name = "p3-interpolation"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d877565a94a527c89459fc8ccb0eb58769d8c86456575d1315a1651bd24616d"
+dependencies = [
+ "p3-field",
+ "p3-matrix",
+ "p3-maybe-rayon",
+ "p3-util",
 ]
 
 [[package]]
