@@ -43,8 +43,7 @@ def main (args : List String) : IO UInt32 := do
   if validate != "true" && validate != "false" then throw <| IO.userError "invalid validation flag"
   if h : logN ≤ KoalaBear.twoAdicity then
     let n := 2 ^ logN
-    let bytes ← IO.FS.readBinFile path
-    let words ← interpolateCoordinates bytes
+    let words ← interpolateCoordinates (← IO.FS.readBinFile path)
     if words.size != 10 + n * width then throw <| IO.userError "incorrect fixture length"
     let ω := (CPolynomial.NTT.KoalaBear.fastDomainOfLogN logN h).omega
     if words.getD 0 0 != ω then throw <| IO.userError "incorrect root"
@@ -54,7 +53,11 @@ def main (args : List String) : IO UInt32 := do
         words.getD (5 + 4 * k) 0⟩
     let points := #[point 0, point 1]
     let evals := words.extract 10 words.size
-    let packed := bytes.extract 40 bytes.size
+    -- The packed path reads Montgomery words, like Plonky3's matrix storage.
+    let packed := evals.foldl (fun b (x : KoalaBear.Fast.Field) ↦
+      let w := x.val
+      b.push w.toUInt8 |>.push (w >>> 8).toUInt8 |>.push (w >>> 16).toUInt8
+        |>.push (w >>> 24).toUInt8) (ByteArray.emptyWithCapacity (4 * evals.size))
     validateOnlyRef.set (validate == "true")
     let spec : BenchSpec := if impl == "packed" then
       { name := s!"interpolate-koalabear-{logN}-{width}-packed", representation := "ByteArray",
