@@ -6,7 +6,6 @@ Authors: Gregor Mitscha-Baude
 module
 
 public import CompPolyBench.Fields.Inputs
-public import CompPoly.Fields.Binary.Tower.Fast
 public import CompPoly.Univariate.EvalFastFields
 
 /-! # One-polynomial, one-point evaluation against Rust -/
@@ -51,7 +50,7 @@ def main (args : List String) : IO UInt32 := do
   let some depth := logWorkers.toNat? | throw <| IO.userError "invalid worker count"
   if mode != "horner" && mode != "parallel" then throw <| IO.userError "invalid mode"
   let width := match field with
-    | "koalabear" => 4 | "goldilocks" => 8 | "bn254" => 32 | "tower-bt128" => 16
+    | "koalabear" => 4 | "goldilocks" => 8 | "bn254" => 32
     | _ => 0
   if width == 0 then throw <| IO.userError "unsupported field"
   let bytes ← IO.FS.readBinFile path
@@ -69,9 +68,5 @@ def main (args : List String) : IO UInt32 := do
   | "bn254" =>
     runEval field values n depth mode
       (fun v ↦ BN254.Fast.ofField (v : BN254.ScalarField)) checksumBn254Fast sinkMont64x4
-  | "tower-bt128" =>
-    runEval field values n depth mode
-      ConcreteBinaryTower.Fast.FastBT128.ofNat ConcreteBinaryTower.Fast.FastBT128.toNat
-      (fun v ↦ v.lo ^^^ v.hi)
   | _ => pure ()
   return 0

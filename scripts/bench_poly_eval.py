@@ -12,7 +12,6 @@ FIELDS = {
     "koalabear": ("KoalaBear", 4, 2130706433),
     "goldilocks": ("Goldilocks", 8, 18446744069414584321),
     "bn254": ("BN254 scalar", 32, 21888242871839275222246405745257275088548364400416034343698204186575808495617),
-    "tower-bt128": ("Binary tower 128", 16, 2**128),
 }
 
 
@@ -57,7 +56,7 @@ def run(args, common, allowed):
                 "cpu_model": next(s.split(":", 1)[1].strip() for s in Path("/proc/cpuinfo").read_text().splitlines() if s.startswith("model name")),
                 "memory_gib": int(Path("/proc/meminfo").read_text().splitlines()[0].split()[1]) / 1024**2,
                 "os": platform.freedesktop_os_release()["PRETTY_NAME"], "kernel": platform.release(),
-                "fixture_format": "field-coordinates-le-v1; four points, then coefficients; widths 4/8/32/16",
+                "fixture_format": "field-coordinates-le-v1; four points, then coefficients; widths 4/8/32",
                 "fixture_sha256": {f: common.file_hash(p) for f, p in fixtures.items()},
                 "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "load_start": os.getloadavg(), "runs": args.runs}
@@ -95,7 +94,7 @@ def run(args, common, allowed):
                         expected = digest
                     if digest != expected:
                         raise ValueError(f"checksum mismatch: {field}, {size}, {mode}, {language}")
-            print(f"Validated {field}: {size} coefficients, Horner and {workers}-worker evalFast", flush=True)
+            print(f"Validated {field}: {size} coefficients, Horner and {workers}-worker evaluation", flush=True)
             if args.validate_only:
                 continue
             for iteration in range(args.runs):
@@ -115,8 +114,8 @@ def run(args, common, allowed):
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     if args.validate_only:
         return
-    lines = ["# One polynomial, one point", "", "Milliseconds per complete steady-state evaluation; median of run medians ± between-run MAD. Lower is better. Lean / Rust compares parallel evaluation (>1 means Rust is faster).", "",
-             f"| Field | Coefficients | Lean Horner (1 core) | Lean evalFast ({workers} workers) | Rust Horner (1 core) | Rust parallel ({workers} workers) | Lean speedup | Lean / Rust |",
+    lines = ["# One polynomial, one point", "", "Milliseconds per complete steady-state evaluation; median of run medians ± between-run MAD. Lower is better. Rust is arkworks' stock `DensePolynomial::evaluate` (ark-poly 0.5.0, `parallel` feature). Lean / Rust compares parallel evaluation (>1 means Rust is faster).", "",
+             f"| Field | Coefficients | Lean evalHorner (1 core) | Lean evalFast ({workers} workers) | ark-poly (1 thread) | ark-poly ({workers} threads) | Lean speedup | Lean / Rust |",
              "|---|---:|---:|---:|---:|---:|---:|---:|"]
     for field, (title, _, _) in FIELDS.items():
         for size in sizes:
@@ -133,10 +132,10 @@ def run(args, common, allowed):
               f"- {manifest['cpu_model']}; {manifest['memory_gib']:.1f} GiB; {manifest['os']}, kernel {manifest['kernel']}.",
               f"- {workers} workers on {physical_cores} physical cores via logical CPUs {cpus}; SMT siblings are {'included' if physical_cores < workers else 'not included'}. Horner uses CPU {cpus[0]}. Shared host; load {manifest['load_start']} → {manifest['load_end']}.",
               f"- {build['context']['lean_version']}; {build['context']['rust_version']}; Rust flags {build['context']['rustflags']!r}. Source `{build['context']['commit']}`, dirty={build['context']['dirty']}.",
-              "- Plonky3 for KoalaBear/Goldilocks, arkworks BN254 scalar, Binius Fan–Paar 128-bit tower. Identical fixed-width input bytes in both languages.",
+              "- Rust evaluates with arkworks' stock `DensePolynomial::evaluate`: `ark_bn254::Fr` for BN254, and arkworks' generic Montgomery fields (`Fp64` from `#[derive(MontConfig)]`) for KoalaBear and Goldilocks, which arkworks does not ship; those two are not Plonky3-grade field arithmetic. Identical fixed-width input bytes in both languages.",
               "- Each call evaluates one prebuilt polynomial at one point. Four varying points prevent constant-result timing; there is no batched evaluation or shared power table.",
-              "- Same binary split tree, zero-initialized leaves, explicit square-and-multiply schedule, and high × power + low joins. Both parallel evaluators use custom lazy multiply-add kernels for prime fields and normalize at leaf boundaries; binary leaves are unchanged. Rust powers/joins use Plonky3/arkworks/Binius. Horner remains the baseline using existing field operations.",
-              "- Task scheduling, per-call powers and joins are timed. Runtime worker pools and input decoding/construction, including Rust raw representations, are outside timing; validation/warmup also excludes first-use input-sharing costs. Lean uses Task.spawn; Rust uses a persistent Rayon pool.",
+              "- Lean evalFast splits the coefficients into a binary tree of contiguous ranges, runs lazy-reduction Horner leaves and joins with square-and-multiply powers; evalHorner is CompPoly's existing sequential evaluator. ark-poly splits the coefficients into one chunk per Rayon thread, runs Horner on each and scales each chunk by a power of the point; with one thread it is plain Horner.",
+              "- Task scheduling, per-call powers and joins are timed. Runtime worker pools and input decoding/construction are outside timing; validation/warmup also excludes first-use input-sharing costs. Lean uses Task.spawn; Rust uses a persistent Rayon pool of the selected size.",
               "- Four full-result digests agree across both languages and both methods before timing. Each run uses the existing 50 ms warmup / 20-sample harness. Only the final evaluation result is consumed.", ""]
     (out / "report.md").write_text("\n".join(lines))
     print(f"Report: {out / 'report.md'}")
