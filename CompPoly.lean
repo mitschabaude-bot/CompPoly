@@ -81,6 +81,7 @@ public import CompPoly.Data.ExtTreeMap.DTreeMap
 public import CompPoly.Data.ExtTreeMap.ExtDTreeMap
 public import CompPoly.Data.ExtTreeMap.ExtTreeMap
 public import CompPoly.Data.Fin.BigOperators
+public import CompPoly.Data.List.BatchInv
 public import CompPoly.Data.List.Lemmas
 public import CompPoly.Data.MvPolynomial.Notation
 public import CompPoly.Data.Nat.Bitwise
@@ -330,6 +331,7 @@ public import CompPoly.Univariate.Modular
 public import CompPoly.Univariate.NTT.BabyBear
 public import CompPoly.Univariate.NTT.Barycentric
 public import CompPoly.Univariate.NTT.Coset
+public import CompPoly.Univariate.NTT.CosetBarycentric
 public import CompPoly.Univariate.NTT.Domain
 public import CompPoly.Univariate.NTT.Evaluation
 public import CompPoly.Univariate.NTT.FastMul
