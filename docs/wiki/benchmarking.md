@@ -808,3 +808,27 @@ With the `schedutil` governor, idle worker cores take a few hundred milliseconds
 ### Coset interpolation against Plonky3 (2026-10-07)
 
 `python3 scripts/bench-fields.py --suite interpolate` compares `KoalaBear.Fast.interpolateCoset` with Plonky3's `p3_interpolation::interpolate_coset` over the quartic extension; see [the benchmark operator guide](../../bench/README.md#koalabear-coset-interpolation-against-plonky3). The first measurement times the proved reference, which is sequential and works on lists of boxed extension elements, against parallel Plonky3 on eight workers. Three alternating rounds, milliseconds per call, Lean / Plonky3: 2^12 rows 0.67 / 0.20 (one column) and 1.78 / 0.16 (sixteen columns), 2^16 rows 12.0 / 0.93 and 28.3 / 0.63, 2^20 rows 249 / 8.05 and 531 / 9.15.
+
+### Packed coset interpolation (2026-10-07)
+
+`KoalaBear.Fast.interpolateCosetPacked` ([`InterpolateCosetPacked.lean`](../../CompPoly/Fields/KoalaBear/InterpolateCosetPacked.lean)) replaces the reference's lists of boxed extension elements with raw words:
+
+* **Base-field weights.** For `t = z₀ - x`, `(z - x)⁻¹ = (b₀ + t b₁ + t² b₂ + t³) / N(t)`, where the extension constants `bₖ` depend on `z` only and `N(t)` is the norm of `z - x` (`Ext4.smul_inv_sub_ofBase`). Each row's weight is the four base-field values `x tᵏ / N`, only base-field norms need inverting, and a column's sum is `∑ₖ Sₖ bₖ` for four base-field sums `Sₖ`. A row costs about twelve base-field multiplications.
+* **Blocks of 512 rows.** A forward pass stores each row's node, `t²`, norm and the prefix product of the norms in a scratch `ByteArray`; one Fermat inversion per block inverts the product; a backward pass overwrites each row with its four weights.
+* **Lazy column sums.** `Montgomery.Native32.LazyAcc` holds an unreduced 64-bit sum below `p · 2^32`: each product of a raw word and a weight costs a multiplication, an addition and one conditional subtraction, and each block ends with one Montgomery reduction per sum. Four adjacent columns share each row's weights.
+* **Tasks.** Eight row ranges run as tasks, the caller taking the lowest; their sums add up at the end.
+
+Interleaved runs chose 512-row blocks (256 was up to 8% slower, 1024 up to 20%) and eight tasks (sixteen oversubscribe eight cores and ran 1.4× slower). The module is compiled with `-march=native` in `CompPolyPackedNative`, like the packed NTT kernels; without it the four-column loop ran almost twice as slow.
+
+`interpolateCosetPacked_eq` ([`InterpolateCosetPackedCorrectness.lean`](../../CompPoly/Fields/KoalaBear/InterpolateCosetPackedCorrectness.lean)) proves it equal to the reference for every point off the coset. The proof follows the loops: the two passes as row updates of the packed buffer with the batch-inversion invariant, `dot4` as four `dot1` loops, `dot1` against a finite sum, then blocks, leaves and the task tree. Five rounds of `--suite interpolate` on eight workers, milliseconds per call:
+
+| Rows | Columns | Lean packed | Lean reference | Plonky3 |
+|---:|---:|---:|---:|---:|
+| 2^12 | 1 | 0.08 | 0.66 | 0.20 |
+| 2^12 | 16 | 0.09 | 1.74 | 0.15 |
+| 2^16 | 1 | 0.31 | 12.03 | 0.89 |
+| 2^16 | 16 | 0.48 | 27.71 | 0.63 |
+| 2^20 | 1 | 3.40 | 247.83 | 8.06 |
+| 2^20 | 16 | 5.82 | 522.99 | 8.79 |
+
+At 2^20 rows some samples take twice the median, when one of the eight row ranges starts late on the shared host; the minimum is about 2.8 ms for one column.
