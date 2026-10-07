@@ -194,6 +194,8 @@ public import CompPoly.Fields.KoalaBear.Ext6.SexticIrreducible
 public import CompPoly.Fields.KoalaBear.Fast
 public import CompPoly.Fields.KoalaBear.FastExt4
 public import CompPoly.Fields.KoalaBear.InterpolateCoset
+public import CompPoly.Fields.KoalaBear.InterpolateCosetPacked
+public import CompPoly.Fields.KoalaBear.InterpolateCosetPackedCorrectness
 public import CompPoly.Fields.Mersenne31
 public import CompPoly.Fields.Mersenne31.Basic
 public import CompPoly.Fields.Mersenne31.Bytes

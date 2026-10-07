@@ -61,14 +61,18 @@ def cosetWeights (ω s : Field) (n : ℕ) (z : Ext4) : List Ext4 :=
   List.zipWith Ext4.smul (cosetNodes ω s n)
     (List.batchInv ((cosetNodes ω s n).map fun x ↦ z - Ext4.ofBase x))
 
+/-- The scale `(zⁿ - sⁿ) / (n sⁿ)` for `n = 2^logN`. -/
+def cosetFactor (logN : ℕ) (s : Field) (z : Ext4) : Ext4 :=
+  let sn := Montgomery.Native32.pow s (2 ^ logN)
+  (Ext4.powTwo z logN - Ext4.ofBase sn) * (Ext4.ofBase (((2 ^ logN : ℕ) : Field) * sn))⁻¹
+
 /-- Evaluate each column of a row-major `2^logN × width` matrix of values on the coset `s · ⟨ω⟩`
 at `z`. -/
 def interpolateCoset (logN : ℕ) (ω s : Field) (width : ℕ) (evals : Array Field) (z : Ext4) :
     Array Ext4 :=
   let n := 2 ^ logN
   let weights := (cosetWeights ω s n z).toArray
-  let sn := Montgomery.Native32.pow s n
-  let factor := (Ext4.powTwo z logN - Ext4.ofBase sn) * (Ext4.ofBase ((n : Field) * sn))⁻¹
+  let factor := cosetFactor logN s z
   Array.ofFn (n := width) fun j ↦
     factor * Fin.foldl n
       (fun acc i ↦ acc + Ext4.smul (evals.getD (i * width + j) 0) (weights.getD i 0)) 0
@@ -154,6 +158,42 @@ theorem size_interpolateCoset (logN : ℕ) (ω s : Field) (width : ℕ) (evals :
     (z : Ext4) : (interpolateCoset logN ω s width evals z).size = width := by
   simp only [interpolateCoset, Array.size_ofFn]
 
+/-- Each output of `interpolateCoset` is the scale times a sum over the rows, for `z` off the
+nodes. -/
+theorem toSpec_getElem_interpolateCoset (logN : ℕ) (ω s : Field) (width : ℕ)
+    (evals : Array Field) (z : Ext4)
+    (hz : ∀ i < 2 ^ logN, Ext4.toSpec z ≠ Ext.ofBase (specNode ω s i)) (j : ℕ) (hj : j < width) :
+    Ext4.toSpec ((interpolateCoset logN ω s width evals z)[j]'(by
+      rw [size_interpolateCoset]; exact hj)) =
+      Ext4.toSpec (cosetFactor logN s z) * ∑ i ∈ Finset.range (2 ^ logN),
+        FastField.toField (evals.getD (i * width + j) 0) •
+          (Ext.ofBase (specNode ω s i) * (Ext4.toSpec z - Ext.ofBase (specNode ω s i))⁻¹) := by
+  simp only [interpolateCoset]
+  rw [Array.getElem_ofFn, Ext4.toSpec_mul, Ext4.toSpec_foldl_add, Ext4.toSpec_zero, zero_add,
+    Fin.sum_univ_eq_sum_range (fun i ↦ Ext4.toSpec (Ext4.smul (evals.getD (i * width + j) 0)
+      ((cosetWeights ω s (2 ^ logN) z).toArray.getD i 0)))]
+  congr 1
+  refine Finset.sum_congr rfl fun i hi ↦ ?_
+  have hi' : i < (cosetWeights ω s (2 ^ logN) z).length := by
+    rw [length_cosetWeights]; exact Finset.mem_range.mp hi
+  have hw : (cosetWeights ω s (2 ^ logN) z).toArray.getD i 0 =
+      (cosetWeights ω s (2 ^ logN) z)[i] := by
+    rw [Array.getD_eq_getD_getElem?, List.getElem?_toArray, List.getElem?_eq_getElem hi',
+      Option.getD_some]
+  rw [hw, Ext4.toSpec_smul, toSpec_getElem_cosetWeights ω s _ z hz i hi']
+
+/-- A point whose `n`-th power differs from `sⁿ` is off every node of the coset `s · ⟨ω⟩`. -/
+theorem toSpec_ne_specNode (D : CPolynomial.NTT.Domain KoalaBear.Field) (ω s : Field)
+    (hω : FastField.toField ω = D.omega) (z : Ext4)
+    (hz : Ext4.toSpec z ^ D.n ≠
+      algebraMap KoalaBear.Field KoalaBear.Ext4 (FastField.toField s) ^ D.n) :
+    ∀ i < D.n, Ext4.toSpec z ≠ Ext.ofBase (specNode ω s i) := by
+  intro i hi h
+  apply hz
+  have := D.cosetNode_pow_n (E := KoalaBear.Ext4) (FastField.toField s) ⟨i, hi⟩
+  rw [h, ← Ext.algebraMap_eq_ofBase, ← this]
+  simp only [CPolynomial.NTT.Domain.cosetNode, CPolynomial.NTT.Domain.node, hω, specNode]
+
 /-- **Correctness of `interpolateCoset`.** If column `j` holds the values of `pⱼ`, of degree below
 `n`, on the coset `s · ⟨ω⟩`, and `z` lies outside the coset, then output `j` is `pⱼ(z)`. -/
 theorem toSpec_interpolateCoset (D : CPolynomial.NTT.Domain KoalaBear.Field) (ω s : Field)
@@ -168,14 +208,9 @@ theorem toSpec_interpolateCoset (D : CPolynomial.NTT.Domain KoalaBear.Field) (ω
     (j : Fin width) :
     Ext4.toSpec ((interpolateCoset D.logN ω s width evals z)[j.val]'(by
       rw [size_interpolateCoset]; exact j.isLt)) = aeval (Ext4.toSpec z) (p j) := by
-  have hz' : ∀ i < D.n, Ext4.toSpec z ≠ Ext.ofBase (specNode ω s i) := by
-    intro i hi h
-    apply hz
-    have := D.cosetNode_pow_n (E := KoalaBear.Ext4) (FastField.toField s) ⟨i, hi⟩
-    rw [h, ← Ext.algebraMap_eq_ofBase, ← this]
-    simp only [CPolynomial.NTT.Domain.cosetNode, CPolynomial.NTT.Domain.node, hω, specNode]
+  have hz' := toSpec_ne_specNode D ω s hω z hz
   rw [CPolynomial.NTT.Domain.aeval_eq_cosetBarycentric D hs (p j) (hp j) _ hz]
-  simp only [interpolateCoset]
+  simp only [interpolateCoset, cosetFactor]
   rw [Array.getElem_ofFn, Ext4.toSpec_mul, Ext4.toSpec_foldl_add, Ext4.toSpec_zero, zero_add,
     Ext4.toSpec_mul, Ext4.toSpec_sub, Ext4.toSpec_powTwo, Ext4.toSpec_ofBase, Ext4.toSpec_inv,
     Ext4.toSpec_ofBase,

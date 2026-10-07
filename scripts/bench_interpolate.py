@@ -9,7 +9,7 @@ import subprocess
 import time
 
 
-IMPLS = ("lean", "rust")
+IMPLS = ("packed", "reference", "rust")
 P = 2130706433
 
 
@@ -59,7 +59,8 @@ def run(args, common, allowed):
         fixtures[log_n, width] = path
     manifest = {
         "build": build, "cpus": cpus, "workers": workers, "physical_cores": physical_cores, "runs": args.runs,
-        "lean": {"implementation": "KoalaBear.Fast.interpolateCoset (proved reference, sequential)", "leanc_args": ["-march=native"]},
+        "packed": {"implementation": "KoalaBear.Fast.interpolateCosetPacked (parallel row ranges, packed words)", "leanc_args": ["-march=native"]},
+        "reference": {"implementation": "KoalaBear.Fast.interpolateCoset (proved reference, sequential)", "leanc_args": ["-march=native"]},
         "rust": {"implementation": "p3_interpolation::interpolate_coset", "extension": "BinomialExtensionField<KoalaBear, 4>", "matrix": "RowMajorMatrix", "parallel": True},
         "cpu_model": next(s.split(":", 1)[1].strip() for s in Path("/proc/cpuinfo").read_text().splitlines() if s.startswith("model name")),
         "memory_gib": int(Path("/proc/meminfo").read_text().splitlines()[0].split()[1]) / 1024**2,
@@ -73,6 +74,8 @@ def run(args, common, allowed):
     def measure(language, log_n, width, label, validate):
         cmd = [str(rust), "--interpolate"] if language == "rust" else [str(lean)]
         cmd += [str(fixtures[log_n, width]), str(log_n), str(width), str(validate).lower()]
+        if language != "rust":
+            cmd.append(language)
         result = subprocess.check_output(cmd, cwd=common.ROOT, env=runtime_env, text=True)
         (out / f"{label}-{log_n}-{width}-{language}.jsonl").write_text(result)
         row = json.loads(result)
@@ -90,7 +93,7 @@ def run(args, common, allowed):
         if args.validate_only or (log_n, width) not in timed:
             continue
         for i in range(args.runs):
-            for language in (IMPLS if i % 2 == 0 else IMPLS[::-1]):
+            for language in IMPLS[i % 3:] + IMPLS[:i % 3]:
                 row = measure(language, log_n, width, f"run-{i + 1}", False)
                 if int(row["checksum"]) != expected:
                     raise ValueError("interpolation timing-run checksum mismatch")
@@ -101,8 +104,8 @@ def run(args, common, allowed):
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     if args.validate_only:
         return
-    lines = ["# KoalaBear coset interpolation: Lean vs Plonky3", "", "Milliseconds per call; median of paired run medians ± between-run MAD. Each call evaluates every column of a row-major matrix of values on a coset at a degree-4 extension point. Lean / Rust > 1 means Rust is faster.", "",
-             "| Rows | Columns | Lean (proved reference) | Plonky3 | Lean / Rust |", "|---:|---:|---:|---:|---:|"]
+    lines = ["# KoalaBear coset interpolation: Lean vs Plonky3", "", "Milliseconds per call; median of run medians ± between-run MAD. Each call evaluates every column of a row-major matrix of values on a coset at a degree-4 extension point. Lean / Plonky3 > 1 means Plonky3 is faster.", "",
+             "| Rows | Columns | Lean packed | Lean reference | Plonky3 | Lean packed / Plonky3 |", "|---:|---:|---:|---:|---:|---:|"]
     for log_n, width in timed:
         medians, cells = [], []
         for language in IMPLS:
@@ -111,13 +114,14 @@ def run(args, common, allowed):
             mad = statistics.median(abs(x - median) for x in samples)
             medians.append(median)
             cells.append(f"{median:.4f} ± {mad:.4f}")
-        lines.append(f"| {2**log_n:,} | {width} | {' | '.join(cells)} | {medians[0] / medians[1]:.2f}× |")
+        lines.append(f"| {2**log_n:,} | {width} | {' | '.join(cells)} | {medians[0] / medians[2]:.2f}× |")
     lines += ["", "## Machine and method", "",
               f"- {manifest['cpu_model']}; {manifest['memory_gib']:.1f} GiB; {manifest['os']}, kernel {manifest['kernel']}; {workers} workers on {physical_cores} physical cores, logical CPUs {cpus}.",
               f"- {build['context']['lean_version']}; {build['context']['rust_version']}; Rust flags {build['context']['rustflags']!r}. Source `{build['context']['commit']}`, dirty={build['context']['dirty']}.",
-              "- Lean runs the proved reference `KoalaBear.Fast.interpolateCoset` sequentially: coset nodes by prefix products, one batch inversion over lists, the weights xᵢ/(z - xᵢ), one dot product per column, and a final scale by (zⁿ - sⁿ)/(n sⁿ). Plonky3 calls `p3_interpolation::interpolate_coset` 0.4.2 on a `RowMajorMatrix` with `BinomialExtensionField<KoalaBear, 4>`, with its parallel feature and native SIMD.",
-              "- Both compute the coset nodes, batch inversion and weights inside every call. Fixture decoding and matrix construction are outside timing.",
-              "- Two deterministic points alternate to prevent result hoisting. Full output digests of both implementations agree before timing, including single-row and narrow matrices.",
-              f"- {args.runs} alternating rounds, 200 ms warmup and 50 samples per invocation. Shared-host load {manifest['load_start']} → {manifest['load_end']}; other work may affect timings.", ""]
+              "- Lean packed runs `KoalaBear.Fast.interpolateCosetPacked` on the matrix's Montgomery words in a `ByteArray`: row ranges on parallel tasks, blocks of 256 rows with base-field weights from one inversion per block, lazily reduced column sums four columns at a time. `interpolateCosetPacked_eq` proves it equal to the reference.",
+              "- Lean reference runs the proved `KoalaBear.Fast.interpolateCoset` sequentially: coset nodes by prefix products, one batch inversion over lists, the weights xᵢ/(z - xᵢ), one dot product per column, and a final scale by (zⁿ - sⁿ)/(n sⁿ). Plonky3 calls `p3_interpolation::interpolate_coset` 0.4.2 on a `RowMajorMatrix` with `BinomialExtensionField<KoalaBear, 4>`, with its parallel feature and native SIMD.",
+              "- All compute the coset nodes, inversions and weights inside every call. Fixture decoding and matrix construction are outside timing.",
+              "- Two deterministic points alternate to prevent result hoisting. Full output digests of all three implementations agree before timing, including single-row and narrow matrices.",
+              f"- {args.runs} rounds in rotating order, 200 ms warmup and 50 samples per invocation. Shared-host load {manifest['load_start']} → {manifest['load_end']}; other work may affect timings.", ""]
     (out / "report.md").write_text("\n".join(lines))
     print(f"Report: {out / 'report.md'}")

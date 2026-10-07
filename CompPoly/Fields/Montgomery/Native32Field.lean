@@ -575,6 +575,119 @@ theorem toField_mulAdd4 (a b c d e f g k : FastField modulus) :
   generalize ((2 ^ 32 : ℕ) : ZMod modulus) = R at hR ⊢
   field_simp
 
+/-- Add a product below `modulus * 2^32` to an accumulator below `modulus * 2^32`, keeping it
+there with one conditional subtraction of `modulus * 2^32`: a dot product reduces only once. -/
+@[inline]
+def accumulate (modulus : ℕ) [P : Mont32Field modulus] (acc prod : UInt64) : UInt64 :=
+  let s := acc + prod
+  if s < P.modulus64 <<< 32 then s else s - P.modulus64 <<< 32
+
+private theorem accumulate_spec {acc prod : UInt64} (ha : acc.toNat < modulus * 2 ^ 32)
+    (hp : prod.toNat < modulus * 2 ^ 32) :
+    (accumulate modulus acc prod).toNat < modulus * 2 ^ 32 ∧
+      ((accumulate modulus acc prod).toNat : ZMod modulus) = acc.toNat + prod.toNat := by
+  have := P.modulus_lt_two_pow_31
+  have hs : (acc + prod).toNat = acc.toNat + prod.toNat := by
+    rw [UInt64.toNat_add]; exact Nat.mod_eq_of_lt (by omega)
+  unfold accumulate
+  dsimp only
+  split
+  · rename_i h
+    rw [UInt64.lt_iff_toNat_lt, modulus64_shift_toNat, hs] at h
+    exact ⟨by rw [hs]; exact h, by rw [hs, Nat.cast_add]⟩
+  · rename_i h
+    rw [UInt64.lt_iff_toNat_lt, modulus64_shift_toNat, hs] at h
+    rw [UInt64.toNat_sub_of_le _ _ (by
+        rw [UInt64.le_iff_toNat_le, modulus64_shift_toNat, hs]; omega),
+      modulus64_shift_toNat, hs]
+    refine ⟨by omega, ?_⟩
+    rw [Nat.cast_sub (by omega), Nat.cast_mul, ZMod.natCast_self, zero_mul, sub_zero,
+      Nat.cast_add]
+
+theorem accumulate_lt {acc prod : UInt64} (ha : acc.toNat < modulus * 2 ^ 32)
+    (hp : prod.toNat < modulus * 2 ^ 32) : (accumulate modulus acc prod).toNat < modulus * 2 ^ 32 :=
+  (accumulate_spec ha hp).1
+
+theorem accumulate_cast {acc prod : UInt64} (ha : acc.toNat < modulus * 2 ^ 32)
+    (hp : prod.toNat < modulus * 2 ^ 32) :
+    ((accumulate modulus acc prod).toNat : ZMod modulus) = acc.toNat + prod.toNat :=
+  (accumulate_spec ha hp).2
+
+/-- The product of any word and a residue fits an accumulator. -/
+theorem word_mul_val_lt (e : UInt32) (x : FastField modulus) :
+    (e.toUInt64 * x.val.toUInt64).toNat < modulus * 2 ^ 32 := by
+  have he := e.toNat_lt
+  have hx := x.property
+  have := P.modulus_lt_two_pow_31
+  rw [UInt64.toNat_mul, UInt32.toNat_toUInt64, UInt32.toNat_toUInt64,
+    Nat.mod_eq_of_lt (by nlinarith)]
+  rw [Nat.mul_comm]
+  exact Nat.mul_lt_mul_of_lt_of_le hx (by omega) (by omega)
+
+/-- The residue a raw 32-bit Montgomery word stands for; words from the modulus up wrap. -/
+@[inline]
+def ofWordMod (x : UInt32) : FastField modulus :=
+  ⟨x % P.modulus32, by
+    rw [UInt32.toNat_mod, Mont32Field.modulus32_toNat]; exact Nat.mod_lt _ P.modulus_pos⟩
+
+theorem toField_ofWordMod (x : UInt32) :
+    toField (ofWordMod x : FastField modulus) =
+      (x.toNat : ZMod modulus) * ((2 ^ 32 : ℕ) : ZMod modulus)⁻¹ := by
+  rw [toField_eq_val_toNat_cast_mul_inv]
+  simp only [ofWordMod, UInt32.toNat_mod, Mont32Field.modulus32_toNat, ZMod.natCast_mod]
+
+/-- A residue's word is its value times `2^32`. -/
+theorem val_toNat_cast (x : FastField modulus) :
+    (x.val.toNat : ZMod modulus) = toField x * ((2 ^ 32 : ℕ) : ZMod modulus) :=
+  val_toNat_cast_eq_toField_mul
+
+/-- Reducing a sum of products of words gives the sum of products of their residues. -/
+theorem toField_reduce (x : UInt64) (h : x.toNat < modulus * 2 ^ 32) :
+    toField (reduce x h) =
+      (x.toNat : ZMod modulus) * ((2 ^ 32 : ℕ) : ZMod modulus)⁻¹ *
+        ((2 ^ 32 : ℕ) : ZMod modulus)⁻¹ := by
+  rw [toField_eq_val_toNat_cast_mul_inv, reduce_val_toNat_cast]
+
+/-- A lazy dot-product accumulator: a 64-bit word below `modulus * 2^32`. -/
+abbrev LazyAcc (modulus : ℕ) [Mont32Field modulus] : Type :=
+  { a : UInt64 // a.toNat < modulus * 2 ^ 32 }
+
+namespace LazyAcc
+
+/-- The empty sum. -/
+@[inline] def zero : LazyAcc modulus := ⟨0, by simp⟩
+
+/-- Accumulate the product of a raw word and a residue. -/
+@[inline] def add (a : LazyAcc modulus) (e : UInt32) (x : FastField modulus) : LazyAcc modulus :=
+  ⟨accumulate modulus a.val (e.toUInt64 * x.val.toUInt64),
+    accumulate_lt a.property (word_mul_val_lt e x)⟩
+
+/-- The residue of the accumulated sum, with one Montgomery reduction. -/
+@[inline] def result (a : LazyAcc modulus) : FastField modulus := reduce a.val a.property
+
+/-- The sum accumulated so far. -/
+def value (a : LazyAcc modulus) : ZMod modulus :=
+  (a.val.toNat : ZMod modulus) * ((2 ^ 32 : ℕ) : ZMod modulus)⁻¹ * ((2 ^ 32 : ℕ) : ZMod modulus)⁻¹
+
+@[simp] theorem value_zero : value (zero : LazyAcc modulus) = 0 := by
+  simp only [value, zero, UInt64.toNat_zero, Nat.cast_zero, zero_mul]
+
+@[simp] theorem value_add (a : LazyAcc modulus) (e : UInt32) (x : FastField modulus) :
+    value (a.add e x) = value a + toField (ofWordMod e : FastField modulus) * toField x := by
+  have hR := P.two_pow_32_ne_zero
+  simp only [value, add]
+  rw [accumulate_cast a.property (word_mul_val_lt e x), toField_ofWordMod,
+    toField_eq_val_toNat_cast_mul_inv (x := x), UInt64.toNat_mul, UInt32.toNat_toUInt64,
+    UInt32.toNat_toUInt64, Nat.mod_eq_of_lt (by
+      have := e.toNat_lt; have := x.property; have := P.modulus_lt_two_pow_31; nlinarith)]
+  push_cast
+  ring
+
+@[simp] theorem toField_result (a : LazyAcc modulus) : toField a.result = value a :=
+  toField_reduce a.val a.property
+
+end LazyAcc
+
 private theorem mul_assoc (x y z : FastField modulus) : (x * y) * z = x * (y * z) := by
   apply toField_injective
   rw [toField_mul, toField_mul, toField_mul, toField_mul]
