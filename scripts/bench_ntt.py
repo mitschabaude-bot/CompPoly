@@ -124,6 +124,6 @@ def run(args, common, allowed):
               "- All three APIs use natural-order inputs and outputs. Forward maps coefficients to evaluations; inverse maps evaluations to coefficients, including 1/n normalization. The fixture root must equal both Lean's certified root and Plonky3's selected root.",
               "- Plan construction, twiddle tables, cached permutation indices and fixture decoding are outside timing. Input copying, arithmetic, output disposal and ordering conversions are timed, including each Lean ordering adapter. Inverse normalization is timed. Inputs remain reusable and unchanged in all three implementations.",
               "- Two deterministic inputs alternate to prevent result hoisting. Full output digests are checked outside timing; a four-position output sink is used inside timing. Native validation includes tiny odd/even sizes and zero/one/near-modulus coordinates.",
-              f"- {args.runs} alternating three-way rounds, 50 ms warmup and 20 samples per invocation. Shared-host load {manifest['load_start']} → {manifest['load_end']}; other work may affect timings.", ""]
+              f"- {args.runs} alternating four-way rounds, 200 ms warmup and 50 samples per invocation, so idle worker cores reach full clocks before timing. Shared-host load {manifest['load_start']} → {manifest['load_end']}; other work may affect timings.", ""]
     (out / "report.md").write_text("\n".join(lines))
     print(f"Report: {out / 'report.md'}")

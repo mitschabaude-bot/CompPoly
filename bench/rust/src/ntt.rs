@@ -1,5 +1,5 @@
 //! Existing optimized Plonky3 NTT API, with natural-order inputs and outputs.
-use crate::harness::{measure_workload, BenchValue, DIGEST_MODULUS, MEDIUM};
+use crate::harness::{measure_workload, BenchValue, DIGEST_MODULUS, LARGE};
 use p3_dft::{Radix2DFTSmallBatch, TwoAdicSubgroupDft};
 use p3_field::{Field, PackedValue, PrimeCharacteristicRing, PrimeField32, TwoAdicField};
 use p3_koala_bear::KoalaBear as F;
@@ -69,7 +69,7 @@ pub fn run(args: &[String]) {
         &args[2],
         1,
         2,
-        MEDIUM,
+        LARGE,
         validate,
         |i| {
             Output(if args[2] == "forward" {
