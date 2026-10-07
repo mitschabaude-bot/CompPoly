@@ -31,6 +31,9 @@ def evalRange [Semiring R] (p : Array R) (x : R) (lo hi : Nat) : R :=
 class EvalKernel (R : Type*) [Semiring R] where
   range : Array R → R → Nat → Nat → R
   range_eq : ∀ p x lo hi, range p x lo hi = evalRange p x lo hi
+  /-- The smallest leaf, in coefficients, worth a task of its own; `evalFast` evaluates smaller
+  ranges on the calling thread. -/
+  minLeaf : Nat := 8192
 
 /-- Default leaves use the semiring’s existing arithmetic. -/
 instance (priority := low) [Semiring R] : EvalKernel R where
@@ -94,10 +97,12 @@ def evalParallel [Semiring R] [EvalKernel R] (p : Array R) (x : R) (lo hi : Nat)
       evalJoin (evalParallelTask p x mid hi depth) (fun _ ↦ evalParallel p x lo mid depth) x
         (mid - lo)
 
-/-- Evaluate one polynomial at one point using up to `2 ^ logWorkers` concurrent blocks. -/
+/-- Evaluate one polynomial at one point using up to `2 ^ logWorkers` concurrent blocks, none
+smaller than the kernel's `minLeaf` coefficients. -/
 @[inline, specialize]
 def evalFast [Semiring R] [EvalKernel R] (x : R) (p : CPolynomial R) (logWorkers : Nat := 4) : R :=
-  evalParallel p.val x 0 p.val.size logWorkers
+  evalParallel p.val x 0 p.val.size
+    (min logWorkers (p.val.size / EvalKernel.minLeaf (R := R)).log2)
 
 private theorem horner_affine [Semiring R] (xs : List R) (x acc : R) :
     xs.foldr (fun a v ↦ v * x + a) acc =
@@ -155,7 +160,7 @@ theorem evalParallel_eq_evalRange [Semiring R] [EvalKernel R] (p : Array R) (x :
 /-- Parallel evaluation computes exactly the existing Horner evaluator. -/
 theorem evalFast_eq_evalHorner [Semiring R] [EvalKernel R] (x : R) (p : CPolynomial R)
     (logWorkers : Nat) : evalFast x p logWorkers = p.evalHorner x := by
-  rw [evalFast, evalParallel_eq_evalRange p.val x logWorkers 0 p.val.size (by omega) (by omega)]
+  rw [evalFast, evalParallel_eq_evalRange p.val x _ 0 p.val.size (by omega) (by omega)]
   rfl
 
 /-- Parallel evaluation agrees with the mathematical polynomial evaluation API. -/

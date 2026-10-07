@@ -487,5 +487,7 @@ theorem evalLazyRange_eq (p : Array ScalarField) (x : ScalarField) (lo hi : Nat)
 instance : CompPoly.CPolynomial.EvalKernel ScalarField where
   range := evalLazyRange
   range_eq := evalLazyRange_eq
+  -- A BN254 multiplication costs about ten small-field ones, so smaller leaves pay off.
+  minLeaf := 1024
 
 end BN254.Fast
