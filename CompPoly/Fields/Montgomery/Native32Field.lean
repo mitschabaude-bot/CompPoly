@@ -492,6 +492,89 @@ theorem toField_mul (x y : FastField modulus) : toField (x * y) = toField x * to
     toField_eq_val_toNat_cast_mul_inv (x := y), mul_def, mul_val_toNat_cast]
   ring
 
+/-- The unreduced 64-bit product of two Montgomery words, below `modulus ^ 2`. -/
+@[inline]
+def mulWide (x y : FastField modulus) : UInt64 := x.val.toUInt64 * y.val.toUInt64
+
+theorem mulWide_toNat (x y : FastField modulus) :
+    (mulWide x y).toNat = x.val.toNat * y.val.toNat := by
+  simp only [mulWide, UInt64.toNat_mul, UInt32.toNat_toUInt64]
+  exact Nat.mod_eq_of_lt (by nlinarith [x.property, y.property, P.modulus_sq_lt_two_pow_64])
+
+theorem modulus64_shift_toNat : (P.modulus64 <<< 32).toNat = modulus * 2 ^ 32 := by
+  rw [UInt64.toNat_shiftLeft, Mont32Field.modulus64_toNat,
+    show (32 : UInt64).toNat % 64 = 32 from rfl, Nat.shiftLeft_eq]
+  have := P.modulus_lt_two_pow_31
+  exact Nat.mod_eq_of_lt (by omega)
+
+/-- Montgomery reduction for inputs below `2 * modulus * 2^32`, such as a sum of four products:
+one conditional subtraction of `modulus * 2^32` brings them into `reduce`'s range. -/
+@[inline]
+def reduceWide (x : UInt64) (h : x.toNat < 2 * (modulus * 2 ^ 32)) : FastField modulus :=
+  if hx : x < P.modulus64 <<< 32 then
+    reduce x (by rw [UInt64.lt_iff_toNat_lt, modulus64_shift_toNat] at hx; exact hx)
+  else
+    reduce (x - P.modulus64 <<< 32) (by
+      rw [UInt64.lt_iff_toNat_lt, modulus64_shift_toNat] at hx
+      rw [UInt64.toNat_sub_of_le _ _ (by
+        rw [UInt64.le_iff_toNat_le, modulus64_shift_toNat]; omega), modulus64_shift_toNat]
+      omega)
+
+private theorem reduceWide_val_toNat_cast {x : UInt64} (h : x.toNat < 2 * (modulus * 2 ^ 32)) :
+    ((reduceWide x h).val.toNat : ZMod modulus) =
+      (x.toNat : ZMod modulus) * ((2 ^ 32 : ℕ) : ZMod modulus)⁻¹ := by
+  unfold reduceWide
+  split
+  · exact reduce_val_toNat_cast _
+  · rename_i hx
+    rw [UInt64.lt_iff_toNat_lt, modulus64_shift_toNat] at hx
+    rw [reduce_val_toNat_cast, UInt64.toNat_sub_of_le _ _ (by
+      rw [UInt64.le_iff_toNat_le, modulus64_shift_toNat]; omega), modulus64_shift_toNat,
+      Nat.cast_sub (by omega), Nat.cast_mul, ZMod.natCast_self, zero_mul, sub_zero]
+
+theorem val_mul_val_lt (x y : FastField modulus) :
+    x.val.toNat * y.val.toNat < modulus * modulus :=
+  Nat.mul_lt_mul'' x.property y.property
+
+/-- A sum of four products with a single Montgomery reduction. -/
+@[inline]
+def mulAdd4 (a b c d e f g k : FastField modulus) : FastField modulus :=
+  reduceWide (mulWide a b + mulWide c d + mulWide e f + mulWide g k) (by
+    have := P.modulus_lt_two_pow_31
+    have h1 := mulWide_toNat a b; have h2 := mulWide_toNat c d
+    have h3 := mulWide_toNat e f; have h4 := mulWide_toNat g k
+    have b1 := val_mul_val_lt a b
+    have b2 := val_mul_val_lt c d
+    have b3 := val_mul_val_lt e f
+    have b4 := val_mul_val_lt g k
+    have hm : modulus * modulus * 4 ≤ 2 * (modulus * 2 ^ 32) := by nlinarith
+    simp only [UInt64.toNat_add, h1, h2, h3, h4]
+    rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
+    omega)
+
+@[simp]
+theorem toField_mulAdd4 (a b c d e f g k : FastField modulus) :
+    toField (mulAdd4 a b c d e f g k) =
+      toField a * toField b + toField c * toField d + toField e * toField f +
+        toField g * toField k := by
+  have := P.modulus_lt_two_pow_31
+  have b1 := val_mul_val_lt a b
+  have b2 := val_mul_val_lt c d
+  have b3 := val_mul_val_lt e f
+  have b4 := val_mul_val_lt g k
+  have hm : modulus * modulus * 4 < 2 ^ 64 := by nlinarith
+  rw [toField_eq_val_toNat_cast_mul_inv, mulAdd4, reduceWide_val_toNat_cast]
+  simp only [UInt64.toNat_add, mulWide_toNat]
+  rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
+  rw [Nat.cast_add, Nat.cast_add, Nat.cast_add, Nat.cast_mul, Nat.cast_mul, Nat.cast_mul,
+    Nat.cast_mul, val_toNat_cast_eq_toField_mul (x := a), val_toNat_cast_eq_toField_mul (x := b),
+    val_toNat_cast_eq_toField_mul (x := c), val_toNat_cast_eq_toField_mul (x := d),
+    val_toNat_cast_eq_toField_mul (x := e), val_toNat_cast_eq_toField_mul (x := f),
+    val_toNat_cast_eq_toField_mul (x := g), val_toNat_cast_eq_toField_mul (x := k)]
+  have hR := P.two_pow_32_ne_zero
+  generalize ((2 ^ 32 : ℕ) : ZMod modulus) = R at hR ⊢
+  field_simp
+
 private theorem mul_assoc (x y z : FastField modulus) : (x * y) * z = x * (y * z) := by
   apply toField_injective
   rw [toField_mul, toField_mul, toField_mul, toField_mul]

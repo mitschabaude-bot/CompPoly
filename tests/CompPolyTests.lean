@@ -78,6 +78,7 @@ public import CompPolyTests.Fields.Extension.RawArithmetic
 public import CompPolyTests.Fields.Goldilocks.Bytes
 public import CompPolyTests.Fields.Goldilocks.Fast
 public import CompPolyTests.Fields.KoalaBear.Fast
+public import CompPolyTests.Fields.KoalaBear.FastExt4
 public import CompPolyTests.Fields.Mersenne31.Bytes
 public import CompPolyTests.Fields.Mersenne31.Circle
 public import CompPolyTests.Fields.Mersenne31.Fast
