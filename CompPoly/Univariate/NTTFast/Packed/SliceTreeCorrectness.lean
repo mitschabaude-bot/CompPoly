@@ -136,7 +136,32 @@ theorem lit16_rows_succ (F : Nat → α) (count : Nat) :
     omega
   rw [e1, e2]
 
-/-- The paired split loop appends the sums and twiddle-scaled differences of its ranges. -/
+/-- The paired split loop at machine indices preserves packing. -/
+theorem pairLoop_packFields (A B w : Array KoalaBear.Fast.Field) :
+    ∀ (count : Nat) (ia ib iw : USize) (l r : Array KoalaBear.Fast.Field) (h),
+    pairLoop (packFields A) (packFields B) (packFields w) count ia ib iw (packFields l)
+      (packFields r) h =
+      (packFields (l ++ rows (fun j k ↦
+          A.getD (ia.toNat + (16 * j + k)) 0 + B.getD (ib.toNat + (16 * j + k)) 0) count),
+        packFields (r ++ rows (fun j k ↦ w.getD (iw.toNat + (16 * j + k)) 0 *
+          (A.getD (ia.toNat + (16 * j + k)) 0 - B.getD (ib.toNat + (16 * j + k)) 0)) count)) := by
+  intro count
+  induction count with
+  | zero => intro ia ib iw l r h; simp only [pairLoop, rows, Array.append_empty]
+  | succ count ih =>
+    intro ia ib iw l r h
+    rw [pairLoop, pairLeft_packFields, pairRight_packFields, ih]
+    have ha := usize_add16 ia _ (by omega) h.2.2.2.1
+    have hb := usize_add16 ib _ (by omega) h.2.2.2.2.1
+    have hw := usize_add16 iw _ (by omega) h.2.2.2.2.2
+    rw [ha, hb, hw]
+    simp only [Array.append_assoc]
+    rw [← lit16_rows_succ (fun k ↦ A.getD (ia.toNat + k) 0 + B.getD (ib.toNat + k) 0),
+      ← lit16_rows_succ (fun k ↦ w.getD (iw.toNat + k) 0 *
+        (A.getD (ia.toNat + k) 0 - B.getD (ib.toNat + k) 0))]
+    simp only [Nat.add_assoc]
+
+/-- The paired split loop preserves packing. -/
 theorem pairGo_packFields (A B w : Array KoalaBear.Fast.Field) (count ia ib iw : Nat)
     (l r : Array KoalaBear.Fast.Field) (hA : ia + 16 * count ≤ A.size)
     (hB : ib + 16 * count ≤ B.size) (hw : iw + 16 * count ≤ w.size)
@@ -148,21 +173,37 @@ theorem pairGo_packFields (A B w : Array KoalaBear.Fast.Field) (count ia ib iw :
           A.getD (ia + (16 * j + k)) 0 + B.getD (ib + (16 * j + k)) 0) count),
         packFields (r ++ rows (fun j k ↦ w.getD (iw + (16 * j + k)) 0 *
           (A.getD (ia + (16 * j + k)) 0 - B.getD (ib + (16 * j + k)) 0)) count)) := by
-  induction count generalizing ia ib iw l r with
-  | zero => simp only [pairGo, rows, Array.append_empty]
+  have hcond : 4 * (ia + 16 * count) ≤ (packFields A).size ∧
+      4 * (ib + 16 * count) ≤ (packFields B).size ∧
+      4 * (iw + 16 * count) ≤ (packFields w).size ∧ (packFields A).size < USize.size ∧
+      (packFields B).size < USize.size ∧ (packFields w).size < USize.size := by
+    simp only [size_packFields]
+    omega
+  rw [pairGo, dite_eq_left_of_eq_true (eq_true hcond), pairLoop_packFields]
+  simp only [USize.toNat_ofNatLT]
+
+/-- The paired input loop at machine indices preserves packing. -/
+theorem pairInputLoop_packFields (a w : Array KoalaBear.Fast.Field) :
+    ∀ (count : Nat) (ia ib iw : USize) (l r : Array KoalaBear.Fast.Field) (h),
+    pairInputLoop a (packFields w) count ia ib iw (packFields l) (packFields r) h =
+      (packFields (l ++ rows (fun j k ↦
+          a.getD (ia.toNat + (16 * j + k)) 0 + a.getD (ib.toNat + (16 * j + k)) 0) count),
+        packFields (r ++ rows (fun j k ↦ w.getD (iw.toNat + (16 * j + k)) 0 *
+          (a.getD (ia.toNat + (16 * j + k)) 0 - a.getD (ib.toNat + (16 * j + k)) 0)) count)) := by
+  intro count
+  induction count with
+  | zero => intro ia ib iw l r h; simp only [pairInputLoop, rows, Array.append_empty]
   | succ count ih =>
-    have hcond : 4 * (ia + 15) + 3 < (packFields A).size ∧
-        4 * (ib + 15) + 3 < (packFields B).size ∧ 4 * (iw + 15) + 3 < (packFields w).size ∧
-        (packFields A).size < USize.size ∧ (packFields B).size < USize.size ∧
-        (packFields w).size < USize.size := by
-      simp only [size_packFields]
-      omega
-    rw [pairGo, dite_eq_left_of_eq_true (eq_true hcond), pairLeft_packFields, pairRight_packFields]
-    simp only [USize.toNat_ofNatLT]
-    rw [ih (ia + 16) (ib + 16) (iw + 16) _ _ (by omega) (by omega) (by omega)]
+    intro ia ib iw l r h
+    rw [pairInputLoop, pairInputLeft_packFields, pairInputRight_packFields, ih]
+    have ha := usize_add16 ia _ (by omega) h.2.2.2.1
+    have hb := usize_add16 ib _ (by omega) h.2.2.2.1
+    have hw := usize_add16 iw _ (by omega) h.2.2.2.2
+    rw [ha, hb, hw]
     simp only [Array.append_assoc]
-    rw [← lit16_rows_succ (fun k ↦ A.getD (ia + k) 0 + B.getD (ib + k) 0),
-      ← lit16_rows_succ (fun k ↦ w.getD (iw + k) 0 * (A.getD (ia + k) 0 - B.getD (ib + k) 0))]
+    rw [← lit16_rows_succ (fun k ↦ a.getD (ia.toNat + k) 0 + a.getD (ib.toNat + k) 0),
+      ← lit16_rows_succ (fun k ↦ w.getD (iw.toNat + k) 0 *
+        (a.getD (ia.toNat + k) 0 - a.getD (ib.toNat + k) 0))]
     simp only [Nat.add_assoc]
 
 /-- The paired split loop over a field array. -/
@@ -175,22 +216,13 @@ theorem pairInputGo_packFields (a w : Array KoalaBear.Fast.Field) (count ia ib i
           a.getD (ia + (16 * j + k)) 0 + a.getD (ib + (16 * j + k)) 0) count),
         packFields (r ++ rows (fun j k ↦ w.getD (iw + (16 * j + k)) 0 *
           (a.getD (ia + (16 * j + k)) 0 - a.getD (ib + (16 * j + k)) 0)) count)) := by
-  induction count generalizing ia ib iw l r with
-  | zero => simp only [pairInputGo, rows, Array.append_empty]
-  | succ count ih =>
-    have hcond : ia + 15 < a.size ∧ ib + 15 < a.size ∧
-        4 * (iw + 15) + 3 < (packFields w).size ∧ a.size < USize.size ∧
-        (packFields w).size < USize.size := by
-      simp only [size_packFields]
-      omega
-    rw [pairInputGo, dite_eq_left_of_eq_true (eq_true hcond), pairInputLeft_packFields,
-      pairInputRight_packFields]
-    simp only [USize.toNat_ofNatLT]
-    rw [ih (ia + 16) (ib + 16) (iw + 16) _ _ (by omega) (by omega) (by omega)]
-    simp only [Array.append_assoc]
-    rw [← lit16_rows_succ (fun k ↦ a.getD (ia + k) 0 + a.getD (ib + k) 0),
-      ← lit16_rows_succ (fun k ↦ w.getD (iw + k) 0 * (a.getD (ia + k) 0 - a.getD (ib + k) 0))]
-    simp only [Nat.add_assoc]
+  have hcond : ia + 16 * count ≤ a.size ∧ ib + 16 * count ≤ a.size ∧
+      4 * (iw + 16 * count) ≤ (packFields w).size ∧ a.size < USize.size ∧
+      (packFields w).size < USize.size := by
+    simp only [size_packFields]
+    omega
+  rw [pairInputGo, dite_eq_left_of_eq_true (eq_true hcond), pairInputLoop_packFields]
+  simp only [USize.toNat_ofNatLT]
 
 /-- Reserved capacity does not change an empty packed buffer. -/
 theorem emptyWithCapacity_eq_packFields (k : Nat) :

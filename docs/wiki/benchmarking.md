@@ -810,3 +810,7 @@ A single-threaded profile of the packed plan at one million points (15.5 ms agai
 
 One normal-driver run per worker count, million-point forward / inverse, milliseconds, packed I/O Lean against Plonky3: one worker 12.41 / 12.72 against 9.36 / 9.10 (was 14.82 / 15.19); four workers 3.47 / 3.52 against 2.86 / 2.79 (was 4.10 / 4.16); eight workers 3.58 / 3.69 against 3.87 / 3.19 (was 4.17 / 4.11), where Plonky3's forward row was noisy (± 0.34 ms). The field-array API improved by 0.5–0.8 ms at every worker count.
 
+
+### Split loops with hoisted bounds (2026-10-07)
+
+`pairGo` and `pairInputGo`, the batch loops of the split levels, checked the bounds of every sixteen-word batch and converted Nat indices to `USize` on each step. They now check the whole range once and hand off to `pairLoop` / `pairInputLoop`, which step `USize` indices under a proof that carries the remaining range; `usize_add16` shows the increments cannot wrap. An isolated split tree with identity leaves went from 3.2–3.7 to 1.9–2.5 ms on one worker. Seven alternating rounds of the normal driver, million-point forward / inverse, milliseconds, packed I/O: one worker 12.56 / 12.86 → 11.72 / 11.92, four workers 3.48 / 3.62 → 3.31 / 3.39; the field-array API was unchanged within noise.

@@ -215,35 +215,63 @@ namespace CompPoly.CPolynomial.NTTFast.Packed.Native
     (mul t8 (sub x8 y8)) (mul t9 (sub x9 y9)) (mul t10 (sub x10 y10)) (mul t11 (sub x11 y11))
     (mul t12 (sub x12 y12)) (mul t13 (sub x13 y13)) (mul t14 (sub x14 y14)) (mul t15 (sub x15 y15))
 
+/-- Advancing a machine index by one batch inside a buffer cannot wrap. -/
+theorem usize_add16 (i : USize) (n : Nat) (h : i.toNat + 16 ≤ n) (hn : n < USize.size) :
+    (i + 16).toNat = i.toNat + 16 := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  simp only [USize.toNat_add, USize.reduceToNat, hsize]
+  exact Nat.mod_eq_of_lt (by omega)
+
+/-- `n` batches of left and right split outputs at machine indices whose ranges were checked
+once. -/
+def pairLoop (A B w : @& ByteArray) : (n : Nat) → (ia ib iw : USize) → ByteArray → ByteArray →
+    4 * (ia.toNat + 16 * n) ≤ A.size ∧ 4 * (ib.toNat + 16 * n) ≤ B.size ∧
+      4 * (iw.toNat + 16 * n) ≤ w.size ∧ A.size < USize.size ∧ B.size < USize.size ∧
+      w.size < USize.size → ByteArray × ByteArray
+  | 0, _, _, _, l, r, _ => (l, r)
+  | n + 1, ia, ib, iw, l, r, h =>
+    let l := pairLeft A B ia ib l (by omega)
+    let r := pairRight A B w ia ib iw r (by omega)
+    pairLoop A B w n (ia + 16) (ib + 16) (iw + 16) l r (by
+      rw [usize_add16 ia A.size (by omega) h.2.2.2.1, usize_add16 ib B.size (by omega) h.2.2.2.2.1,
+        usize_add16 iw w.size (by omega) h.2.2.2.2.2]
+      omega)
+
 /-- Append `count` batches of left and right split outputs, from word ranges `ia` of `A` and
-`ib` of `B` with twiddles from `iw`, reading each input word once. -/
-def pairGo (A B w : @& ByteArray) : Nat → Nat → Nat → Nat → ByteArray → ByteArray →
-    ByteArray × ByteArray
-  | 0, _, _, _, l, r => (l, r)
-  | count + 1, ia, ib, iw, l, r =>
-    if h : 4 * (ia + 15) + 3 < A.size ∧ 4 * (ib + 15) + 3 < B.size ∧
-        4 * (iw + 15) + 3 < w.size ∧ A.size < USize.size ∧ B.size < USize.size ∧
-        w.size < USize.size then
-      let l := pairLeft A B (USize.ofNatLT ia (by omega)) (USize.ofNatLT ib (by omega)) l
-        (by simp only [USize.toNat_ofNatLT]; omega)
-      let r := pairRight A B w (USize.ofNatLT ia (by omega)) (USize.ofNatLT ib (by omega))
-        (USize.ofNatLT iw (by omega)) r (by simp only [USize.toNat_ofNatLT]; omega)
-      pairGo A B w count (ia + 16) (ib + 16) (iw + 16) l r
-    else (l, r)
+`ib` of `B` with twiddles from `iw`, reading each input word once; the ranges are checked once,
+and out-of-range requests append nothing. -/
+def pairGo (A B w : @& ByteArray) (count ia ib iw : Nat) (l r : ByteArray) :
+    ByteArray × ByteArray :=
+  if h : 4 * (ia + 16 * count) ≤ A.size ∧ 4 * (ib + 16 * count) ≤ B.size ∧
+      4 * (iw + 16 * count) ≤ w.size ∧ A.size < USize.size ∧ B.size < USize.size ∧
+      w.size < USize.size then
+    pairLoop A B w count (USize.ofNatLT ia (by omega)) (USize.ofNatLT ib (by omega))
+      (USize.ofNatLT iw (by omega)) l r (by simp only [USize.toNat_ofNatLT]; exact h)
+  else (l, r)
+
+/-- `pairLoop` reading both ranges from a field array. -/
+def pairInputLoop (a : @& Array KoalaBear.Fast.Field) (w : @& ByteArray) :
+    (n : Nat) → (ia ib iw : USize) → ByteArray → ByteArray →
+    ia.toNat + 16 * n ≤ a.size ∧ ib.toNat + 16 * n ≤ a.size ∧
+      4 * (iw.toNat + 16 * n) ≤ w.size ∧ a.size < USize.size ∧ w.size < USize.size →
+      ByteArray × ByteArray
+  | 0, _, _, _, l, r, _ => (l, r)
+  | n + 1, ia, ib, iw, l, r, h =>
+    let l := pairInputLeft a ia ib l (by omega)
+    let r := pairInputRight a w ia ib iw r (by omega)
+    pairInputLoop a w n (ia + 16) (ib + 16) (iw + 16) l r (by
+      rw [usize_add16 ia a.size (by omega) h.2.2.2.1, usize_add16 ib a.size (by omega) h.2.2.2.1,
+        usize_add16 iw w.size (by omega) h.2.2.2.2]
+      omega)
 
 /-- `pairGo` reading both ranges from a field array. -/
-def pairInputGo (a : @& Array KoalaBear.Fast.Field) (w : @& ByteArray) :
-    Nat → Nat → Nat → Nat → ByteArray → ByteArray → ByteArray × ByteArray
-  | 0, _, _, _, l, r => (l, r)
-  | count + 1, ia, ib, iw, l, r =>
-    if h : ia + 15 < a.size ∧ ib + 15 < a.size ∧ 4 * (iw + 15) + 3 < w.size ∧
-        a.size < USize.size ∧ w.size < USize.size then
-      let l := pairInputLeft a (USize.ofNatLT ia (by omega)) (USize.ofNatLT ib (by omega)) l
-        (by simp only [USize.toNat_ofNatLT]; omega)
-      let r := pairInputRight a w (USize.ofNatLT ia (by omega)) (USize.ofNatLT ib (by omega))
-        (USize.ofNatLT iw (by omega)) r (by simp only [USize.toNat_ofNatLT]; omega)
-      pairInputGo a w count (ia + 16) (ib + 16) (iw + 16) l r
-    else (l, r)
+def pairInputGo (a : @& Array KoalaBear.Fast.Field) (w : @& ByteArray) (count ia ib iw : Nat)
+    (l r : ByteArray) : ByteArray × ByteArray :=
+  if h : ia + 16 * count ≤ a.size ∧ ib + 16 * count ≤ a.size ∧
+      4 * (iw + 16 * count) ≤ w.size ∧ a.size < USize.size ∧ w.size < USize.size then
+    pairInputLoop a w count (USize.ofNatLT ia (by omega)) (USize.ofNatLT ib (by omega))
+      (USize.ofNatLT iw (by omega)) l r (by simp only [USize.toNat_ofNatLT]; exact h)
+  else (l, r)
 
 /-- Wait for every task without blocking a worker; results keep the task order. -/
 def joinTasks (ts : Array (Task α)) : Task (Array α) :=
