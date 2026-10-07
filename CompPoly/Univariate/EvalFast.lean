@@ -14,7 +14,8 @@ public import CompPoly.Univariate.Basic
 
 Split a coefficient array into contiguous blocks without copying it. Leaves run Horner;
 internal nodes evaluate the halves concurrently and combine their values. `logWorkers`
-bounds the number of simultaneously active leaves by `2 ^ logWorkers`.
+bounds the number of simultaneously active leaves by `2 ^ logWorkers`; the calling thread
+evaluates one of them.
 -/
 
 @[expose] public section
@@ -73,10 +74,25 @@ def evalParallelTask [Semiring R] [EvalKernel R] (p : Array R) (x : R) (lo hi : 
       lower.bind (sync := true) fun low ↦ upper.map (sync := true) fun high ↦
         high * evalPower x (mid - lo) + low
 
-/-- Parallel range evaluation; only the calling thread waits for the final result. -/
-@[inline, specialize]
-def evalParallel [Semiring R] [EvalKernel R] (p : Array R) (x : R) (lo hi depth : Nat) : R :=
-  (evalParallelTask p x lo hi depth).get
+/-- Join a spawned upper subtree with the lower range, which the calling thread evaluates
+itself. Taking the task as an argument spawns it before the inline work starts. -/
+@[noinline, specialize]
+def evalJoin [Semiring R] (upper : Task R) (low : Unit → R) (x : R) (n : Nat) : R :=
+  let low := low ()
+  upper.get * evalPower x n + low
+
+/-- Parallel range evaluation. The calling thread spawns the upper subtrees along the tree's
+lower edge and evaluates the lowest leaf itself, so `2 ^ depth` leaves occupy `2 ^ depth - 1`
+tasks plus the caller; a caller that only waited would leave one worker's core idle when the
+tasks are woken. -/
+@[specialize]
+def evalParallel [Semiring R] [EvalKernel R] (p : Array R) (x : R) (lo hi : Nat) : Nat → R
+  | 0 => EvalKernel.range p x lo hi
+  | depth + 1 =>
+    if hi - lo < 2 then EvalKernel.range p x lo hi else
+      let mid := lo + (hi - lo) / 2
+      evalJoin (evalParallelTask p x mid hi depth) (fun _ ↦ evalParallel p x lo mid depth) x
+        (mid - lo)
 
 /-- Evaluate one polynomial at one point using up to `2 ^ logWorkers` concurrent blocks. -/
 @[inline, specialize]
@@ -121,11 +137,25 @@ theorem evalParallelTask_get_eq_evalRange [Semiring R] [EvalKernel R] (p : Array
       rw [ih _ _ (by omega) hhi, ih _ _ (by omega) (by omega), evalPower_eq_pow]
       exact (evalRange_split p x lo (lo + (hi - lo) / 2) hi (by omega) (by omega) hhi).symm
 
+/-- Parallel range evaluation agrees with sequential evaluation of its range. -/
+theorem evalParallel_eq_evalRange [Semiring R] [EvalKernel R] (p : Array R) (x : R)
+    (depth lo hi : Nat) (hlo : lo ≤ hi) (hhi : hi ≤ p.size) :
+    evalParallel p x lo hi depth = evalRange p x lo hi := by
+  induction depth generalizing lo hi with
+  | zero => exact EvalKernel.range_eq p x lo hi
+  | succ depth ih =>
+    rw [evalParallel]
+    split
+    · exact EvalKernel.range_eq p x lo hi
+    · simp only [evalJoin]
+      rw [ih _ _ (by omega) (by omega),
+        evalParallelTask_get_eq_evalRange p x depth _ _ (by omega) hhi, evalPower_eq_pow]
+      exact (evalRange_split p x lo (lo + (hi - lo) / 2) hi (by omega) (by omega) hhi).symm
+
 /-- Parallel evaluation computes exactly the existing Horner evaluator. -/
 theorem evalFast_eq_evalHorner [Semiring R] [EvalKernel R] (x : R) (p : CPolynomial R)
     (logWorkers : Nat) : evalFast x p logWorkers = p.evalHorner x := by
-  rw [evalFast, evalParallel,
-    evalParallelTask_get_eq_evalRange p.val x logWorkers 0 p.val.size (by omega) (by omega)]
+  rw [evalFast, evalParallel_eq_evalRange p.val x logWorkers 0 p.val.size (by omega) (by omega)]
   rfl
 
 /-- Parallel evaluation agrees with the mathematical polynomial evaluation API. -/
