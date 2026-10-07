@@ -215,13 +215,6 @@ namespace CompPoly.CPolynomial.NTTFast.Packed.Native
     (mul t8 (sub x8 y8)) (mul t9 (sub x9 y9)) (mul t10 (sub x10 y10)) (mul t11 (sub x11 y11))
     (mul t12 (sub x12 y12)) (mul t13 (sub x13 y13)) (mul t14 (sub x14 y14)) (mul t15 (sub x15 y15))
 
-/-- Advancing a machine index by one batch inside a buffer cannot wrap. -/
-theorem usize_add16 (i : USize) (n : Nat) (h : i.toNat + 16 ≤ n) (hn : n < USize.size) :
-    (i + 16).toNat = i.toNat + 16 := by
-  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
-  simp only [USize.toNat_add, USize.reduceToNat, hsize]
-  exact Nat.mod_eq_of_lt (by omega)
-
 /-- `n` batches of left and right split outputs at machine indices whose ranges were checked
 once. -/
 def pairLoop (A B w : @& ByteArray) : (n : Nat) → (ia ib iw : USize) → ByteArray → ByteArray →

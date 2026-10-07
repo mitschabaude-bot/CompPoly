@@ -426,25 +426,72 @@ decreasing_by omega
   let b := write16U b i3 y3_0 y3_1 y3_2 y3_3 y3_4 y3_5 y3_6 y3_7 y3_8 y3_9 y3_10 y3_11 y3_12
     y3_13 y3_14 y3_15
   b
+/-- Overwriting stores keep the buffer size. -/
+theorem size_storeWords_overwrite (b : ByteArray) (offset : USize) (count : UInt8)
+    (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) :
+    (storeWords b offset count false v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14
+      v15).size = b.size := by
+  unfold storeWords
+  split
+  · rfl
+  · simp only [Bool.false_eq_true, ↓reduceIte]
+    split
+    · rename_i hc h
+      have hp := Storage.size_pack (#[v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13,
+        v14, v15].extract 0 count.toNat)
+      simp only [Array.size_extract, List.size_toArray, List.length_cons, List.length_nil] at hp
+      simp only [ByteArray.size] at hp h
+      simp only [Storage.replace, ByteArray.size, Array.size_append, Array.size_extract]
+      omega
+    · rfl
+
+/-- The sixteen-cell kernel keeps the buffer size. -/
+theorem size_step16 (th tl : ByteArray) (j j1 i0 i1 i2 i3 : USize) (b : ByteArray) (h) :
+    (step16 th tl j j1 i0 i1 i2 i3 b h).size = b.size := by
+  unfold step16
+  simp only [write16U, size_storeWords_overwrite]
+
+/-- Advancing a machine index by one batch inside a buffer cannot wrap. -/
+theorem usize_add16 (i : USize) (n : Nat) (h : i.toNat + 16 ≤ n) (hn : n < USize.size) :
+    (i + 16).toNat = i.toNat + 16 := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  simp only [USize.toNat_add, USize.reduceToNat, hsize]
+  exact Nat.mod_eq_of_lt (by omega)
+
+/-- `n` sixteen-cell batches at machine indices whose ranges were checked once. -/
+def inner16Loop (th tl : @& ByteArray) : (n : Nat) → (j j1 i0 i1 i2 i3 : USize) →
+    (b : ByteArray) → 4 * (i0.toNat + 16 * n) ≤ b.size ∧ 4 * (i1.toNat + 16 * n) ≤ b.size ∧
+      4 * (i2.toNat + 16 * n) ≤ b.size ∧ 4 * (i3.toNat + 16 * n) ≤ b.size ∧
+      4 * (j1.toNat + 16 * n) ≤ th.size ∧ 4 * (j.toNat + 16 * n) ≤ th.size ∧
+      4 * (j.toNat + 16 * n) ≤ tl.size ∧ b.size < USize.size ∧ th.size < USize.size ∧
+      tl.size < USize.size → ByteArray
+  | 0, _, _, _, _, _, _, b, _ => b
+  | n + 1, j, j1, i0, i1, i2, i3, b, h =>
+    let b' := step16 th tl j j1 i0 i1 i2 i3 b (by omega)
+    inner16Loop th tl n (j + 16) (j1 + 16) (i0 + 16) (i1 + 16) (i2 + 16) (i3 + 16) b' (by
+      have hs : b'.size = b.size := size_step16 ..
+      have hb := h.2.2.2.2.2.2.2.1
+      have ht := h.2.2.2.2.2.2.2.2.1
+      rw [hs, usize_add16 j th.size (by omega) ht, usize_add16 j1 th.size (by omega) ht,
+        usize_add16 i0 b.size (by omega) hb, usize_add16 i1 b.size (by omega) hb,
+        usize_add16 i2 b.size (by omega) hb, usize_add16 i3 b.size (by omega) hb]
+      omega)
+
+/-- The radix-four inner loop: whole sixteen-cell batches after one range check, then the
+scalar tail. -/
 def inner16 (th tl : ByteArray) (q j i0 i1 i2 i3 : Nat) (b : ByteArray) : ByteArray :=
-  if hj : j + 16 ≤ q then
-    if h : 4 * (i0 + 15) + 3 < b.size ∧
-      4 * (i1 + 15) + 3 < b.size ∧
-      4 * (i2 + 15) + 3 < b.size ∧
-      4 * (i3 + 15) + 3 < b.size ∧
-      4 * (j + q + 15) + 3 < th.size ∧
-      4 * (j + 15) + 3 < tl.size ∧
-      b.size < USize.size ∧
-      th.size < USize.size ∧
+  let n := (q - j) / 16
+  if h : 4 * (i0 + 16 * n) ≤ b.size ∧ 4 * (i1 + 16 * n) ≤ b.size ∧
+      4 * (i2 + 16 * n) ≤ b.size ∧ 4 * (i3 + 16 * n) ≤ b.size ∧
+      4 * (j + q + 16 * n) ≤ th.size ∧ 4 * (j + 16 * n) ≤ th.size ∧
+      4 * (j + 16 * n) ≤ tl.size ∧ b.size < USize.size ∧ th.size < USize.size ∧
       tl.size < USize.size then
-      let b := step16 th tl (USize.ofNatLT (j) (by omega)) (USize.ofNatLT (j + q) (by omega))
-        (USize.ofNatLT (i0) (by omega)) (USize.ofNatLT (i1) (by omega)) (USize.ofNatLT (i2)
-        (by omega)) (USize.ofNatLT (i3) (by omega)) b (by simp only [USize.toNat_ofNatLT]; omega)
-      inner16 th tl q (j + 16) (i0 + 16) (i1 + 16) (i2 + 16) (i3 + 16) b
-    else inner th tl q j i0 i1 i2 i3 b
+    inner th tl q (j + 16 * n) (i0 + 16 * n) (i1 + 16 * n) (i2 + 16 * n) (i3 + 16 * n)
+      (inner16Loop th tl n (USize.ofNatLT j (by omega)) (USize.ofNatLT (j + q) (by omega))
+        (USize.ofNatLT i0 (by omega)) (USize.ofNatLT i1 (by omega))
+        (USize.ofNatLT i2 (by omega)) (USize.ofNatLT i3 (by omega)) b
+        (by simp only [USize.toNat_ofNatLT]; exact h))
   else inner th tl q j i0 i1 i2 i3 b
-termination_by q - j
-decreasing_by omega
 @[noinline] def leaf16 (t3 t2 t1 : @& ByteArray) (i : USize) (b : ByteArray)
     (h : 4 * (i.toNat + 15) + 3 < b.size ∧ b.size < USize.size ∧
       31 < t3.size ∧ t3.size < USize.size ∧ 15 < t2.size ∧ t2.size < USize.size ∧
