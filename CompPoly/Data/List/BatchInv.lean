@@ -29,7 +29,7 @@ variable {K L : Type*}
 
 section Ops
 
-variable [Mul K] [Inv K] [One K]
+variable [Mul K]
 
 /-- The products `q, q x₀, q x₀ x₁, …` of all proper prefixes, each times `q`. -/
 def prefixProducts (q : K) : List K → List K
@@ -48,8 +48,30 @@ def batchInvGo : List K → List K → K → List K → List K
   | _, _, _, out => out
 
 /-- The inverses of all elements, with one inversion. -/
-def batchInv (xs : List K) : List K :=
+def batchInv [Inv K] [One K] (xs : List K) : List K :=
   batchInvGo xs.reverse (prefixProducts 1 xs).reverse (productFrom 1 xs)⁻¹ []
+
+theorem length_prefixProducts (q : K) (l : List K) :
+    (prefixProducts q l).length = l.length := by
+  induction l generalizing q with
+  | nil => rfl
+  | cons x l ih => simp only [prefixProducts, List.length_cons, ih]
+
+theorem length_batchInvGo (xs ps : List K) (hl : xs.length = ps.length) (acc : K)
+    (out : List K) : (batchInvGo xs ps acc out).length = xs.length + out.length := by
+  induction xs generalizing ps acc out with
+  | nil => cases ps <;> simp [batchInvGo]
+  | cons x xs ih =>
+    cases ps with
+    | nil => simp at hl
+    | cons p ps =>
+      rw [batchInvGo, ih ps (by simpa using hl)]
+      simp only [List.length_cons]; omega
+
+@[simp] theorem length_batchInv [Inv K] [One K] (xs : List K) :
+    (batchInv xs).length = xs.length := by
+  rw [batchInv, length_batchInvGo _ _ (by simp [length_prefixProducts]), List.length_reverse,
+    List.length_nil, Nat.add_zero]
 
 end Ops
 
@@ -57,7 +79,7 @@ end Ops
 
 section Map
 
-variable [Mul K] [Inv K] [One K] [Mul L] [Inv L] [One L] (f : K → L)
+variable [Mul K] [Mul L] (f : K → L)
 
 theorem prefixProducts_map (hmul : ∀ a b, f (a * b) = f a * f b) (q : K) (l : List K) :
     prefixProducts (f q) (l.map f) = (prefixProducts q l).map f := by
@@ -84,7 +106,8 @@ theorem batchInvGo_map (hmul : ∀ a b, f (a * b) = f a * f b) (xs ps : List K) 
       rw [← ih, List.map_cons, hmul]
 
 /-- Batch inversion commutes with maps preserving `*`, `⁻¹` and `1`. -/
-theorem batchInv_map (hmul : ∀ a b, f (a * b) = f a * f b) (hinv : ∀ a, f a⁻¹ = (f a)⁻¹)
+theorem batchInv_map [Inv K] [One K] [Inv L] [One L] (hmul : ∀ a b, f (a * b) = f a * f b)
+    (hinv : ∀ a, f a⁻¹ = (f a)⁻¹)
     (hone : f 1 = 1) (xs : List K) :
     batchInv (xs.map f) = (batchInv xs).map f := by
   rw [batchInv, batchInv, ← List.map_reverse, ← hone, prefixProducts_map f hmul,

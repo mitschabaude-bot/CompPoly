@@ -44,7 +44,7 @@ theorem cosetNode_pow_n (D : Domain F) (s : F) (i : D.Idx) :
   rw [cosetNode, ← map_pow, mul_pow, node_pow_n, mul_one, map_pow]
 
 theorem cosetNode_injective (D : Domain F) {s : F} (hs : s ≠ 0) :
-    Function.Injective (D.cosetNode s : D.Idx → E) := fun i j h ↦
+    Function.Injective (D.cosetNode s : D.Idx → E) := fun _ _ h ↦
   D.node_injective (mul_left_cancel₀ hs ((algebraMap F E).injective h))
 
 /-- The nodal polynomial of a coset of the order-`n` subgroup is `Xⁿ - sⁿ`. -/
