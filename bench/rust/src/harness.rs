@@ -82,8 +82,33 @@ pub fn measure<F: BenchValue>(
     validate_only: bool,
     run: impl Fn(usize) -> F,
 ) {
-    measure_workload(&fixture.group_key, mode, units, 64, validate_only, run);
+    measure_workload(
+        &fixture.group_key,
+        mode,
+        units,
+        64,
+        MEDIUM,
+        validate_only,
+        run,
+    );
 }
+
+/// Warmup and sample count, matching the Lean harness's presets of the same name.
+#[derive(Clone, Copy)]
+pub struct Budget {
+    pub warmup_nanos: u64,
+    pub samples: usize,
+}
+pub const MEDIUM: Budget = Budget {
+    warmup_nanos: 50_000_000,
+    samples: 20,
+};
+/// Parallel workloads need the longer warmup: idle worker cores take a few hundred
+/// milliseconds of load before the frequency governor raises their clocks.
+pub const LARGE: Budget = Budget {
+    warmup_nanos: 200_000_000,
+    samples: 50,
+};
 
 /// Shared timing and digest machinery, with workload-specific validation period.
 pub fn measure_workload<F: BenchValue>(
@@ -91,6 +116,7 @@ pub fn measure_workload<F: BenchValue>(
     mode: &str,
     units: usize,
     period: usize,
+    budget: Budget,
     validate_only: bool,
     run: impl Fn(usize) -> F,
 ) {
@@ -120,13 +146,13 @@ pub fn measure_workload<F: BenchValue>(
             let nanos = time(iters).max(1);
             elapsed += nanos;
             warmup_iterations += iters;
-            if elapsed >= 50_000_000 {
+            if elapsed >= budget.warmup_nanos {
                 iters = ((1_000_000u128 * iters as u128) / nanos as u128).max(1) as usize;
                 break;
             }
             iters *= 2;
         }
-        for _ in 0..20 {
+        for _ in 0..budget.samples {
             samples.push(time(iters) as f64 * 1000.0 / iters as f64);
         }
     }

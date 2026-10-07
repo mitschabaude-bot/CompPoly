@@ -35,7 +35,7 @@ def runEval {F : Type} [Semiring F] [CPolynomial.EvalKernel F] [BEq F] [LawfulBE
     { name := s!"poly-eval-{field}-{n}-{mode}-fast", representation := "CPolynomial",
       method := mode, field, inputShape := s!"{n} coefficients, one point per evaluation",
       digestIterations := 4, digestClass := mode }
-    .medium
+    .large
     (fun i ↦
       let x := points.getD (i % 4) 0
       if mode == "horner" then p.evalHorner x else p.evalFast x depth)

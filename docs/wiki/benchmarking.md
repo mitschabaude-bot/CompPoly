@@ -527,11 +527,15 @@ BN254's lazy leaf uses scalar accumulator parameters and machine-word indices. I
 
 The BN254 leaf reuses `Native64x4.mulUnreduced` and its shared range/congruence theorem from the field-arithmetic layer. The modulus bound proves the retained fifth limb is zero before taking four limbs. The leaf keeps its scalar accumulator and its out-of-line loop with dynamic modulus parameters; final normalization still occurs only at the leaf boundary.
 
-#### Caller-evaluated leaf (2026-10-07)
+### Caller-evaluated leaf (2026-10-07)
 
 Against ark-poly, `evalFast` gained only about 2× from four workers while ark-poly scaled almost perfectly. Timestamping the leaf tasks showed the cause: the benchmark pins Lean to exactly as many CPUs as workers, and the calling thread is still running when the leaves are spawned, so in most runs one woken worker queued behind another and started only when the first leaf finished. With spare CPUs, the same tree scaled perfectly. Rayon avoids this because its workers spin between calls. `evalParallel` now has the calling thread evaluate the lowest leaf itself, spawning the upper subtrees along the tree's lower edge, so `2 ^ depth` leaves need `2 ^ depth - 1` tasks. Million-coefficient KoalaBear on four workers went from 1.94 to 0.95 ms, Goldilocks from 1.74 to 0.88 ms and BN254 from 11.1 to 7.8 ms.
 
-## Optimized Plonky3 NTT comparison
+### Warmup for parallel workloads (2026-10-07)
+
+At eight workers `evalFast` measured either 0.50 or 0.85 ms per million-coefficient KoalaBear evaluation, depending on the run. The split followed the harness calibration: with one iteration per sample it was slow, with two it was fast. Sampled core frequencies explained it. With the `schedutil` governor, idle worker cores take a few hundred milliseconds of load before their clocks rise from 2.2 to about 4.1 GHz, and the medium preset's 50 ms warmup plus about 15 ms of samples ended before that. Long runs settle at 0.51 ms whatever the loop shape. Rayon's spinning workers load their cores sooner, which favoured ark-poly. The poly-eval suite now uses the large budget, 200 ms of warmup and 50 samples, on both sides (`BenchPreset.large` in Lean, `harness::LARGE` in Rust), which made eight-worker runs a stable 0.50 ms.
+
+### Optimized Plonky3 NTT comparison
 
 `python3 scripts/bench-fields.py --suite ntt` compares the proved KoalaBear `NTTFast.NaturalPlan` forward/inverse transforms against the existing optimized `p3_dft::Radix2DFTSmallBatch` API, at 2^12, 2^16 and 2^20 elements. Plonky3 uses native packed arithmetic and its parallel feature. The default budget is one worker per available physical core, at most sixteen, without SMT siblings (`--cpus` overrides it; `--cpu` selects one worker). Both sides receive the same CPU allocation; the existing Lean plan remains sequential. Plans are outside timing. Input copying, ordering conversions and inverse normalization are timed. Both APIs use natural-order arrays and the same root; Lean's bit-reversal adapter is therefore part of the measured cost. Different algorithms and arithmetic schedules are allowed in this library comparison, replacing the original custom scalar Rust baseline. This suite is included in `--suite all` and CI validation. See [the operator guide](../../bench/README.md#koalabear-ntt-against-optimized-plonky3) for fixtures, validation and timing boundaries.
 

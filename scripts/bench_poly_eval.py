@@ -136,6 +136,6 @@ def run(args, common, allowed):
               "- Each call evaluates one prebuilt polynomial at one point. Four varying points prevent constant-result timing; there is no batched evaluation or shared power table.",
               "- Lean evalFast splits the coefficients into a binary tree of contiguous ranges, runs lazy-reduction Horner leaves and joins with square-and-multiply powers; evalHorner is CompPoly's existing sequential evaluator. ark-poly splits the coefficients into one chunk per Rayon thread, runs Horner on each and scales each chunk by a power of the point; with one thread it is plain Horner.",
               "- Task scheduling, per-call powers and joins are timed. Runtime worker pools and input decoding/construction are outside timing; validation/warmup also excludes first-use input-sharing costs. Lean uses Task.spawn; Rust uses a persistent Rayon pool of the selected size.",
-              "- Four full-result digests agree across both languages and both methods before timing. Each run uses the existing 50 ms warmup / 20-sample harness. Only the final evaluation result is consumed.", ""]
+              "- Four full-result digests agree across both languages and both methods before timing. Each run warms up for 200 ms, then takes 50 samples, in both languages; with the usual 50 ms, idle worker cores were often still at reduced clocks when timing began. Only the final evaluation result is consumed.", ""]
     (out / "report.md").write_text("\n".join(lines))
     print(f"Report: {out / 'report.md'}")

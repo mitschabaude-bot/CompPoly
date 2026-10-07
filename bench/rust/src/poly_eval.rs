@@ -1,5 +1,5 @@
 //! One polynomial at one point with arkworks' stock `DensePolynomial::evaluate`.
-use crate::harness::{measure_workload, BenchValue};
+use crate::harness::{measure_workload, BenchValue, LARGE};
 use ark_ff::{Fp64, MontBackend, MontConfig, PrimeField};
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
 use std::hint::black_box;
@@ -57,7 +57,7 @@ fn bench<F: PrimeField + BenchValue>(
         .num_threads(threads)
         .build()
         .unwrap();
-    measure_workload(&key, mode, 1, 4, validate, |i| {
+    measure_workload(&key, mode, 1, 4, LARGE, validate, |i| {
         let x = black_box(points[i % 4]);
         pool.install(|| black_box(&poly).evaluate(&x))
     });
