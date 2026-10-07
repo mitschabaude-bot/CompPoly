@@ -36,6 +36,7 @@ lean_lib CompPoly where
 lean_lib CompPolyPackedNative where
   roots := #[`CompPoly.Univariate.NTTFast.Packed.Native,
     `CompPoly.Univariate.NTTFast.Packed.NativeOrder,
+    `CompPoly.Univariate.NTTFast.Packed.NativeLast,
     `CompPoly.Univariate.NTTFast.Packed.SliceTree]
   platformIndependent := true
   moreLeancArgs := #["-march=native"]

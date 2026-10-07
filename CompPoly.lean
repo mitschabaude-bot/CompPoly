@@ -386,6 +386,8 @@ public import CompPoly.Univariate.NTTFast.Packed.LeafScaling
 public import CompPoly.Univariate.NTTFast.Packed.LocalLayers
 public import CompPoly.Univariate.NTTFast.Packed.LoopRefinement
 public import CompPoly.Univariate.NTTFast.Packed.Native
+public import CompPoly.Univariate.NTTFast.Packed.NativeLast
+public import CompPoly.Univariate.NTTFast.Packed.NativeLastCorrectness
 public import CompPoly.Univariate.NTTFast.Packed.NativeLeaf
 public import CompPoly.Univariate.NTTFast.Packed.NativeOrder
 public import CompPoly.Univariate.NTTFast.Packed.NativeOrderCorrectness

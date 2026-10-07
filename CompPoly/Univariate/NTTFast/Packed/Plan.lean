@@ -5,7 +5,7 @@ Authors: Gregor Mitscha-Baude
 -/
 module
 
-public import CompPoly.Univariate.NTTFast.Packed.NativeOrderCorrectness
+public import CompPoly.Univariate.NTTFast.Packed.NativeLastCorrectness
 
 /-! # Proved parallel KoalaBear transforms with packed native storage
 

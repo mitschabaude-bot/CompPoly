@@ -433,22 +433,31 @@ theorem levelOut_snd (W : Array KoalaBear.Fast.Field) (half m c : Nat)
 
 /-- The sliced task tree computes the leaves of the binary split tree, post-processed. -/
 theorem sliceChunks_eq (twF : Array (Array KoalaBear.Fast.Field)) (nInv : UInt32)
-    (normalize : Bool) (P : Nat) (post : ByteArray → ByteArray) :
+    (normalize : Bool) (P : Nat) (post : ByteArray → ByteArray)
+    (leaf : Nat → ByteArray → ByteArray) :
     ∀ (depth logN k s : Nat) (g : Nat → KoalaBear.Fast.Field), k * s = 2 ^ logN → 0 < k →
       (∀ L < logN, (twF.getD L #[]).size = 2 ^ L) → 4 * 2 ^ logN < USize.size →
+      (∀ X : Array KoalaBear.Fast.Field, X.size = 2 ^ (logN - depth) →
+        leaf (logN - depth) (packFields X) =
+          post (stages (logN - depth) (twF.map packFields) (packFields X) nInv normalize)) →
       (sliceChunks (twF.map packFields) logN ((slicesOf k s g).map packFields)
-        nInv normalize P post depth).get =
+        nInv normalize P post leaf depth).get =
       (splitChunks (twF.map packFields) logN
         (packFields (Array.ofFn (n := 2 ^ logN) fun i ↦ g i)) nInv normalize depth).get.map
           post := by
   intro depth
   induction depth with
   | zero =>
-    intro logN k s g hks _ _ _
+    intro logN k s g hks _ _ _ hleaf
     simp only [sliceChunks, splitChunks, Task.spawn, assemble_slicesOf _ k s _ g hks,
       Array.map_singleton]
+    rw [← Nat.sub_zero logN, hleaf _ (by rw [Array.size_ofFn]), Nat.sub_zero]
   | succ depth ih =>
-    intro logN k s g hks hk htw hu
+    intro logN k s g hks hk htw hu hleaf
+    have hleaf' : ∀ X : Array KoalaBear.Fast.Field, X.size = 2 ^ (logN - 1 - depth) →
+        leaf (logN - 1 - depth) (packFields X) =
+          post (stages (logN - 1 - depth) (twF.map packFields) (packFields X) nInv normalize) := by
+      rw [Nat.sub_sub, Nat.add_comm 1 depth]; exact hleaf
     rw [sliceChunks]
     simp only [Array.size_map, size_slicesOf]
     split
@@ -491,7 +500,8 @@ theorem sliceChunks_eq (twF : Array (Array KoalaBear.Fast.Field)) (nInv : UInt32
       simp only [Task.bind, Task.map, joinTasks_get, hlevel, levelOut_fst, levelOut_snd]
       have htw' : ∀ L < logN - 1, (twF.getD L #[]).size = 2 ^ L := fun L hL ↦ htw L (by omega)
       have hu' : 4 * 2 ^ (logN - 1) < USize.size := by omega
-      rw [ih (logN - 1) m c _ hmc hm htw' hu', ih (logN - 1) m c _ hmc hm htw' hu', splitChunks]
+      rw [ih (logN - 1) m c _ hmc hm htw' hu' hleaf', ih (logN - 1) m c _ hmc hm htw' hu' hleaf',
+        splitChunks]
       simp only [hlog, ↓reduceIte, Task.bind, Task.map, Task.spawn, getD_map_packFields]
       rw [Array.map_append]
       have hX : (packFields (Array.ofFn (n := 2 ^ logN) fun i ↦ g i)).size < USize.size := by
@@ -575,9 +585,13 @@ theorem slicesOf_one (a : Array KoalaBear.Fast.Field) (n : Nat) (ha : a.size = n
 /-- The sliced input tree computes the leaves of the binary input tree, post-processed. -/
 theorem sliceInputChunks_eq (twF : Array (Array KoalaBear.Fast.Field))
     (a : Array KoalaBear.Fast.Field) (logN depth P : Nat) (nInv : UInt32) (normalize : Bool)
-    (post : ByteArray → ByteArray) (ha : a.size = 2 ^ logN)
-    (htw : ∀ L < logN, (twF.getD L #[]).size = 2 ^ L) (hu : 4 * 2 ^ logN < USize.size) :
-    (sliceInputChunks (twF.map packFields) logN a nInv normalize P post depth).get =
+    (post : ByteArray → ByteArray) (leaf : Nat → ByteArray → ByteArray)
+    (ha : a.size = 2 ^ logN)
+    (htw : ∀ L < logN, (twF.getD L #[]).size = 2 ^ L) (hu : 4 * 2 ^ logN < USize.size)
+    (hleaf : ∀ X : Array KoalaBear.Fast.Field, X.size = 2 ^ (logN - depth) →
+      leaf (logN - depth) (packFields X) =
+        post (stages (logN - depth) (twF.map packFields) (packFields X) nInv normalize)) :
+    (sliceInputChunks (twF.map packFields) logN a nInv normalize P post leaf depth).get =
       (splitInputChunks (twF.map packFields) logN a nInv normalize depth).get.map post := by
   unfold sliceInputChunks
   dsimp only
@@ -617,8 +631,15 @@ theorem sliceInputChunks_eq (twF : Array (Array KoalaBear.Fast.Field))
     simp only [Task.bind, Task.map, joinTasks_get, hchunks, levelOut_fst, levelOut_snd]
     have htw' : ∀ L < logN - 1, (twF.getD L #[]).size = 2 ^ L := fun L hL ↦ htw L (by omega)
     have hu' : 4 * 2 ^ (logN - 1) < USize.size := by omega
-    rw [sliceChunks_eq twF nInv normalize P post _ (logN - 1) P _ _ hPc (by omega) htw' hu',
-      sliceChunks_eq twF nInv normalize P post _ (logN - 1) P _ _ hPc (by omega) htw' hu']
+    have hleaf' : ∀ X : Array KoalaBear.Fast.Field, X.size = 2 ^ (logN - 1 - (depth - 1)) →
+        leaf (logN - 1 - (depth - 1)) (packFields X) =
+          post (stages (logN - 1 - (depth - 1)) (twF.map packFields) (packFields X) nInv
+            normalize) := by
+      rw [show logN - 1 - (depth - 1) = logN - depth by omega]; exact hleaf
+    rw [sliceChunks_eq twF nInv normalize P post leaf _ (logN - 1) P _ _ hPc (by omega) htw' hu'
+        hleaf',
+      sliceChunks_eq twF nInv normalize P post leaf _ (logN - 1) P _ _ hPc (by omega) htw' hu'
+        hleaf']
     unfold splitInputChunks
     have hnot : ¬(depth = 0 ∨ logN < 6) := by omega
     simp only [hnot, ↓reduceIte, Task.bind, Task.map, Task.spawn, getD_map_packFields]
