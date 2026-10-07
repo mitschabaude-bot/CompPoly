@@ -25,7 +25,6 @@ def run(args, common, allowed):
             key = Path(f"/sys/devices/system/cpu/cpu{c}/topology/thread_siblings_list").read_text()
             physical.setdefault(key, c)
         preferred = list(physical.values())
-        preferred += sorted(allowed - set(preferred))
         count = min(16, 2 ** (len(preferred).bit_length() - 1))
         cpus = preferred[:count]
     workers = len(cpus)
