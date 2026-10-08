@@ -35,10 +35,10 @@ theorem storeWords_lit16 (o : Array UInt32) (g : Nat → UInt32) :
   rfl
 
 /-- A checked read at a numeral offset inside a known word range. -/
-theorem readRaw_pack_at (v : Array UInt32) (q : USize) (o : Nat) (ho : o < 16)
+theorem readAt_pack_at (v : Array UInt32) (q : USize) (o : Nat) (ho : o < 16)
     (h : q.toNat + 16 ≤ v.size) (hs : (pack v).size < USize.size) :
-    readRaw (pack v) q (OfNat.ofNat o) true (by intro h; cases h) = v.getD (q.toNat + o) 0 := by
-  rw [readRaw_pack_true v q (OfNat.ofNat o)
+    readAt (pack v) q (OfNat.ofNat o) = v.getD (q.toNat + o) 0 := by
+  rw [readAt_pack v q (OfNat.ofNat o)
     (by rw [usize_numeral o (by omega)]; refine ⟨?_, hs⟩; rw [size_pack]; omega),
     usize_numeral o (by omega)]
 
@@ -52,14 +52,14 @@ theorem line_pack (v : Array UInt32) (q : USize) (h : q.toNat + 16 ≤ v.size)
       v.getD (q.toNat + 12) 0, v.getD (q.toNat + 13) 0, v.getD (q.toNat + 14) 0,
       v.getD (q.toNat + 15) 0⟩ := by
   unfold line
-  rw [readRaw_pack_at v q 0 (by decide) h hs, readRaw_pack_at v q 1 (by decide) h hs,
-    readRaw_pack_at v q 2 (by decide) h hs, readRaw_pack_at v q 3 (by decide) h hs,
-    readRaw_pack_at v q 4 (by decide) h hs, readRaw_pack_at v q 5 (by decide) h hs,
-    readRaw_pack_at v q 6 (by decide) h hs, readRaw_pack_at v q 7 (by decide) h hs,
-    readRaw_pack_at v q 8 (by decide) h hs, readRaw_pack_at v q 9 (by decide) h hs,
-    readRaw_pack_at v q 10 (by decide) h hs, readRaw_pack_at v q 11 (by decide) h hs,
-    readRaw_pack_at v q 12 (by decide) h hs, readRaw_pack_at v q 13 (by decide) h hs,
-    readRaw_pack_at v q 14 (by decide) h hs, readRaw_pack_at v q 15 (by decide) h hs]
+  rw [readAt_pack_at v q 0 (by decide) h hs, readAt_pack_at v q 1 (by decide) h hs,
+    readAt_pack_at v q 2 (by decide) h hs, readAt_pack_at v q 3 (by decide) h hs,
+    readAt_pack_at v q 4 (by decide) h hs, readAt_pack_at v q 5 (by decide) h hs,
+    readAt_pack_at v q 6 (by decide) h hs, readAt_pack_at v q 7 (by decide) h hs,
+    readAt_pack_at v q 8 (by decide) h hs, readAt_pack_at v q 9 (by decide) h hs,
+    readAt_pack_at v q 10 (by decide) h hs, readAt_pack_at v q 11 (by decide) h hs,
+    readAt_pack_at v q 12 (by decide) h hs, readAt_pack_at v q 13 (by decide) h hs,
+    readAt_pack_at v q 14 (by decide) h hs, readAt_pack_at v q 15 (by decide) h hs]
 
 /-- The `c`-th of sixteen word arrays. -/
 def sel16 (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : Array UInt32) (c : Nat) :

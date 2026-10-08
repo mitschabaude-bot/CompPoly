@@ -60,7 +60,7 @@ theorem Native.read_packFields (a : Array KoalaBear.Fast.Field) (i : Nat)
 /-- A single word append has its ordinary packed-array semantics. -/
 theorem Native.push_eq (b : ByteArray) (x : UInt32) :
     Native.push b x = b ++ Storage.pack #[x] := by
-  simp only [Native.push, Native.storeWords]
+  rw [Native.push, Native.storeWords_eq]
   rfl
 
 private theorem encodeList_eq (xs : List KoalaBear.Fast.Field) (b : ByteArray) :

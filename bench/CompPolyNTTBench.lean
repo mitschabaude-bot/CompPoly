@@ -78,7 +78,7 @@ def main (args : List String) : IO UInt32 := do
     let row ← match variant with
       | "packed" =>
         let plan := CPolynomial.NTTFast.Packed.Plan.ofDomain domain h32 hu
-        fields "proved packed parallel radix-4, two storage externs" fun input ↦
+        fields "proved packed parallel radix-4, ByteArray word accessors" fun input ↦
           if direction == "forward" then plan.forward input depth else plan.inverse input depth
       | "packed-io" =>
         let plan := CPolynomial.NTTFast.Packed.Plan.ofDomain domain h32 hu

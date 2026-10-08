@@ -82,14 +82,14 @@ structure Line where
 
 /-- Read one aligned line of sixteen words; inlining removes the record. -/
 @[inline] def line (b : @& ByteArray) (q : USize) : Line :=
-  ⟨readRaw b q 0 true (by intro h; cases h), readRaw b q 1 true (by intro h; cases h),
-    readRaw b q 2 true (by intro h; cases h), readRaw b q 3 true (by intro h; cases h),
-    readRaw b q 4 true (by intro h; cases h), readRaw b q 5 true (by intro h; cases h),
-    readRaw b q 6 true (by intro h; cases h), readRaw b q 7 true (by intro h; cases h),
-    readRaw b q 8 true (by intro h; cases h), readRaw b q 9 true (by intro h; cases h),
-    readRaw b q 10 true (by intro h; cases h), readRaw b q 11 true (by intro h; cases h),
-    readRaw b q 12 true (by intro h; cases h), readRaw b q 13 true (by intro h; cases h),
-    readRaw b q 14 true (by intro h; cases h), readRaw b q 15 true (by intro h; cases h)⟩
+  ⟨readAt b q 0, readAt b q 1,
+    readAt b q 2, readAt b q 3,
+    readAt b q 4, readAt b q 5,
+    readAt b q 6, readAt b q 7,
+    readAt b q 8, readAt b q 9,
+    readAt b q 10, readAt b q 11,
+    readAt b q 12, readAt b q 13,
+    readAt b q 14, readAt b q 15⟩
 
 /-- Append the transpose of one `16 × 16` tile: word `u` of every stream, for each `u`.
 Reading whole lines first keeps sixteen equally aligned streams from evicting each other. -/

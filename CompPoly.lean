@@ -64,6 +64,7 @@ public import CompPoly.Bivariate.Kronecker
 public import CompPoly.Bivariate.ToPoly
 public import CompPoly.Data.Array.Involution
 public import CompPoly.Data.Array.Lemmas
+public import CompPoly.Data.ByteArray.Pack
 public import CompPoly.Data.Bytes.Bias
 public import CompPoly.Data.Bytes.CanonicalNat
 public import CompPoly.Data.Bytes.Codec
