@@ -169,46 +169,48 @@ theorem transposeStep_pack (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v1
     List.length_cons, List.length_nil])
   all_goals omega
 
-/-- Repeated transposed tiles store consecutive interleave rows from output word `p`. -/
+/-- Repeated transposed tiles append consecutive interleave rows to a written prefix. -/
 theorem transposeGo_pack (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : Array UInt32)
-    (count : Nat) (q p : USize) (o Z : Array UInt32)
+    (count : Nat) (q p : USize) (o : Array UInt32)
     (h : ∀ c < 16, q.toNat + 16 * count ≤
       (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c).size)
     (hs : ∀ c < 16,
       (pack (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c)).size < USize.size)
-    (hp : p.toNat = o.size) (hZ : 256 * count ≤ Z.size)
-    (ho : (pack (o ++ Z)).size < USize.size) :
+    (hp : p.toNat = o.size) (ho : 4 * (o.size + 256 * count) < USize.size) :
     transposeGo (pack v0) (pack v1) (pack v2) (pack v3) (pack v4) (pack v5) (pack v6) (pack v7)
       (pack v8) (pack v9) (pack v10) (pack v11) (pack v12) (pack v13) (pack v14) (pack v15)
-      count q p (pack (o ++ Z)) =
+      count q p (pack o) =
       pack (o ++ rows (fun u c ↦
         (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c).getD (q.toNat + u) 0)
-        (16 * count) ++ Z.extract (256 * count) Z.size) := by
-  induction count generalizing q p o Z with
-  | zero => simp only [transposeGo, rows, Array.append_empty, Nat.mul_zero, Array.extract_size]
+        (16 * count)) := by
+  induction count generalizing q p o with
+  | zero => simp only [transposeGo, rows, Array.append_empty]
   | succ count ih =>
     have hq : q.toNat + 16 < USize.size := by
       have h0 := h 0 (by decide)
       have hs0 := hs 0 (by decide)
       rw [size_pack] at hs0
       omega
-    have hsz := ho
-    rw [size_pack, Array.size_append] at hsz
-    rw [transposeGo, transposeStep_pack v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 o Z
-        q p (fun c hc ↦ by have := h c hc; omega) hs hp (by omega) ho,
+    have hZ : (Array.replicate 256 (0 : UInt32)).extract 256
+        (Array.replicate 256 (0 : UInt32)).size = #[] :=
+      Array.extract_eq_empty_of_le (by simp)
+    have hoZ : (pack (o ++ Array.replicate 256 0)).size < USize.size := by
+      rw [size_pack, Array.size_append, Array.size_replicate]
+      exact Nat.lt_of_le_of_lt (by omega) ho
+    rw [transposeGo, extendZeros_pack,
+      transposeStep_pack v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
+        o (Array.replicate 256 0) q p (fun c hc ↦ by have := h c hc; omega) hs hp
+        (by rw [Array.size_replicate]) hoZ,
+      hZ, Array.append_empty,
       ih (q + 16) (p + 256) (o ++ rows (fun u c ↦
           (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c).getD (q.toNat + u) 0) 16)
-        (Z.extract 256 Z.size)
         (fun c hc ↦ by rw [usize_add_numeral q 16 (by decide) hq]; have := h c hc; omega)
         (by rw [usize_add_numeral p 256 (by decide) (by omega), Array.size_append, size_rows,
           hp])
-        (by rw [Array.size_extract]; omega)
-        (by rw [size_pack, Array.size_append, Array.size_append, size_rows, Array.size_extract]
-            omega),
+        (by rw [Array.size_append, size_rows]; omega),
       show 16 * (count + 1) = 16 + 16 * count by omega, rows_add, Array.append_assoc,
-      usize_add_numeral q 16 (by decide) hq, extract_extract_tail,
-      show 256 + 256 * count = 256 * (count + 1) by omega]
-    simp only [Nat.add_assoc, Array.append_assoc]
+      usize_add_numeral q 16 (by decide) hq]
+    simp only [Nat.add_assoc]
 
 /-- A word read at a strided offset. -/
 theorem readWord_stride (w : Array UInt32) (r : USize) (k : Nat) (st : USize) (hk16 : k < 16)
@@ -384,19 +386,14 @@ theorem interleaveRange_pack (V : Nat → Array UInt32) (M q count : Nat)
     getD_map_range _ 16 10 (by decide), getD_map_range _ 16 11 (by decide),
     getD_map_range _ 16 12 (by decide), getD_map_range _ 16 13 (by decide),
     getD_map_range _ 16 14 (by decide), getD_map_range _ 16 15 (by decide)]
-  have hz : zeroWords (256 * count) = pack (#[] ++ Array.replicate (256 * count) 0) := by
-    rw [Array.empty_append, zeroWords_eq]
-  have he : (Array.replicate (256 * count) (0 : UInt32)).extract (256 * count)
-      (Array.replicate (256 * count) (0 : UInt32)).size = #[] :=
-    Array.extract_eq_empty_of_le (by simp)
-  rw [hz, transposeGo_pack (V 0) (V 8) (V 4) (V 12) (V 2) (V 10) (V 6)
-    (V 14) (V 1) (V 9) (V 5) (V 13) (V 3) (V 11) (V 7) (V 15) count q.toUSize 0 #[] _
+  rw [show ByteArray.emptyWithCapacity (1024 * count) = pack #[] from rfl,
+    transposeGo_pack (V 0) (V 8) (V 4) (V 12) (V 2) (V 10) (V 6)
+    (V 14) (V 1) (V 9) (V 5) (V 13) (V 3) (V 11) (V 7) (V 15) count q.toUSize 0 #[]
     (fun c hc ↦ by rw [sel16_bitRev V c hc, hqu, hV _ (NTT.Transform.bitRevNat_lt 4 c)]; exact hq)
     (fun c hc ↦ by
       rw [sel16_bitRev V c hc, size_pack, hV _ (NTT.Transform.bitRevNat_lt 4 c)]; omega)
-    rfl (by rw [Array.size_replicate])
-    (by rw [size_pack, Array.size_append, Array.size_replicate, Array.size_empty]; omega),
-    he, Array.empty_append, Array.append_empty, hqu]
+    rfl (by rw [Array.size_empty]; omega),
+    Array.empty_append, hqu]
   congr 1
   exact rows_congr _ _ _ (fun j c hc ↦ by rw [sel16_bitRev V c hc])
 

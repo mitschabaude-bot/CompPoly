@@ -136,8 +136,6 @@ checks run on machine words. -/
   storeWords b (i.toUSize * 4) 1 false v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 @[inline] def push (b : ByteArray) (v : UInt32) : ByteArray :=
   storeWords b 0 1 true v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-def encode (a : Array KoalaBear.Fast.Field) : ByteArray :=
-  a.foldl (fun b x ↦ push b x.val) (ByteArray.emptyWithCapacity (4 * a.size))
 @[inline] def write16 (b : ByteArray) (i : @& Nat) (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13
   v14 v15 : UInt32) : ByteArray :=
   storeWords b (i.toUSize * 4) 16 false v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
@@ -159,6 +157,14 @@ def fillZeros (target : Nat) : Nat → ByteArray → ByteArray
 /-- A buffer of `n` zero words, for kernels that store their output words in place. -/
 def zeroWords (n : Nat) : ByteArray :=
   fillZeros (4 * n) (n / 1024 + 1) (ByteArray.emptyWithCapacity (4 * n))
+/-- Store words `i` up to `i + n` of `a`. -/
+def encodeGo (a : @& Array KoalaBear.Fast.Field) : Nat → Nat → ByteArray → ByteArray
+  | 0, _, b => b
+  | n + 1, i, b => encodeGo a n (i + 1) (write b i (a.getD i 0).val)
+/-- Pack a field array, overwriting a zero buffer word by word. -/
+def encode (a : Array KoalaBear.Fast.Field) : ByteArray :=
+  if 4 * a.size < USize.size then encodeGo a a.size 0 (zeroWords a.size)
+  else Storage.pack (a.map Subtype.val)
 @[inline] def push16 (b : ByteArray) (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 :
   UInt32) : ByteArray :=
   storeWords b 0 16 true v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15

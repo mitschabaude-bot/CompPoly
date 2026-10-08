@@ -212,11 +212,15 @@ Reading whole lines first keeps sixteen equally aligned streams from evicting ea
     x8.w15 x9.w15 x10.w15 x11.w15 x12.w15 x13.w15 x14.w15 x15.w15
   else out
 
-/-- Store `count` transposed tiles, starting at stream word `q` and output word `p`. -/
+/-- Store `count` transposed tiles, starting at stream word `q` and output word `p`, the end of
+`out`. Each tile first extends `out` by one zero block, which the tile then overwrites while it
+is in cache. -/
 def transposeGo (s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 : @& ByteArray) :
     Nat → USize → USize → ByteArray → ByteArray
   | 0, _, _, out => out
   | count + 1, q, p, out =>
+    let n := out.size
+    let out := zeroBlock.copySlice 0 out n 1024 false
     transposeGo s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 count (q + 16) (p + 256)
       (transposeStep s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 q out p)
 
@@ -227,7 +231,7 @@ def interleaveRange (r : @& Array ByteArray) (q count : Nat) : ByteArray :=
     (r.getD 2 .empty) (r.getD 10 .empty) (r.getD 6 .empty) (r.getD 14 .empty)
     (r.getD 1 .empty) (r.getD 9 .empty) (r.getD 5 .empty) (r.getD 13 .empty)
     (r.getD 3 .empty) (r.getD 11 .empty) (r.getD 7 .empty) (r.getD 15 .empty)
-    count q.toUSize 0 (zeroWords (256 * count))
+    count q.toUSize 0 (ByteArray.emptyWithCapacity (1024 * count))
 
 /-- Natural-order packed words from sixteen locally reversed leaves of `2 ^ (logN - 4)` words,
 `12 ≤ logN`. Sixteen interleave tasks run in parallel; the join copies bytes. -/

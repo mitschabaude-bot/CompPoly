@@ -63,39 +63,12 @@ theorem Native.push_eq (b : ByteArray) (x : UInt32) :
   rw [Native.push, Native.storeWords_eq]
   rfl
 
-private theorem encodeList_eq (xs : List KoalaBear.Fast.Field) (b : ByteArray) :
-    xs.foldl (fun acc x ↦ Native.push acc x.val) b =
-      b ++ Storage.pack (xs.map Subtype.val).toArray := by
-  induction xs generalizing b with
-  | nil =>
-    simp only [List.foldl_nil, List.map_nil]
-    change b = b ++ ByteArray.empty
-    exact ByteArray.append_empty.symm
-  | cons x xs ih =>
-    rw [List.foldl_cons, Native.push_eq, ih]
-    have h : ((x :: xs).map Subtype.val).toArray = #[x.val] ++ (xs.map Subtype.val).toArray := by
-      apply Array.toList_inj.mp
-      simp only [Array.toList_append, List.map_cons]
-      rfl
-    rw [h, Storage.pack_append, ByteArray.append_assoc]
-
 /-- Packing an empty field array gives an empty byte buffer. -/
 @[simp] theorem packFields_empty : packFields (#[] : Array KoalaBear.Fast.Field) =
   ByteArray.empty := by
   unfold packFields Storage.pack
   simp only [Array.map_empty, Array.toList_empty, ByteCodec.encodeList, List.flatMap_nil]
   rfl
-
-/-- The executable encoder realizes the packed field-array representation. -/
-theorem Native.encode_eq (a : Array KoalaBear.Fast.Field) : Native.encode a = packFields a := by
-  simp only [Native.encode, ← Array.foldl_toList]
-  rw [encodeList_eq]
-  rw [show ByteArray.emptyWithCapacity (4 * a.size) = ByteArray.empty by
-    calc
-      _ = ByteArray.emptyWithCapacity 0 := by simp only [ByteArray.emptyWithCapacity]
-      _ = ByteArray.empty := ByteArray.emptyWithCapacity_eq_empty, ByteArray.empty_append]
-  change Storage.pack (a.toList.map Subtype.val).toArray = Storage.pack (a.map Subtype.val)
-  rw [← Array.toList_map, Array.toArray_toList]
 
 /-- A field-coordinate batch store realizes the corresponding array splice. -/
 theorem Native.write16_packFields (a : Array KoalaBear.Fast.Field) (i : Nat)
@@ -194,5 +167,52 @@ theorem Native.write_packFields (a : Array KoalaBear.Fast.Field) (i : Nat)
   rw [← splice_singleton a i x hi]
   simp only [splice, Array.map_append, map_val_extract, Array.size_map, Array.size_singleton,
     Array.map_singleton]
+
+theorem Native.encodeGo_packFields (a c : Array KoalaBear.Fast.Field) (hs : (packFields a).size <
+    USize.size) : ∀ (n i : Nat), c.size = a.size → i + n = a.size →
+    Native.encodeGo a n i (packFields c) = packFields (c.extract 0 i ++ a.extract i a.size) := by
+  intro n
+  induction n generalizing c with
+  | zero =>
+    intro i hc hi
+    simp only [Native.encodeGo, Nat.add_zero] at hi ⊢
+    have e1 : a.extract a.size a.size = #[] := Array.extract_eq_empty_of_le (by omega)
+    have e2 : c.extract 0 a.size = c := by rw [← hc, Array.extract_size]
+    rw [hi, e1, e2, Array.append_empty]
+  | succ n ih =>
+    intro i hc hi
+    rw [Native.encodeGo, Native.write_packFields c i (by
+      rw [size_packFields, hc]; rw [size_packFields] at hs; exact hs)
+      (by omega), ih _ (i + 1) (by simp only [Array.size_setIfInBounds, hc]) (by omega)]
+    congr 1
+    apply Array.ext
+    · simp only [Array.size_append, Array.size_extract, Array.size_setIfInBounds]
+      omega
+    · intro j h1 h2
+      simp only [Array.getElem_append, Array.getElem_extract, Array.size_extract,
+        Array.size_setIfInBounds, Nat.zero_add, Nat.sub_zero]
+      split_ifs with ha hb hb
+      · rw [Array.getElem_setIfInBounds]
+        split
+        · omega
+        · rfl
+      · rw [Array.getElem_setIfInBounds]
+        split
+        · rw [Array.getD_eq_getD_getElem?, Array.getElem?_eq_getElem (by omega), Option.getD_some]
+          simp only [show i + (j - min i c.size) = i by omega]
+        · omega
+        · omega
+      · omega
+      · simp only [show i + 1 + (j - min (i + 1) c.size) = i + (j - min i c.size) by omega]
+
+/-- The executable encoder realizes the packed field-array representation. -/
+theorem Native.encode_eq (a : Array KoalaBear.Fast.Field) : Native.encode a = packFields a := by
+  unfold Native.encode
+  split
+  · rename_i hs
+    rw [Native.zeroWords_packFields, Native.encodeGo_packFields a _
+      (by rwa [size_packFields]) _ 0 Array.size_replicate (by omega)]
+    simp only [Array.extract_zero, Array.empty_append, Array.extract_size]
+  · rfl
 
 end CompPoly.CPolynomial.NTTFast.Packed

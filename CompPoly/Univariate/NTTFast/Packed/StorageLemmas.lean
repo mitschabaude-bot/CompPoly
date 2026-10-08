@@ -297,6 +297,19 @@ theorem zeroWords_eq (n : Nat) : zeroWords n = Storage.pack (Array.replicate n 0
   rw [show ByteArray.emptyWithCapacity (4 * n) = zeroBuffer 0 from rfl]
   exact fillZeros_zeroBuffer _ _ _ (by omega) (by omega)
 
+/-- Extending a packed buffer by one zero block appends 256 zero words. -/
+theorem extendZeros_pack (o : Array UInt32) :
+    zeroBlock.copySlice 0 (Storage.pack o) (Storage.pack o).size 1024 false =
+      Storage.pack (o ++ Array.replicate 256 0) := by
+  have hz : zeroBlock.data.size = 4096 := Array.size_replicate
+  have hb : zeroBlock.extract 0 (0 + 1024) = zeroBuffer (4 * 256) := by
+    apply ByteArray.ext
+    simp only [ByteArray.data_extract, zeroBlock, Array.extract_replicate]
+    rfl
+  rw [ByteArray.copySlice_eq_append, ByteArray.extract_zero_size, hb,
+    (ByteArray.extract_eq_empty_iff).mpr (by simp only [ByteArray.size, hz]; omega),
+    ByteArray.append_empty, Storage.pack_append, zeroBuffer_eq_pack]
+
 /-- A machine-index batch store is the natural-index batch store. -/
 theorem write16U_eq (b : ByteArray) (i : USize)
     (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) :
