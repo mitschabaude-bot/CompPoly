@@ -39,30 +39,36 @@ theorem Native.splitInputLeft_packFields (a : Array KoalaBear.Fast.Field) (half 
   · rename_i hmod
     have hm : half % 16 = 0 := by simpa using hmod
     have he : 16 * (half / 16) = half := by omega
-    have hfor := forIn_packFields (List.range' 0 (half / 16))
+    have hfor := forIn_packFields 0 (half / 16)
       (fun block state ↦
         if h : 16 * block + 15 < a.size ∧ 16 * block + half + 15 < a.size ∧ a.size < USize.size then
           pure (.yield (none, Native.splitInputStepLeft a
             (USize.ofNatLT (16 * block) (by omega))
             (USize.ofNatLT (16 * block + half) (by omega)) state.2
-            (by simpa only [USize.toNat_ofNatLT] using h)))
+            (USize.ofNatLT (16 * block) (by omega)) (by simpa only [USize.toNat_ofNatLT] using h)))
         else pure (.done (some (Native.splitLeft (Native.encode a) ByteArray.empty half), state.2)))
       (fun block out ↦ out ++ Array.ofFn (fun k : Fin 16 ↦ a.getD (16 * block + k.val) 0 + a.getD
         (16 * block + k.val + half) 0))
       (by
-        intro block hb out
-        rw [dite_eq_left (hloop block hb), Native.splitInputStepLeft_packFields a #[],
+        intro block hb l Z hl hZ hs'
+        rw [dite_eq_left (hloop block hb),
+          Native.splitInputStepLeft_packFields a #[] l Z _ _ _ ?hp hZ hs',
           splitInputStepLeftField_eq]
         simp only [USize.toNat_ofNatLT, packFields_append, Nat.add_assoc, Nat.add_comm half]
-        rfl)
-      #[]
-    rw [show ByteArray.emptyWithCapacity (4 * half) = packFields (#[] : Array
-      KoalaBear.Fast.Field) by rw [packFields_empty]; rfl]
-    rw [hfor]
+        rfl
+        simp only [USize.toNat_ofNatLT]
+        omega)
+      (fun _ _ ↦ by simp only [Array.size_append, Array.size_ofFn])
+      #[] (Array.replicate half 0) rfl (by simp only [Array.size_replicate]; omega)
+      (by simp only [size_packFields, Array.size_append, Array.size_replicate, Array.size_empty]
+          omega)
+    rw [Native.zeroWords_packFields, show Array.replicate half (0 : KoalaBear.Fast.Field) =
+      #[] ++ Array.replicate half 0 from Array.empty_append.symm, hfor]
     simp only [bind, pure, Id.run]
     rw [fold_append_batches (fun i ↦ a.getD i 0 + a.getD (i + half) 0) 0 (half / 16) #[]]
     simp only [Nat.mul_zero, Nat.zero_add, Array.empty_append]
-    rw [he]
+    rw [he, Array.extract_eq_empty_of_le (by simp only [Array.size_replicate]; omega),
+      Array.append_empty]
 
 /-- Fusing the input read computes the same first-layer partition coordinates. -/
 theorem Native.splitInputRight_packFields (a w : Array KoalaBear.Fast.Field) (half : Nat)
@@ -93,31 +99,37 @@ theorem Native.splitInputRight_packFields (a w : Array KoalaBear.Fast.Field) (ha
   · rename_i hmod
     have hm : half % 16 = 0 := by simpa using hmod
     have he : 16 * (half / 16) = half := by omega
-    have hfor := forIn_packFields (List.range' 0 (half / 16))
+    have hfor := forIn_packFields 0 (half / 16)
       (fun block state ↦
         if h : 16 * block + 15 < a.size ∧ 16 * block + half + 15 < a.size ∧ a.size < USize.size ∧
           4 * (16 * block + 15) + 3 < (packFields w).size ∧ (packFields w).size < USize.size then
           pure (.yield (none, Native.splitInputStepRight a (packFields w)
             (USize.ofNatLT (16 * block) (by omega))
             (USize.ofNatLT (16 * block + half) (by omega)) state.2
-            (by simpa only [USize.toNat_ofNatLT] using h)))
+            (USize.ofNatLT (16 * block) (by omega)) (by simpa only [USize.toNat_ofNatLT] using h)))
         else pure (.done (some (Native.splitRight (Native.encode a) (packFields w) half), state.2)))
       (fun block out ↦ out ++ Array.ofFn (fun k : Fin 16 ↦ w.getD (16 * block + k.val) 0 *
         (a.getD (16 * block + k.val) 0 - a.getD (16 * block + k.val + half) 0)))
       (by
-        intro block hb out
-        rw [dite_eq_left (hloop block hb), Native.splitInputStepRight_packFields a w,
+        intro block hb l Z hl hZ hs'
+        rw [dite_eq_left (hloop block hb),
+          Native.splitInputStepRight_packFields a w l Z _ _ _ ?hp hZ hs',
           splitInputStepRightField_eq]
         simp only [USize.toNat_ofNatLT, packFields_append, Nat.add_assoc, Nat.add_comm half]
-        rfl)
-      #[]
-    rw [show ByteArray.emptyWithCapacity (4 * half) = packFields (#[] : Array
-      KoalaBear.Fast.Field) by rw [packFields_empty]; rfl]
-    rw [hfor]
+        rfl
+        simp only [USize.toNat_ofNatLT]
+        omega)
+      (fun _ _ ↦ by simp only [Array.size_append, Array.size_ofFn])
+      #[] (Array.replicate half 0) rfl (by simp only [Array.size_replicate]; omega)
+      (by simp only [size_packFields, Array.size_append, Array.size_replicate, Array.size_empty]
+          omega)
+    rw [Native.zeroWords_packFields, show Array.replicate half (0 : KoalaBear.Fast.Field) =
+      #[] ++ Array.replicate half 0 from Array.empty_append.symm, hfor]
     simp only [bind, pure, Id.run]
     rw [fold_append_batches (fun i ↦ w.getD i 0 * (a.getD i 0 - a.getD (i + half) 0)) 0 (half /
       16) #[]]
     simp only [Nat.mul_zero, Nat.zero_add, Array.empty_append]
-    rw [he]
+    rw [he, Array.extract_eq_empty_of_le (by simp only [Array.size_replicate]; omega),
+      Array.append_empty]
 
 end CompPoly.CPolynomial.NTTFast.Packed

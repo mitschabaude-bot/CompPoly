@@ -134,6 +134,26 @@ theorem Native.write16_packFields (a : Array KoalaBear.Fast.Field) (i : Nat)
   simp only [splice, Array.map_append, map_val_extract, Array.size_map]
   rfl
 
+/-- `n` zero words represent `n` zero coordinates. -/
+theorem Native.zeroWords_packFields (n : Nat) :
+    Native.zeroWords n = packFields (Array.replicate n 0) := by
+  rw [Native.zeroWords_eq, packFields, Array.map_replicate]
+  rfl
+
+/-- A batch store at the end of a written prefix extends the prefix and consumes the batch's
+slots of the rest. -/
+theorem Native.write16U_cursor (l Z : Array KoalaBear.Fast.Field) (p : USize)
+    (hp : p.toNat = l.size) (hZ : 16 ≤ Z.size) (hs : (packFields (l ++ Z)).size < USize.size)
+    (x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 : KoalaBear.Fast.Field) :
+    Native.write16U (packFields (l ++ Z)) p x0.val x1.val x2.val x3.val x4.val x5.val x6.val
+      x7.val x8.val x9.val x10.val x11.val x12.val x13.val x14.val x15.val =
+      packFields (l ++ #[x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15] ++
+        Z.extract 16 Z.size) := by
+  rw [Native.write16U_eq, Native.write16_packFields _ _ hs
+    (by rw [Array.size_append]; omega), hp,
+    splice_cursor l Z #[x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15] hZ]
+  rfl
+
 /-- Appending a complete field-coordinate batch preserves its packed representation. -/
 theorem Native.push16_packFields (a : Array KoalaBear.Fast.Field)
     (x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 : KoalaBear.Fast.Field) :

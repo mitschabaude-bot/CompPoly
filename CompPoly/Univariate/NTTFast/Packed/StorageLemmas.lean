@@ -241,6 +241,62 @@ theorem storeWords_replace_pack (words : Array UInt32) (offset : USize)
   simp only [storeWords_eq, Nat.not_lt.mpr hc, ↓reduceIte, Bool.false_eq_true, hf, ho,
     Storage.replace_pack, hv, and_self]
 
+/-! ### Zero buffers -/
+
+/-- `m` zero bytes. -/
+abbrev zeroBuffer (m : Nat) : ByteArray := ⟨Array.replicate m 0⟩
+
+theorem copySlice_zeroBuffer (k m len : Nat) (hl : len ≤ k) :
+    (zeroBuffer k).copySlice 0 (zeroBuffer m) m len false = zeroBuffer (m + len) := by
+  rw [ByteArray.copySlice_eq_append]
+  apply ByteArray.ext
+  apply Array.ext
+  · simp only [ByteArray.data_append, ByteArray.data_extract, Array.size_append,
+      Array.size_extract, Array.size_replicate]
+    omega
+  · intro j h1 h2
+    simp only [ByteArray.data_append, ByteArray.data_extract, Array.getElem_append,
+      Array.getElem_extract, Array.getElem_replicate]
+    split_ifs <;> rfl
+
+theorem fillZeros_zeroBuffer (target : Nat) :
+    ∀ (fuel m : Nat), m ≤ target → target ≤ m + 4096 * fuel →
+      fillZeros target fuel (zeroBuffer m) = zeroBuffer target := by
+  intro fuel
+  induction fuel with
+  | zero =>
+    intro m hle hge
+    rw [show m = target by omega]
+    rfl
+  | succ fuel ih =>
+    intro m hle hge
+    have hm : (zeroBuffer m).size = m := Array.size_replicate
+    unfold fillZeros
+    by_cases hlt : m < target
+    · simp only [hm, hlt, ↓reduceIte]
+      rw [show zeroBlock = zeroBuffer 4096 from rfl, copySlice_zeroBuffer 4096 m _ (by omega)]
+      exact ih _ (by omega) (by omega)
+    · simp only [hm, hlt, ↓reduceIte]
+      rw [show m = target by omega]
+
+theorem zeroBuffer_eq_pack (n : Nat) : zeroBuffer (4 * n) = Storage.pack (Array.replicate n 0) := by
+  apply ByteArray.ext
+  simp only [Storage.pack, ← List.toArray_replicate]
+  congr 1
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+    rw [List.replicate_succ, ByteCodec.encodeList_cons, ← ih,
+      show 4 * (n + 1) = 4 + 4 * n by ring, List.replicate_add]
+    rfl
+
+/-- `n` zero words are the packing of `n` zeros. -/
+theorem zeroWords_eq (n : Nat) : zeroWords n = Storage.pack (Array.replicate n 0) := by
+  rw [← zeroBuffer_eq_pack]
+  unfold zeroWords
+  rw [show ByteArray.emptyWithCapacity (4 * n) = zeroBuffer 0 from rfl]
+  exact fillZeros_zeroBuffer _ _ _ (by omega) (by omega)
+
 /-- A machine-index batch store is the natural-index batch store. -/
 theorem write16U_eq (b : ByteArray) (i : USize)
     (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) :
