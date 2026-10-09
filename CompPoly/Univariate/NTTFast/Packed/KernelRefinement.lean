@@ -71,41 +71,47 @@ theorem Native.leaf16Scaled_packFields (t3 t2 t1 : Array KoalaBear.Fast.Field) (
   rfl
 
 /-- The unrolled partition kernel preserves the represented field array. -/
-theorem Native.splitStepLeft_packFields (a w out : Array KoalaBear.Fast.Field) (i j : USize) (h) :
-    Native.splitStepLeft (packFields a) (packFields w) i j (packFields out) h =
-      packFields (splitStepLeftField a w i j out) := by
+theorem Native.splitStepLeft_packFields (a w l Z : Array KoalaBear.Fast.Field) (i j p : USize)
+    (hp : p.toNat = l.size) (hZ : 16 ≤ Z.size) (hs : (packFields (l ++ Z)).size < USize.size)
+    (h) :
+    Native.splitStepLeft (packFields a) (packFields w) i j (packFields (l ++ Z)) p h =
+      packFields (splitStepLeftField a w i j l ++ Z.extract 16 Z.size) := by
   unfold Native.splitStepLeft
   simp only [Native.readUOffset_packFields, add_val]
-  rw [Native.push16_packFields]
+  rw [Native.write16U_cursor _ _ _ hp hZ hs]
   rfl
 
 /-- The unrolled partition kernel preserves the represented field array. -/
-theorem Native.splitStepRight_packFields (a w out : Array KoalaBear.Fast.Field) (i j : USize) (h) :
-    Native.splitStepRight (packFields a) (packFields w) i j (packFields out) h =
-      packFields (splitStepRightField a w i j out) := by
+theorem Native.splitStepRight_packFields (a w l Z : Array KoalaBear.Fast.Field) (i j p : USize)
+    (hp : p.toNat = l.size) (hZ : 16 ≤ Z.size) (hs : (packFields (l ++ Z)).size < USize.size)
+    (h) :
+    Native.splitStepRight (packFields a) (packFields w) i j (packFields (l ++ Z)) p h =
+      packFields (splitStepRightField a w i j l ++ Z.extract 16 Z.size) := by
   unfold Native.splitStepRight
   simp only [Native.readUOffset_packFields, sub_val, mul_val]
-  rw [Native.push16_packFields]
+  rw [Native.write16U_cursor _ _ _ hp hZ hs]
   rfl
 
 /-- The unrolled partition kernel preserves the represented field array. -/
-theorem Native.splitInputStepLeft_packFields (a w out : Array KoalaBear.Fast.Field) (i j : USize)
-    (h) :
-    Native.splitInputStepLeft a i j (packFields out) h =
-      packFields (splitInputStepLeftField a w i j out) := by
+theorem Native.splitInputStepLeft_packFields (a w l Z : Array KoalaBear.Fast.Field)
+    (i j p : USize) (hp : p.toNat = l.size) (hZ : 16 ≤ Z.size)
+    (hs : (packFields (l ++ Z)).size < USize.size) (h) :
+    Native.splitInputStepLeft a i j (packFields (l ++ Z)) p h =
+      packFields (splitInputStepLeftField a w i j l ++ Z.extract 16 Z.size) := by
   unfold Native.splitInputStepLeft
   simp only [Native.fieldAtOffset_val, add_val]
-  rw [Native.push16_packFields]
+  rw [Native.write16U_cursor _ _ _ hp hZ hs]
   rfl
 
 /-- The unrolled partition kernel preserves the represented field array. -/
-theorem Native.splitInputStepRight_packFields (a w out : Array KoalaBear.Fast.Field) (i j :
-    USize) (h) :
-    Native.splitInputStepRight a (packFields w) i j (packFields out) h =
-      packFields (splitInputStepRightField a w i j out) := by
+theorem Native.splitInputStepRight_packFields (a w l Z : Array KoalaBear.Fast.Field)
+    (i j p : USize) (hp : p.toNat = l.size) (hZ : 16 ≤ Z.size)
+    (hs : (packFields (l ++ Z)).size < USize.size) (h) :
+    Native.splitInputStepRight a (packFields w) i j (packFields (l ++ Z)) p h =
+      packFields (splitInputStepRightField a w i j l ++ Z.extract 16 Z.size) := by
   unfold Native.splitInputStepRight
   simp only [Native.readUOffset_packFields, Native.fieldAtOffset_val, sub_val, mul_val]
-  rw [Native.push16_packFields]
+  rw [Native.write16U_cursor _ _ _ hp hZ hs]
   rfl
 
 

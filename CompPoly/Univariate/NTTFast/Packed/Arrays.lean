@@ -33,6 +33,23 @@ def splice (a : Array α) (index : Nat) (values : Array α) : Array α :=
   change i + 16 ≤ a.size
   exact hi
 
+/-- Dropping a prefix of a tail drops the combined prefix. -/
+theorem extract_extract_tail (Z : Array α) (a b : Nat) :
+    (Z.extract a Z.size).extract b (Z.extract a Z.size).size = Z.extract (a + b) Z.size := by
+  rw [Array.extract_extract, Array.size_extract]
+  congr 1
+  omega
+
+/-- Splicing a batch at the end of a written prefix moves it into the prefix. -/
+theorem splice_cursor (l Z V : Array α) (hZ : V.size ≤ Z.size) :
+    splice (l ++ Z) l.size V = l ++ V ++ Z.extract V.size Z.size := by
+  simp only [splice, Array.size_append]
+  rw [Array.extract_append, Array.extract_append]
+  simp only [Nat.sub_self, Array.extract_size, Array.extract_zero, Array.append_empty]
+  rw [Array.extract_eq_empty_of_le (by omega), Array.empty_append,
+    show l.size + V.size - l.size = V.size by omega,
+    show l.size + Z.size - l.size = Z.size by omega]
+
 private theorem getD_append (a b : Array α) (i : Nat) (d : α) :
     (a ++ b).getD i d = if i < a.size then a.getD i d else b.getD (i - a.size) d := by
   simp only [Array.getD_eq_getD_getElem?, Array.getElem?_append]

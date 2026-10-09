@@ -72,4 +72,4 @@ refinement statements and coefficient ordering.
 
 ### Packed FFT native storage
 
-`CompPolyTests/NTT/NativeStorage.lean` runs as part of `lake exe CompPolyNativeSmoke`. Its compiled comparisons exercise the two packed FFT storage externs against independent bytewise Lean operations, including shared input preservation, allocation growth, partial batches, unaligned stores, invalid counts and near-overflow offsets. These are checks of the runtime trust boundary; FFT mathematics is covered by the kernel refinement theorems.
+`CompPolyTests/NTT/NativeStorage.lean` runs as part of `lake exe CompPolyNativeSmoke`. Its compiled comparisons exercise the inline C of the backported `ByteArray` word accessors (`CompPoly/Data/ByteArray/Pack.lean`), and the packed FFT batch stores and checked reads built on them, against independent bytewise Lean operations, including shared input preservation, allocation growth, partial batches, unaligned stores, invalid counts and near-overflow offsets. These are checks of the runtime trust boundary; FFT mathematics is covered by the kernel refinement theorems.

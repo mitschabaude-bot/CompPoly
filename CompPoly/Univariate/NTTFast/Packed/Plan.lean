@@ -9,8 +9,9 @@ public import CompPoly.Univariate.NTTFast.Packed.NativeLastCorrectness
 
 /-! # Proved parallel KoalaBear transforms with packed native storage
 
-The correctness theorems cover the complete Lean pipeline. The two storage externs
-in `Native` remain runtime trust assumptions; arithmetic, tasks and ordering are Lean.
+The correctness theorems cover the complete Lean pipeline. Packed words are read and written
+with the `ByteArray` word accessors proposed for Lean core (`CompPoly.Data.ByteArray.Pack`),
+whose inline C remains a runtime trust assumption; arithmetic, tasks and ordering are Lean.
 `forward`/`inverse` take and return field arrays. `forwardPacked`/`inversePacked` take and
 return packed Montgomery words (`packFields`), which avoids the sequential field-array
 decoding of the output.
