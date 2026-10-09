@@ -126,13 +126,13 @@ def forward (ω z0 k0 k1 z2x2 : Field) : ℕ → USize → Field → Field → B
     let t2 := t * t
     let nm := Ext4.normAt k0 k1 z2x2 t t2
     forward ω z0 k0 k1 z2x2 n (i + 1) (x * ω) (acc * nm)
-      (Native.storeWords buf (16 * i) 4 false x.val t2.val nm.val acc.val 0 0 0 0 0 0 0 0 0 0 0 0)
+      (Native.storeWords buf (16 * i) 4 x.val t2.val nm.val acc.val 0 0 0 0 0 0 0 0 0 0 0 0)
 
 theorem size_forward (ω z0 k0 k1 z2x2 : Field) (n : ℕ) (i : USize) (x acc : Field)
     (buf : ByteArray) : (forward ω z0 k0 k1 z2x2 n i x acc buf).1.size = buf.size := by
   induction n generalizing i x acc buf with
   | zero => rfl
-  | succ n ih => rw [forward, ih, Native.size_storeWords_overwrite]
+  | succ n ih => rw [forward, ih, Native.size_storeWords]
 
 theorem usize_four_mul (j : USize) (n : ℕ) (h : 16 * j.toNat ≤ n) (hn : n < USize.size) :
     (4 * j).toNat = 4 * j.toNat := by
@@ -166,15 +166,15 @@ def backward (z0 : Field) : (n : ℕ) → (i : USize) → Field → (buf : ByteA
     let u := x * (inv * pre)
     let v1 := u * (z0 - x)
     backward z0 n (i - 1) (inv * nm)
-      (Native.storeWords buf (16 * (i - 1)) 4 false u.val v1.val (u * t2).val (v1 * t2).val
+      (Native.storeWords buf (16 * (i - 1)) 4 u.val v1.val (u * t2).val (v1 * t2).val
         0 0 0 0 0 0 0 0 0 0 0 0)
-      (by rw [Native.size_storeWords_overwrite]; omega)
+      (by rw [Native.size_storeWords]; omega)
 
 theorem size_backward (z0 : Field) (n : ℕ) (i : USize) (inv : Field) (buf : ByteArray) (h) :
     (backward z0 n i inv buf h).size = buf.size := by
   induction n generalizing i inv buf with
   | zero => rfl
-  | succ n ih => rw [backward, ih, Native.size_storeWords_overwrite]
+  | succ n ih => rw [backward, ih, Native.size_storeWords]
 
 /-- One column of `n` block rows: `e` steps through the column's words by `width`, `w` through
 the rows' weights. -/

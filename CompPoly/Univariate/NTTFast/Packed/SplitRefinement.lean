@@ -193,10 +193,9 @@ theorem Native.splitLeft_empty (a : ByteArray) (half : Nat) :
     by_cases hn : half / 16 = 0
     · have hz : half = 0 := by omega
       subst half
-      simp only [Nat.zero_div, List.range'_zero, List.forIn_nil, bind, pure, Id.run,
-        Native.generate, Std.Legacy.Range.forIn_eq_forIn_range', Std.Legacy.Range.size,
-        Nat.sub_zero, Nat.add_sub_cancel, Nat.div_one]
-      rw [Native.zeroWords_packFields, Array.replicate_zero, packFields_empty]
+      simp only [Nat.zero_div, List.range'_zero, List.forIn_nil, bind, pure, Id.run]
+      rw [Native.zeroWords_packFields, Array.replicate_zero, packFields_empty, Native.generate_eq,
+        Array.ofFn_zero]
       rfl
     · obtain ⟨count, hc⟩ : ∃ count, half / 16 = count + 1 := ⟨half / 16 - 1, by omega⟩
       rw [hc, List.range'_succ, List.forIn_cons]

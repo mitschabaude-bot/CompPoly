@@ -167,7 +167,7 @@ theorem row_setRow (W : Array UInt32) (j : ℕ) (v0 v1 v2 v3 : UInt32) (hj : 4 *
 /-- Storing four words at row `j` of a packed array. -/
 theorem storeRow (W : Array UInt32) (j : USize) (hj : 4 * j.toNat + 4 ≤ W.size)
     (hs : 4 * W.size < USize.size) (v0 v1 v2 v3 : UInt32) :
-    Native.storeWords (Storage.pack W) (16 * j) 4 false v0 v1 v2 v3 0 0 0 0 0 0 0 0 0 0 0 0 =
+    Native.storeWords (Storage.pack W) (16 * j) 4 v0 v1 v2 v3 0 0 0 0 0 0 0 0 0 0 0 0 =
       Storage.pack (setRow W j.toNat v0 v1 v2 v3) := by
   have hsize : (2 : ℕ) ^ System.Platform.numBits = USize.size := rfl
   rw [Native.storeWords_replace_pack W (16 * j) 4 (4 * j.toNat) (by decide) (by

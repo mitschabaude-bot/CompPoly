@@ -154,9 +154,6 @@ theorem extract_extract16 (Z : Array α) (count : Nat) :
   rw [Array.extract_extract, Array.size_extract]
   congr 1 <;> omega
 
-theorem usize_add16_cursor (p : USize) (n : Nat) (h : p.toNat + 16 ≤ n) (hn : n < USize.size) :
-    (p + 16).toNat = p.toNat + 16 := usize_add16 p n h hn
-
 /-- The paired split loop at machine indices stores its batches from word `p`. -/
 theorem pairLoop_packFields (A B w : Array KoalaBear.Fast.Field) :
     ∀ (count : Nat) (ia ib iw p : USize) (l r ZL ZR : Array KoalaBear.Fast.Field),
