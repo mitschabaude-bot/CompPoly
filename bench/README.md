@@ -406,4 +406,4 @@ This suite compares two Lean implementations with Plonky3's stock `p3_interpolat
 
 Each fixture holds the subgroup root, the shift (KoalaBear's multiplicative generator `3`), two extension points that alternate between iterations, and the matrix, as canonical little-endian 32-bit words. The root must equal Lean's certified root and Plonky3's two-adic generator. `CompPolyInterpolateBench` and `comppoly-field-bench --interpolate` read the same fixture; full output digests agree before timing, including single-row and narrow matrices. Workers follow the same physical-core selection as the NTT suite, and every invocation warms up for 200 ms.
 
-The packed version reads and writes words with the packed NTT's backported `ByteArray` word accessors and nothing else outside the kernel proof; `lake exe CompPolyNativeSmoke` compares it with the reference on 38 compiled cases, including words from the modulus up and malformed byte lengths.
+The packed version reads and writes words with the packed NTT's backported `ByteArray` word accessors and nothing else outside the kernel proof, so `interpolateCosetPacked_eq` and the accessors' compiled checks cover it.

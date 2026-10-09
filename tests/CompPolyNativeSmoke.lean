@@ -10,7 +10,6 @@ public import CompPoly.Fields.Binary.BF128Ghash.Impl
 public import CompPoly.Fields.Binary.BF64.Ext3
 public import CompPoly.Fields.Binary.Tower.Fast.Multilinear
 public import CompPolyTests.NTT.NativeStorage
-public import CompPolyTests.Fields.KoalaBear.InterpolateCosetPacked
 
 /-!
 # Native field startup and arithmetic checks
@@ -18,7 +17,7 @@ public import CompPolyTests.Fields.KoalaBear.InterpolateCosetPacked
 This executable checks canonical arithmetic in AES, BF64, its cubic extension, GHASH,
 and the binary tower, including packed coefficient evaluation. It also checks
 the backported `ByteArray` word accessors under the packed FFT against independent bytewise
-Lean operations, and coset interpolation over packed words against its reference.
+Lean operations.
 The test guide documents resource limits for native initialization and execution.
 Unlike compile-time guards, this target exercises the linked executable's module initializers.
 The extension product uses the reference vector from the existing BF64 regression tests.
@@ -168,7 +167,6 @@ def run : IO Unit := do
   check "GHASH named inverse" (BF128Ghash.invItohTsujii high == expectedInverse)
   checkGhashOperations high expectedInverse
   CompPolyTests.NTT.NativeStorage.run
-  CompPolyTests.Fields.KoalaBear.InterpolateCosetPacked.run
   IO.println "Native field startup and arithmetic checks passed."
 
 end CompPolyTests.NativeSmoke
