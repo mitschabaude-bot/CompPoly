@@ -27,20 +27,6 @@ namespace Native
 
 open Storage
 
-/-- Appending a sixteen-word literal. -/
-theorem storeWords_lit16 (o : Array UInt32) (g : Nat → UInt32) :
-    storeWords (pack o) 0 16 true (g 0) (g 1) (g 2) (g 3) (g 4) (g 5) (g 6) (g 7) (g 8)
-      (g 9) (g 10) (g 11) (g 12) (g 13) (g 14) (g 15) = pack (o ++ lit16 g) := by
-  rw [storeWords_append_pack o 0 16 (by decide)]
-  rfl
-
-/-- A checked read at a numeral offset inside a known word range. -/
-theorem readAt_pack_at (v : Array UInt32) (q : USize) (o : Nat) (ho : o < 16)
-    (h : q.toNat + 16 ≤ v.size) (hs : (pack v).size < USize.size) :
-    readAt (pack v) q (OfNat.ofNat o) = v.getD (q.toNat + o) 0 := by
-  rw [readAt_pack v q (OfNat.ofNat o)
-    (by rw [usize_numeral o (by omega)]; refine ⟨?_, hs⟩; rw [size_pack]; omega),
-    usize_numeral o (by omega)]
 
 /-- A line inside a packed word array that fits machine indices passes the range check. -/
 theorem lineFits_pack (v : Array UInt32) (q : USize) (h : q.toNat + 16 ≤ v.size)

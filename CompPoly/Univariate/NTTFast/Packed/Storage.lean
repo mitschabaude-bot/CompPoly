@@ -17,10 +17,6 @@ namespace CompPoly.CPolynomial.NTTFast.Packed.Storage
 def pack (words : Array UInt32) : ByteArray :=
   ⟨(ByteCodec.encodeList words.toList).toArray⟩
 
-/-- Read a complete word slot, with zero for a missing slot. -/
-def wordAt (bytes : ByteArray) (index : Nat) : UInt32 :=
-  UInt32.ofNat (Bytes.ofListLE ((bytes.data.toList.drop (4 * index)).take 4))
-
 @[simp] theorem size_pack (words : Array UInt32) : (pack words).size = 4 * words.size := by
   simp only [pack, ByteArray.size, List.size_toArray, ByteCodec.length_encodeList,
     Array.length_toList, ByteCodec.width_uint32, Nat.mul_comm]
@@ -84,30 +80,6 @@ theorem replace_pack (words values : Array UInt32) (index : Nat) :
   simp only [Nat.mul_zero] at hp
   rw [hp,
     show 4 * index + 4 * values.size = 4 * (index + values.size) by omega, pack_extract]
-
-/-- Each packed slot decodes to its original word. -/
-theorem wordAt_pack (words : Array UInt32) (index : Nat) :
-    wordAt (pack words) index = words.getD index 0 := by
-  simp only [wordAt, pack, List.toList_toArray, drop_encodeList]
-  rw [List.drop_eq_getElem?_toList_append]
-  cases h : words.toList[index]? with
-  | none =>
-    have hn : words.toList.length ≤ index := List.getElem?_eq_none_iff.mp h
-    rw [List.drop_of_length_le (show words.toList.length ≤ index + 1 by omega)]
-    simp only [Option.toList_none, List.nil_append]
-    simp only [ByteCodec.encodeList_nil, List.take_nil, Bytes.ofListLE_nil,
-      Array.getD_eq_getD_getElem?, ← Array.getElem?_toList, h,
-      Option.getD_none]
-    rfl
-  | some x =>
-    simp only [Option.toList_some, List.singleton_append, ByteCodec.encodeList_cons]
-    rw [List.take_left' (show (ByteCodec.toBytes x).toList.length = 4 by
-      simp only [Vector.length_toList, ByteCodec.width_uint32]), ByteCodec.toBytes_uint32,
-      Bytes.ofListLE_toListLE_of_lt (show x.toNat < 256 ^ 4 from x.toNat_lt),
-      UInt32.ofNat_toNat]
-    simp only [Array.getD_eq_getD_getElem?, ← Array.getElem?_toList, h, Option.getD_some]
-
-/-! ### Word stores as byte-range replacements -/
 
 theorem size_replace (bytes values : ByteArray) (offset : Nat)
     (h : offset + values.size ≤ bytes.size) : (replace bytes offset values).size = bytes.size := by

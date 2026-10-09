@@ -144,41 +144,23 @@ theorem putWords_eq (b : ByteArray) (off : USize) (c : Nat) (hc : c ≤ 16)
   rw [Nat.min_eq_right (show c ≤ 15 + 1 by omega)] at e15
   exact e15
 
-/-- The batch store is a byte-range replacement or an append of the batch's first `count`
-words. -/
-theorem storeWords_eq (b : ByteArray) (offset : USize) (count : UInt8) (append : Bool)
+/-- The batch store is a byte-range replacement by the batch's first `count` words. -/
+theorem storeWords_eq (b : ByteArray) (offset : USize) (count : UInt8)
     (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) :
-    storeWords b offset count append v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 =
+    storeWords b offset count v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 =
       if count.toNat > 16 then b else
-      let packed := Storage.pack
-        ((batch v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15).extract 0 count.toNat)
-      if append then b ++ packed else
       if offset ≤ offset + (4 * count.toNat).toUSize ∧
           offset + (4 * count.toNat).toUSize ≤ b.usize then
-        Storage.replace b offset.toNat packed
+        Storage.replace b offset.toNat (Storage.pack
+          ((batch v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15).extract 0 count.toNat))
       else b := by
   unfold storeWords
   split
   · rfl
   · rename_i hc
-    cases append
-    · simp only [Bool.false_eq_true, ↓reduceIte]
-      split
-      · rw [putWords_eq _ _ count.toNat (by omega)]
-      · rfl
-    · simp only [↓reduceIte]
-      split
-      · rename_i h
-        have hz : b.extract (b.size + min (4 * count.toNat) (zeroBytes.data.size - 0))
-            b.data.size = ByteArray.empty :=
-          ByteArray.extract_eq_empty_iff.mpr (by simp only [ByteArray.size]; omega)
-        rw [putWords_eq _ _ count.toNat (by omega), h.1, ByteArray.copySlice_eq_append,
-          ByteArray.extract_zero_size, hz, ByteArray.append_empty, Storage.replace_append_size]
-        rw [Storage.size_pack, Array.size_extract]
-        simp only [ByteArray.data_extract, Array.size_extract, zeroBytes, ByteArray.size,
-          Array.size_replicate, List.size_toArray, List.length_cons, List.length_nil]
-        omega
-      · rfl
+    split
+    · rw [putWords_eq _ _ count.toNat (by omega)]
+    · rfl
 
 /-- In a packed buffer that fits machine indices, a batch's range check is its slot bound. -/
 theorem storeWords_fits (words : Array UInt32) (offset : USize) (count : UInt8) (index : Nat)
@@ -209,25 +191,13 @@ theorem storeWords_fits (words : Array UInt32) (offset : USize) (count : UInt8) 
     rw [Nat.mod_eq_of_lt (by omega)]
     omega
 
-/-- The append primitive appends the given canonical word slots. -/
-theorem storeWords_append_pack (words : Array UInt32) (offset : USize) (count : UInt8)
-    (hc : count.toNat ≤ 16)
-    (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) :
-    storeWords (Storage.pack words) offset count true
-      v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 =
-    Storage.pack (words ++
-      #[v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15].extract
-        0 count.toNat) := by
-  simp only [storeWords_eq, Nat.not_lt.mpr hc, ↓reduceIte,
-    ← Storage.pack_append]
-
 /-- The overwrite primitive changes precisely the specified word slots. -/
 theorem storeWords_replace_pack (words : Array UInt32) (offset : USize)
     (count : UInt8) (index : Nat) (hc : count.toNat ≤ 16)
     (ho : offset.toNat = 4 * index) (hi : index + count.toNat ≤ words.size)
     (hs : (Storage.pack words).size < USize.size)
     (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) :
-    storeWords (Storage.pack words) offset count false
+    storeWords (Storage.pack words) offset count
       v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 =
     Storage.pack (words.extract 0 index ++
       #[v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15].extract
@@ -238,7 +208,7 @@ theorem storeWords_replace_pack (words : Array UInt32) (offset : USize)
     rw [Array.size_extract]
     change min count.toNat 16 - 0 = count.toNat
     omega
-  simp only [storeWords_eq, Nat.not_lt.mpr hc, ↓reduceIte, Bool.false_eq_true, hf, ho,
+  simp only [storeWords_eq, Nat.not_lt.mpr hc, ↓reduceIte, hf, ho,
     Storage.replace_pack, hv, and_self]
 
 /-! ### Zero buffers -/
@@ -309,13 +279,5 @@ theorem extendZeros_pack (o : Array UInt32) :
   rw [ByteArray.copySlice_eq_append, ByteArray.extract_zero_size, hb,
     (ByteArray.extract_eq_empty_iff).mpr (by simp only [ByteArray.size, hz]; omega),
     ByteArray.append_empty, Storage.pack_append, zeroBuffer_eq_pack]
-
-/-- A machine-index batch store is the natural-index batch store. -/
-theorem write16U_eq (b : ByteArray) (i : USize)
-    (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) :
-    write16U b i v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 =
-      write16 b i.toNat v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 := by
-  unfold write16U write16
-  simp only [Nat.toUSize_eq, USize.ofNat_toNat]
 
 end CompPoly.CPolynomial.NTTFast.Packed.Native

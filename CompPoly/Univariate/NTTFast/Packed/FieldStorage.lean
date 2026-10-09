@@ -57,12 +57,6 @@ theorem Native.read_packFields (a : Array KoalaBear.Fast.Field) (i : Nat)
   exact (Native.read_pack (a.map Subtype.val) i hs
     (by simpa only [Array.size_map] using hi)).trans (getD_map_val a i)
 
-/-- A single word append has its ordinary packed-array semantics. -/
-theorem Native.push_eq (b : ByteArray) (x : UInt32) :
-    Native.push b x = b ++ Storage.pack #[x] := by
-  rw [Native.push, Native.storeWords_eq]
-  rfl
-
 /-- Packing an empty field array gives an empty byte buffer. -/
 @[simp] theorem packFields_empty : packFields (#[] : Array KoalaBear.Fast.Field) =
   ByteArray.empty := by
@@ -71,18 +65,16 @@ theorem Native.push_eq (b : ByteArray) (x : UInt32) :
   rfl
 
 /-- A field-coordinate batch store realizes the corresponding array splice. -/
-theorem Native.write16_packFields (a : Array KoalaBear.Fast.Field) (i : Nat)
-    (hs : (packFields a).size < USize.size) (hi : i + 16 ≤ a.size)
+theorem Native.write16U_packFields (a : Array KoalaBear.Fast.Field) (i : USize)
+    (hs : (packFields a).size < USize.size) (hi : i.toNat + 16 ≤ a.size)
     (x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 : KoalaBear.Fast.Field) :
-    Native.write16 (packFields a) i x0.val x1.val x2.val x3.val x4.val x5.val x6.val x7.val
+    Native.write16U (packFields a) i x0.val x1.val x2.val x3.val x4.val x5.val x6.val x7.val
       x8.val x9.val x10.val x11.val x12.val x13.val x14.val x15.val =
-      packFields (splice a i #[x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14,
-        x15]) := by
-  have hin : i < USize.size := by rw [size_packFields] at hs; omega
-  have hmul : i * 4 < USize.size := by rw [size_packFields] at hs; omega
-  have ho : (i.toUSize * 4).toNat = 4 * i := by
-    rw [USize.toNat_mul, USize.toNat_ofNat_of_lt' hin,
-      Native.usize_numeral 4 (by decide), Nat.mod_eq_of_lt hmul]
+      packFields (splice a i.toNat #[x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13,
+        x14, x15]) := by
+  have hmul : i.toNat * 4 < USize.size := by rw [size_packFields] at hs; omega
+  have ho : (i * 4).toNat = 4 * i.toNat := by
+    rw [USize.toNat_mul, Native.usize_numeral 4 (by decide), Nat.mod_eq_of_lt hmul]
     omega
   have hc : (16 : UInt8).toNat ≤ 16 := by decide
   have hvalues : (#[x0.val, x1.val, x2.val, x3.val, x4.val, x5.val, x6.val, x7.val, x8.val,
@@ -91,14 +83,15 @@ theorem Native.write16_packFields (a : Array KoalaBear.Fast.Field) (i : Nat)
     apply Array.toList_inj.mp
     simp only [Array.toList_map]
     rfl
-  unfold Native.write16 packFields
-  rw [Native.storeWords_replace_pack (a.map Subtype.val) (i.toUSize * 4) 16 i hc ho
+  unfold Native.write16U packFields
+  rw [Native.storeWords_replace_pack (a.map Subtype.val) (i * 4) 16 i.toNat hc ho
     (by simpa only [Array.size_map, show (16 : UInt8).toNat = 16 by decide] using hi) hs]
   simp only [show (16 : UInt8).toNat = 16 by decide]
   change Storage.pack
-    ((a.map Subtype.val).extract 0 i ++ #[x0.val, x1.val, x2.val, x3.val, x4.val, x5.val, x6.val,
-      x7.val, x8.val, x9.val, x10.val, x11.val, x12.val, x13.val, x14.val, x15.val].extract 0 16 ++
-      (a.map Subtype.val).extract (i + 16) (a.map Subtype.val).size) = _
+    ((a.map Subtype.val).extract 0 i.toNat ++ #[x0.val, x1.val, x2.val, x3.val, x4.val, x5.val,
+      x6.val, x7.val, x8.val, x9.val, x10.val, x11.val, x12.val, x13.val, x14.val,
+      x15.val].extract 0 16 ++
+      (a.map Subtype.val).extract (i.toNat + 16) (a.map Subtype.val).size) = _
   have hv : #[x0.val, x1.val, x2.val, x3.val, x4.val, x5.val, x6.val, x7.val, x8.val, x9.val,
     x10.val, x11.val, x12.val, x13.val, x14.val, x15.val].extract 0 16 = #[x0.val, x1.val,
     x2.val, x3.val, x4.val, x5.val, x6.val, x7.val, x8.val, x9.val, x10.val, x11.val, x12.val,
@@ -122,29 +115,9 @@ theorem Native.write16U_cursor (l Z : Array KoalaBear.Fast.Field) (p : USize)
       x7.val x8.val x9.val x10.val x11.val x12.val x13.val x14.val x15.val =
       packFields (l ++ #[x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15] ++
         Z.extract 16 Z.size) := by
-  rw [Native.write16U_eq, Native.write16_packFields _ _ hs
+  rw [Native.write16U_packFields _ _ hs
     (by rw [Array.size_append]; omega), hp,
     splice_cursor l Z #[x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15] hZ]
-  rfl
-
-/-- Appending a complete field-coordinate batch preserves its packed representation. -/
-theorem Native.push16_packFields (a : Array KoalaBear.Fast.Field)
-    (x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 : KoalaBear.Fast.Field) :
-    Native.push16 (packFields a) x0.val x1.val x2.val x3.val x4.val x5.val x6.val x7.val x8.val
-      x9.val x10.val x11.val x12.val x13.val x14.val x15.val =
-      packFields (a ++ #[x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14,
-        x15]) := by
-  unfold Native.push16 packFields
-  rw [Native.storeWords_append_pack (a.map Subtype.val) 0 16 (by decide)]
-  simp only [show (16 : UInt8).toNat = 16 by decide, Array.map_append]
-  have hv : (#[x0.val, x1.val, x2.val, x3.val, x4.val, x5.val, x6.val, x7.val, x8.val, x9.val,
-    x10.val, x11.val, x12.val, x13.val, x14.val, x15.val] : Array UInt32).extract 0 16 =
-    #[x0.val, x1.val, x2.val, x3.val, x4.val, x5.val, x6.val, x7.val, x8.val, x9.val, x10.val,
-    x11.val, x12.val, x13.val, x14.val, x15.val] := Array.extract_size
-  rw [hv]
-  congr 2
-  apply Array.toList_inj.mp
-  simp only [Array.toList_map]
   rfl
 
 /-- A bounded single-coordinate write implements the corresponding field-array update. -/
@@ -168,51 +141,75 @@ theorem Native.write_packFields (a : Array KoalaBear.Fast.Field) (i : Nat)
   simp only [splice, Array.map_append, map_val_extract, Array.size_map, Array.size_singleton,
     Array.map_singleton]
 
-theorem Native.encodeGo_packFields (a c : Array KoalaBear.Fast.Field) (hs : (packFields a).size <
-    USize.size) : ∀ (n i : Nat), c.size = a.size → i + n = a.size →
-    Native.encodeGo a n i (packFields c) = packFields (c.extract 0 i ++ a.extract i a.size) := by
-  intro n
-  induction n generalizing c with
+/-- A word store on a written prefix followed by zeros extends the prefix. -/
+theorem Native.write_prefix (P : Array UInt32) (n : Nat) (x : UInt32)
+    (hs : 4 * (P.size + n + 1) < USize.size) :
+    Native.write (Storage.pack (P ++ Array.replicate (n + 1) 0)) P.size x =
+      Storage.pack (P.push x ++ Array.replicate n 0) := by
+  have hin : P.size < USize.size := by omega
+  have hmul : P.size * 4 < USize.size := by omega
+  have ho : (P.size.toUSize * 4).toNat = 4 * P.size := by
+    rw [USize.toNat_mul, USize.toNat_ofNat_of_lt' hin,
+      Native.usize_numeral 4 (by decide), Nat.mod_eq_of_lt hmul]
+    omega
+  unfold Native.write
+  rw [Native.storeWords_replace_pack _ (P.size.toUSize * 4) 1 P.size (by decide) ho
+    (by simp only [Array.size_append, Array.size_replicate, show (1 : UInt8).toNat = 1 by decide]
+        omega)
+    (by rw [Storage.size_pack, Array.size_append, Array.size_replicate]; omega)]
+  simp only [show (1 : UInt8).toNat = 1 by decide]
+  change Storage.pack ((P ++ Array.replicate (n + 1) 0).extract 0 P.size ++ #[x] ++
+    (P ++ Array.replicate (n + 1) 0).extract (P.size + 1)
+      (P ++ Array.replicate (n + 1) 0).size) = _
+  rw [Array.extract_append, Array.extract_append]
+  simp only [Array.extract_size, Nat.zero_sub, Nat.sub_self, Array.extract_zero,
+    Array.append_empty, Array.append_singleton, Array.size_append, Array.size_replicate,
+    Array.extract_replicate, Nat.add_sub_cancel_left, Nat.min_self, Nat.add_sub_cancel]
+  rw [Array.extract_eq_empty_of_le (by omega), Array.empty_append]
+
+private theorem ofFn_push (f : Nat → UInt32) (i : Nat) :
+    (Array.ofFn fun k : Fin i ↦ f k.val).push (f i) = Array.ofFn fun k : Fin (i + 1) ↦ f k.val := by
+  rw [Array.ofFn_succ]
+  rfl
+
+/-- Generating the remaining words of a buffer whose prefix is already written. -/
+theorem Native.generateGo_pack (f : Nat → UInt32) (n : Nat) : ∀ (i : Nat),
+    4 * (i + n) < USize.size →
+    Native.generateGo f n i
+        (Storage.pack (Array.ofFn (fun k : Fin i ↦ f k.val) ++ Array.replicate n 0)) =
+      Storage.pack (Array.ofFn (fun k : Fin (i + n) ↦ f k.val)) := by
+  induction n with
   | zero =>
-    intro i hc hi
-    simp only [Native.encodeGo, Nat.add_zero] at hi ⊢
-    have e1 : a.extract a.size a.size = #[] := Array.extract_eq_empty_of_le (by omega)
-    have e2 : c.extract 0 a.size = c := by rw [← hc, Array.extract_size]
-    rw [hi, e1, e2, Array.append_empty]
+    intro i _
+    simp only [Native.generateGo, Array.replicate_zero, Array.append_empty, Nat.add_zero]
   | succ n ih =>
-    intro i hc hi
-    rw [Native.encodeGo, Native.write_packFields c i (by
-      rw [size_packFields, hc]; rw [size_packFields] at hs; exact hs)
-      (by omega), ih _ (i + 1) (by simp only [Array.size_setIfInBounds, hc]) (by omega)]
-    congr 1
-    apply Array.ext
-    · simp only [Array.size_append, Array.size_extract, Array.size_setIfInBounds]
-      omega
-    · intro j h1 h2
-      simp only [Array.getElem_append, Array.getElem_extract, Array.size_extract,
-        Array.size_setIfInBounds, Nat.zero_add, Nat.sub_zero]
-      split_ifs with ha hb hb
-      · rw [Array.getElem_setIfInBounds]
-        split
-        · omega
-        · rfl
-      · rw [Array.getElem_setIfInBounds]
-        split
-        · rw [Array.getD_eq_getD_getElem?, Array.getElem?_eq_getElem (by omega), Option.getD_some]
-          simp only [show i + (j - min i c.size) = i by omega]
-        · omega
-        · omega
-      · omega
-      · simp only [show i + 1 + (j - min (i + 1) c.size) = i + (j - min i c.size) by omega]
+    intro i hs
+    have hP := Native.write_prefix (Array.ofFn (fun k : Fin i ↦ f k.val)) n (f i)
+      (by rw [Array.size_ofFn]; omega)
+    rw [Array.size_ofFn] at hP
+    rw [Native.generateGo, hP, ofFn_push, ih (i + 1) (by omega),
+      show i + 1 + n = i + (n + 1) by omega]
+
+/-- The packed generator is the encoding of its indexed array. -/
+theorem Native.generate_eq (n : Nat) (f : Nat → UInt32) :
+    Native.generate n f = Storage.pack (Array.ofFn (fun i : Fin n ↦ f i.val)) := by
+  unfold Native.generate
+  split
+  · rename_i hs
+    have h := Native.generateGo_pack f n 0 (by omega)
+    rw [Array.ofFn_zero, Array.empty_append, Nat.zero_add] at h
+    rw [Native.zeroWords_eq, h]
+  · rfl
 
 /-- The executable encoder realizes the packed field-array representation. -/
 theorem Native.encode_eq (a : Array KoalaBear.Fast.Field) : Native.encode a = packFields a := by
-  unfold Native.encode
-  split
-  · rename_i hs
-    rw [Native.zeroWords_packFields, Native.encodeGo_packFields a _
-      (by rwa [size_packFields]) _ 0 Array.size_replicate (by omega)]
-    simp only [Array.extract_zero, Array.empty_append, Array.extract_size]
-  · rfl
+  rw [Native.encode, Native.generate_eq, packFields]
+  congr 1
+  apply Array.ext
+  · simp only [Array.size_ofFn, Array.size_map]
+  · intro j h1 h2
+    simp only [Array.getElem_ofFn, Array.getElem_map, Array.getD_eq_getD_getElem?,
+      Array.getElem?_eq_getElem (show j < a.size by simpa only [Array.size_ofFn] using h1),
+      Option.getD_some]
 
 end CompPoly.CPolynomial.NTTFast.Packed
