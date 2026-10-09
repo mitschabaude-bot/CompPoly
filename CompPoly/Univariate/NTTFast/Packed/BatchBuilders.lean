@@ -13,20 +13,40 @@ public import CompPoly.Univariate.NTTFast.Packed.PartitionKernels
 @[expose] public section
 namespace CompPoly.CPolynomial.NTTFast.Packed
 
-/-- A loop whose iterations preserve the packed representation has a field-array fold model. -/
-theorem forIn_packFields (xs : List Nat)
+/-- A loop whose iterations write one 16-word batch at the end of a written prefix has a
+field-array fold model: the prefix grows by the fold and the rest of the buffer shrinks by the
+batches written. -/
+theorem forIn_packFields (off n : Nat)
     (step : Nat → Option ByteArray × ByteArray → Id (ForInStep (Option ByteArray × ByteArray)))
     (f : Nat → Array KoalaBear.Fast.Field → Array KoalaBear.Fast.Field)
-    (hstep : ∀ i ∈ xs, ∀ a, step i (none, packFields a) = .yield (none, packFields (f i a)))
-    (a : Array KoalaBear.Fast.Field) :
-    forIn xs (none, packFields a) step =
-      (none, packFields (xs.foldl (fun acc i ↦ f i acc) a)) := by
-  induction xs generalizing a with
-  | nil => rfl
-  | cons i xs ih =>
-    simp only [List.forIn_cons, hstep i (by simp only [List.mem_cons, true_or]) a,
-      List.foldl_cons]
-    exact ih (fun j hj b ↦ hstep j (List.mem_cons_of_mem i hj) b) _
+    (hstep : ∀ i ∈ List.range' off n, ∀ l Z, l.size = 16 * i → 16 ≤ Z.size →
+      (packFields (l ++ Z)).size < USize.size →
+      step i (none, packFields (l ++ Z)) = .yield (none, packFields (f i l ++ Z.extract 16 Z.size)))
+    (hf : ∀ i l, (f i l).size = l.size + 16)
+    (l Z : Array KoalaBear.Fast.Field) (hl : l.size = 16 * off) (hZ : 16 * n ≤ Z.size)
+    (hs : (packFields (l ++ Z)).size < USize.size) :
+    forIn (List.range' off n) (none, packFields (l ++ Z)) step =
+      (none, packFields ((List.range' off n).foldl (fun acc i ↦ f i acc) l ++
+        Z.extract (16 * n) Z.size)) := by
+  induction n generalizing off l Z with
+  | zero => simp only [List.range'_zero, List.forIn_nil, List.foldl_nil, Nat.mul_zero,
+    Array.extract_size]; rfl
+  | succ n ih =>
+    rw [List.range'_succ, List.forIn_cons,
+      hstep off (List.mem_range'.mpr ⟨0, by omega, by omega⟩) l Z hl (by omega) hs]
+    simp only [List.foldl_cons]
+    change forIn (List.range' (off + 1) n) (none, packFields (f off l ++ Z.extract 16 Z.size))
+      step = _
+    have hs' : (packFields (f off l ++ Z.extract 16 Z.size)).size < USize.size := by
+      simp only [size_packFields, Array.size_append, Array.size_extract, hf] at hs ⊢
+      omega
+    rw [ih (off + 1) (fun j hj ↦ hstep j (List.mem_range'_1.mpr (by
+        have := List.mem_range'_1.mp hj
+        omega))) (f off l) (Z.extract 16 Z.size) (by rw [hf]; omega)
+      (by simp only [Array.size_extract]; omega) hs',
+      extract_extract_tail]
+    congr 4
+    omega
 
 /-- Consecutive batches concatenate to one indexed array. -/
 theorem fold_append_batches (f : Nat → α) (offset count : Nat) (a : Array α) :

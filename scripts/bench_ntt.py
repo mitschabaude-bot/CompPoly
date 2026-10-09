@@ -62,7 +62,7 @@ def run(args, common, allowed):
         fixtures[log_n] = path
     manifest = {
         "build": build, "cpus": cpus, "workers": workers, "physical_cores": physical_cores, "runs": args.runs,
-        "rust_ntt": rust_ntt, "lean_ntt": {"packed": {"implementation": "NTTFast.Packed.Plan", "task_depth": depth, "storage_externs": 2}, "packed-io": {"implementation": "NTTFast.Packed.Plan.forwardPacked/inversePacked", "task_depth": depth, "storage_externs": 2}, "externless": {"implementation": "NTTFast.NaturalPlan", "max_arithmetic_workers": workers, "serial_below_log_n": 18}, "leanc_args": ["-march=native"]}, "ordering": "natural input and output",
+        "rust_ntt": rust_ntt, "lean_ntt": {"packed": {"implementation": "NTTFast.Packed.Plan", "task_depth": depth, "storage": "ByteArray.ugetUInt32LE/usetUInt32LE (lean4#14053 backport)"}, "packed-io": {"implementation": "NTTFast.Packed.Plan.forwardPacked/inversePacked", "task_depth": depth, "storage": "ByteArray.ugetUInt32LE/usetUInt32LE (lean4#14053 backport)"}, "externless": {"implementation": "NTTFast.NaturalPlan", "max_arithmetic_workers": workers, "serial_below_log_n": 18}, "leanc_args": ["-march=native"]}, "ordering": "natural input and output",
         "cpu_model": next(s.split(":", 1)[1].strip() for s in Path("/proc/cpuinfo").read_text().splitlines() if s.startswith("model name")),
         "memory_gib": int(Path("/proc/meminfo").read_text().splitlines()[0].split()[1]) / 1024**2,
         "os": platform.freedesktop_os_release()["PRETTY_NAME"], "kernel": platform.release(),
@@ -105,7 +105,7 @@ def run(args, common, allowed):
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     if args.validate_only:
         return
-    lines = ["# KoalaBear NTT: Lean vs optimized Plonky3", "", "Milliseconds per complete transform; median of paired run medians ± between-run MAD. All implementations receive the same CPU budget. All Lean pipelines are fully proved: packed Lean uses two native storage externs, either with packed Montgomery words in and out (packed I/O) or with field arrays; externless Lean uses ordinary field arrays and parallel segments above 2^18 elements. Lean / Rust > 1 means Rust is faster.", "",
+    lines = ["# KoalaBear NTT: Lean vs optimized Plonky3", "", "Milliseconds per complete transform; median of paired run medians ± between-run MAD. All implementations receive the same CPU budget. All Lean pipelines are fully proved: packed Lean stores packed words with the `ByteArray` word accessors proposed for Lean core, either with packed Montgomery words in and out (packed I/O) or with field arrays; externless Lean uses ordinary field arrays and parallel segments above 2^18 elements. Lean / Rust > 1 means Rust is faster.", "",
              "| Elements | Direction | Packed I/O Lean | Packed Lean | Externless Lean | Plonky3 | Packed I/O / Rust | Packed / Rust | Externless / Rust |", "|---:|---|---:|---:|---:|---:|---:|---:|---:|"]
     for log_n in sizes:
         for direction in ("forward", "inverse"):

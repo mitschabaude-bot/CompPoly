@@ -230,10 +230,10 @@ theorem storeWords_half (O : Array UInt32) (off : USize) (idx : Nat) (ho : off.t
     exact Native.storeWords_replace_pack O off 8 idx (by decide) ho hi hs _ _ _ _ _ _ _ _ _ _ _ _
       _ _ _ _
   · rename_i hi
-    rw [Storage.size_pack] at hs
-    simp only [Native.storeWords, ↓reduceIte, Bool.false_eq_true, ho, Storage.size_pack,
-      show (8 : UInt8).toNat = 8 from rfl,
-      show ¬(4 * idx + 4 * 8 ≤ 4 * O.size ∧ 4 * idx + 4 * 8 < USize.size) by omega, ite_self]
+    have hf := (Native.storeWords_fits O off 8 idx (by decide) ho hs).not.mpr hi
+    simp only [Native.storeWords_eq, ↓reduceIte, Bool.false_eq_true,
+      show (8 : UInt8).toNat = 8 from rfl, show ¬(8 > 16) by decide] at hf ⊢
+    exact ite_eq_right_iff.mpr (fun h ↦ absurd h hf)
 
 /-- The byte offset of half `half` of line `bitrev (16 c + T)`. -/
 theorem lineOffset (mm : Nat) (hm : 0 < mm) (h32 : mm ≤ 32) (c T half : USize)

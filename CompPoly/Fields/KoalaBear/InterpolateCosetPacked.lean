@@ -92,8 +92,7 @@ end Quad
 
 /-- The words of a byte array, as residues. -/
 def decodeWords (b : ByteArray) : Array Field :=
-  Array.ofFn (n := b.size / 4) fun k ↦
-    ofWordMod (Native.readRaw b k.val.toUSize 0 true (by intro h; cases h))
+  Array.ofFn (n := b.size / 4) fun k ↦ ofWordMod (b.getUInt32LE! (4 * k.val))
 
 namespace InterpolatePacked
 

@@ -106,11 +106,9 @@ namespace InterpolatePacked
 
 /-- An unchecked read is the word at its index. -/
 theorem readUOffset_eq (b : ByteArray) (i o : USize) (h) :
-    Native.readUOffset b i o h = Storage.wordAt b (i.toNat + o.toNat) := by
+    Native.readUOffset b i o h = b.getUInt32LE! (4 * (i.toNat + o.toNat)) := by
   have hb : 4 * (i.toNat + o.toNat) + 3 < USize.size := h.1.trans h.2
-  simp only [Native.readUOffset, Native.readRaw, Bool.false_and, Bool.false_eq_true, ↓reduceIte,
-    Native.wordOffset_toNat i o hb]
-  rfl
+  rw [Native.readUOffset, Native.ugetUInt32LE_eq, Native.wordOffset_toNat i o hb]
 
 /-- Word `4 r + k` of a word array: coordinate `k` of row `r`. -/
 def row (W : Array UInt32) (r k : ℕ) : UInt32 := W.getD (4 * r + k) 0
@@ -241,7 +239,7 @@ theorem forward_spec (ω z0 k0 k1 z2x2 : Field) (n : ℕ) (i : USize) (x acc : F
 
 theorem readField_pack (W : Array UInt32) (i o : USize) (h) :
     readField (Storage.pack W) i o h = wordField (W.getD (i.toNat + o.toNat) 0) := by
-  rw [readField, readUOffset_eq, Storage.wordAt_pack]
+  rw [readField, readUOffset_eq, Storage.getUInt32LE!_pack]
 
 /-- Peeling one norm off the inverse of a prefix product. -/
 theorem inv_mul_prefix (p m : Field) (hp : p ≠ 0) (hm : m ≠ 0) :
@@ -336,8 +334,8 @@ theorem backward_spec (z0 : Field) (X T2 Nn Pp : ℕ → Field) (n : ℕ) (i : U
 /-- Term `r` of a column sum: the residue of evaluation word `e + r · width` times coordinate `k`
 of row `r`'s weights. -/
 def dotTerm (evals buf : ByteArray) (e width w r k : ℕ) : KoalaBear.Field :=
-  FastField.toField (ofWordMod (Storage.wordAt evals (e + r * width)) : Field) *
-    FastField.toField (wordField (Storage.wordAt buf (w + 4 * r + k)))
+  FastField.toField (ofWordMod (evals.getUInt32LE! (4 * (e + r * width))) : Field) *
+    FastField.toField (wordField (buf.getUInt32LE! (4 * (w + 4 * r + k))))
 
 theorem dot1_spec (evals buf : ByteArray) (width : USize) (n : ℕ) (e w : USize)
     (a0 a1 a2 a3 : Acc) (h) :
@@ -427,15 +425,15 @@ theorem dot4_eq (evals buf : ByteArray) (width : USize) (n : ℕ) (e w : USize)
 
 /-- Rows `0, …, b - 1` of `buf` hold weights whose column sums are `wt r`. -/
 def WeightsAt (buf : ByteArray) (z : Ext4) (wt : ℕ → KoalaBear.Ext4) (b : ℕ) : Prop :=
-  ∀ r < b, Ext4.toSpec (Quad.combine z ⟨wordField (Storage.wordAt buf (4 * r)),
-    wordField (Storage.wordAt buf (4 * r + 1)), wordField (Storage.wordAt buf (4 * r + 2)),
-    wordField (Storage.wordAt buf (4 * r + 3))⟩) = wt r
+  ∀ r < b, Ext4.toSpec (Quad.combine z ⟨wordField (buf.getUInt32LE! (4 * (4 * r))),
+    wordField (buf.getUInt32LE! (4 * (4 * r + 1))), wordField (buf.getUInt32LE! (4 * (4 * r + 2))),
+    wordField (buf.getUInt32LE! (4 * (4 * r + 3)))⟩) = wt r
 
 /-- The block's sum of column `c`. -/
 def colBlock (evals : ByteArray) (width row b c : ℕ) (wt : ℕ → KoalaBear.Ext4) :
     KoalaBear.Ext4 :=
   ∑ r ∈ Finset.range b,
-    FastField.toField (ofWordMod (Storage.wordAt evals ((row + r) * width + c)) : Field) • wt r
+    FastField.toField (ofWordMod (evals.getUInt32LE! (4 * ((row + r) * width + c))) : Field) • wt r
 
 /-- A column's sums give the column's block sum. -/
 theorem toSpec_combine_dot1 (evals buf : ByteArray) (z : Ext4) (wt : ℕ → KoalaBear.Ext4)
@@ -630,7 +628,7 @@ theorem toSpec_weight (z : Ext4) (x : Field) :
 /-- Term `R` of column `c`: the residue of its word times the weight of node `s ω^R`. -/
 def rowTerm (evals : ByteArray) (width : ℕ) (ω s : Field) (z : Ext4) (R c : ℕ) :
     KoalaBear.Ext4 :=
-  FastField.toField (ofWordMod (Storage.wordAt evals (R * width + c)) : Field) •
+  FastField.toField (ofWordMod (evals.getUInt32LE! (4 * (R * width + c))) : Field) •
     specWeight z (FastField.toField s * FastField.toField ω ^ R)
 
 theorem pack_zeros (m : ℕ) : ByteArray.mk (Array.replicate (4 * m) 0) =
@@ -665,7 +663,7 @@ theorem weightsAt_passes (z : Ext4) (ω x : Field) (b : ℕ) (W2 : Array UInt32)
     WeightsAt (Storage.pack W2) z (fun r ↦ specWeight z (FastField.toField (nodeAt ω x r))) b := by
   intro r hr
   obtain ⟨h0, h1, h2, h3⟩ := hrows r hr
-  simp only [Storage.wordAt_pack]
+  simp only [Storage.getUInt32LE!_pack]
   rw [show W2.getD (4 * r) 0 = row W2 r 0 from rfl,
     show W2.getD (4 * r + 1) 0 = row W2 r 1 from rfl,
     show W2.getD (4 * r + 2) 0 = row W2 r 2 from rfl,
@@ -826,17 +824,10 @@ end InterpolatePacked
 
 open InterpolatePacked
 
-theorem getD_decodeWords (b : ByteArray) (k : ℕ) (hk : k < b.size / 4)
-    (hb : b.size < USize.size) :
-    (decodeWords b).getD k 0 = ofWordMod (Storage.wordAt b k) := by
-  have hkt : k.toUSize.toNat = k := toUSize_toNat_of_lt k b.size (by omega) hb
-  have hw := Native.wordOffset_toNat k.toUSize 0 (by rw [hkt, USize.toNat_zero]; omega)
-  rw [hkt, USize.toNat_zero, Nat.add_zero] at hw
+theorem getD_decodeWords (b : ByteArray) (k : ℕ) (hk : k < b.size / 4) :
+    (decodeWords b).getD k 0 = ofWordMod (b.getUInt32LE! (4 * k)) := by
   rw [decodeWords, Array.getD_eq_getD_getElem?, Array.getElem?_ofFn]
-  simp only [hk, ↓reduceDIte, Option.getD_some, Native.readRaw, hw, Bool.true_and,
-    show 4 * k + 3 < b.size by omega, show 4 * k + 3 < USize.size by omega, and_self,
-    decide_true, Bool.not_true, Bool.false_eq_true, ↓reduceIte]
-  rfl
+  simp only [hk, ↓reduceDIte, Option.getD_some]
 
 /-- **Correctness of `interpolateCosetPacked`.** For a point off the coset, it computes
 `interpolateCoset` on the matrix's words, read as residues. -/
@@ -871,7 +862,7 @@ theorem interpolateCosetPacked_eq (logN : ℕ) (ω s : Field) (width : ℕ) (eva
         have := Nat.mul_le_mul_right width (show R + 1 ≤ 2 ^ logN from hR')
         rw [Nat.add_mul, Nat.one_mul] at this
         omega
-      rw [rowTerm, getD_decodeWords evals _ hk h.2]
+      rw [rowTerm, getD_decodeWords evals _ hk]
       rfl
   · rfl
 

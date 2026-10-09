@@ -35,31 +35,44 @@ theorem storeWords_lit16 (o : Array UInt32) (g : Nat → UInt32) :
   rfl
 
 /-- A checked read at a numeral offset inside a known word range. -/
-theorem readRaw_pack_at (v : Array UInt32) (q : USize) (o : Nat) (ho : o < 16)
+theorem readAt_pack_at (v : Array UInt32) (q : USize) (o : Nat) (ho : o < 16)
     (h : q.toNat + 16 ≤ v.size) (hs : (pack v).size < USize.size) :
-    readRaw (pack v) q (OfNat.ofNat o) true (by intro h; cases h) = v.getD (q.toNat + o) 0 := by
-  rw [readRaw_pack_true v q (OfNat.ofNat o)
+    readAt (pack v) q (OfNat.ofNat o) = v.getD (q.toNat + o) 0 := by
+  rw [readAt_pack v q (OfNat.ofNat o)
     (by rw [usize_numeral o (by omega)]; refine ⟨?_, hs⟩; rw [size_pack]; omega),
     usize_numeral o (by omega)]
 
+/-- A line inside a packed word array that fits machine indices passes the range check. -/
+theorem lineFits_pack (v : Array UInt32) (q : USize) (h : q.toNat + 16 ≤ v.size)
+    (hs : (pack v).size < USize.size) : LineFits (pack v) q := by
+  have hu : (pack v).usize.toNat = 4 * v.size := by
+    rw [ByteArray.usize, Nat.toUSize, USize.toNat_ofNat_of_lt' hs, size_pack]
+  have h16 : (16 : USize).toNat = 16 := usize_numeral 16 (by decide)
+  have h4 : (4 : USize).toNat = 4 := usize_numeral 4 (by decide)
+  have h1 : 16 ≤ (pack v).usize / 4 := by
+    rw [USize.le_iff_toNat_le, USize.toNat_div, h4, h16, hu]; omega
+  refine ⟨h1, ?_⟩
+  rw [USize.le_iff_toNat_le, USize.toNat_sub_of_le _ _ h1, USize.toNat_div, h4, h16, hu]
+  omega
+
 /-- One aligned line of a packed word array. -/
-theorem line_pack (v : Array UInt32) (q : USize) (h : q.toNat + 16 ≤ v.size)
-    (hs : (pack v).size < USize.size) :
-    line (pack v) q = ⟨v.getD (q.toNat + 0) 0, v.getD (q.toNat + 1) 0, v.getD (q.toNat + 2) 0,
+theorem line_pack (v : Array UInt32) (q : USize) (hl) :
+    line (pack v) q hl = ⟨v.getD (q.toNat + 0) 0, v.getD (q.toNat + 1) 0, v.getD (q.toNat + 2) 0,
       v.getD (q.toNat + 3) 0, v.getD (q.toNat + 4) 0, v.getD (q.toNat + 5) 0,
       v.getD (q.toNat + 6) 0, v.getD (q.toNat + 7) 0, v.getD (q.toNat + 8) 0,
       v.getD (q.toNat + 9) 0, v.getD (q.toNat + 10) 0, v.getD (q.toNat + 11) 0,
       v.getD (q.toNat + 12) 0, v.getD (q.toNat + 13) 0, v.getD (q.toNat + 14) 0,
       v.getD (q.toNat + 15) 0⟩ := by
   unfold line
-  rw [readRaw_pack_at v q 0 (by decide) h hs, readRaw_pack_at v q 1 (by decide) h hs,
-    readRaw_pack_at v q 2 (by decide) h hs, readRaw_pack_at v q 3 (by decide) h hs,
-    readRaw_pack_at v q 4 (by decide) h hs, readRaw_pack_at v q 5 (by decide) h hs,
-    readRaw_pack_at v q 6 (by decide) h hs, readRaw_pack_at v q 7 (by decide) h hs,
-    readRaw_pack_at v q 8 (by decide) h hs, readRaw_pack_at v q 9 (by decide) h hs,
-    readRaw_pack_at v q 10 (by decide) h hs, readRaw_pack_at v q 11 (by decide) h hs,
-    readRaw_pack_at v q 12 (by decide) h hs, readRaw_pack_at v q 13 (by decide) h hs,
-    readRaw_pack_at v q 14 (by decide) h hs, readRaw_pack_at v q 15 (by decide) h hs]
+  simp only [ugetUInt32LE_eq, (lineFits_toNat hl 0 (by decide)).1,
+    (lineFits_toNat hl 1 (by decide)).1, (lineFits_toNat hl 2 (by decide)).1,
+    (lineFits_toNat hl 3 (by decide)).1, (lineFits_toNat hl 4 (by decide)).1,
+    (lineFits_toNat hl 5 (by decide)).1, (lineFits_toNat hl 6 (by decide)).1,
+    (lineFits_toNat hl 7 (by decide)).1, (lineFits_toNat hl 8 (by decide)).1,
+    (lineFits_toNat hl 9 (by decide)).1, (lineFits_toNat hl 10 (by decide)).1,
+    (lineFits_toNat hl 11 (by decide)).1, (lineFits_toNat hl 12 (by decide)).1,
+    (lineFits_toNat hl 13 (by decide)).1, (lineFits_toNat hl 14 (by decide)).1,
+    (lineFits_toNat hl 15 (by decide)).1, Storage.getUInt32LE!_pack]
 
 /-- The `c`-th of sixteen word arrays. -/
 def sel16 (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : Array UInt32) (c : Nat) :
@@ -72,61 +85,105 @@ theorem extract_literal16 (x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15
       0 16 = #[x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15] :=
   Array.extract_size
 
-/-- One transposed tile appends rows `q, …, q + 15` of the sixteen-stream interleave. -/
-theorem transposeStep_pack (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 o : Array UInt32)
-    (q : USize)
-    (h : ∀ c < 16, q.toNat + 16 ≤
-      (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c).size)
-    (hs : ∀ c < 16,
-      (pack (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c)).size < USize.size) :
-    transposeStep (pack v0) (pack v1) (pack v2) (pack v3) (pack v4) (pack v5) (pack v6)
-      (pack v7) (pack v8) (pack v9) (pack v10) (pack v11) (pack v12) (pack v13) (pack v14)
-      (pack v15) q (pack o) =
-      pack (o ++ rows (fun u c ↦
-        (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c).getD (q.toNat + u) 0)
-        16) := by
-  unfold transposeStep
-  rw [
-    line_pack v0 q (h 0 (by decide)) (hs 0 (by decide)),
-    line_pack v1 q (h 1 (by decide)) (hs 1 (by decide)),
-    line_pack v2 q (h 2 (by decide)) (hs 2 (by decide)),
-    line_pack v3 q (h 3 (by decide)) (hs 3 (by decide)),
-    line_pack v4 q (h 4 (by decide)) (hs 4 (by decide)),
-    line_pack v5 q (h 5 (by decide)) (hs 5 (by decide)),
-    line_pack v6 q (h 6 (by decide)) (hs 6 (by decide)),
-    line_pack v7 q (h 7 (by decide)) (hs 7 (by decide)),
-    line_pack v8 q (h 8 (by decide)) (hs 8 (by decide)),
-    line_pack v9 q (h 9 (by decide)) (hs 9 (by decide)),
-    line_pack v10 q (h 10 (by decide)) (hs 10 (by decide)),
-    line_pack v11 q (h 11 (by decide)) (hs 11 (by decide)),
-    line_pack v12 q (h 12 (by decide)) (hs 12 (by decide)),
-    line_pack v13 q (h 13 (by decide)) (hs 13 (by decide)),
-    line_pack v14 q (h 14 (by decide)) (hs 14 (by decide)),
-    line_pack v15 q (h 15 (by decide)) (hs 15 (by decide))]
-  simp only [storeWords_append_pack _ 0 16 (by decide), extract_literal16,
-    show (16 : UInt8).toNat = 16 from rfl]
-  simp only [rows, lit16, Array.append_assoc, Array.empty_append]
-  rfl
+/-- A sixteen-word store at the end of a written prefix extends the prefix. -/
+theorem write16U_pack_cursor (o Z : Array UInt32) (p : USize) (hp : p.toNat = o.size)
+    (hZ : 16 ≤ Z.size) (hs : (pack (o ++ Z)).size < USize.size)
+    (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) :
+    write16U (pack (o ++ Z)) p v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 =
+      pack (o ++ #[v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15] ++
+        Z.extract 16 Z.size) := by
+  have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
+  rw [size_pack, Array.size_append] at hs
+  unfold write16U
+  rw [storeWords_replace_pack (o ++ Z) (p * 4) 16 o.size (by decide)
+    (by rw [USize.toNat_mul, usize_numeral 4 (by decide), hsize, Nat.mod_eq_of_lt (by omega)]
+        omega)
+    (by simp only [Array.size_append, show (16 : UInt8).toNat = 16 from rfl]; omega)
+    (by rw [size_pack, Array.size_append]; omega)]
+  simp only [show (16 : UInt8).toNat = 16 from rfl, extract_literal16]
+  have := splice_cursor o Z
+    #[v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15] hZ
+  simp only [splice, List.size_toArray, List.length_cons, List.length_nil] at this
+  rw [this]
 
 /-- Adding a small numeral to a machine index that cannot wrap. -/
 theorem usize_add_numeral (q : USize) (k : Nat) (hk : k < 4294967296)
     (h : q.toNat + k < USize.size) : (q + OfNat.ofNat k).toNat = q.toNat + k := by
   rw [USize.toNat_add, usize_numeral k hk, Nat.mod_eq_of_lt h]
 
-/-- Repeated transposed tiles append consecutive interleave rows. -/
+set_option maxHeartbeats 1000000 in
+/-- One transposed tile stores rows `q, …, q + 15` of the sixteen-stream interleave at output
+word `p`, the end of the written prefix. -/
+theorem transposeStep_pack (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 o Z :
+    Array UInt32) (q p : USize)
+    (h : ∀ c < 16, q.toNat + 16 ≤
+      (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c).size)
+    (hs : ∀ c < 16,
+      (pack (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c)).size < USize.size)
+    (hp : p.toNat = o.size) (hZ : 256 ≤ Z.size) (ho : (pack (o ++ Z)).size < USize.size) :
+    transposeStep (pack v0) (pack v1) (pack v2) (pack v3) (pack v4) (pack v5) (pack v6)
+      (pack v7) (pack v8) (pack v9) (pack v10) (pack v11) (pack v12) (pack v13) (pack v14)
+      (pack v15) q (pack (o ++ Z)) p =
+      pack (o ++ rows (fun u c ↦
+        (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c).getD (q.toNat + u) 0)
+        16 ++ Z.extract 256 Z.size) := by
+  have hsz := ho
+  rw [size_pack, Array.size_append] at hsz
+  have hf : ∀ c < 16,
+      LineFits (pack (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c)) q :=
+    fun c hc ↦ lineFits_pack _ q (h c hc) (hs c hc)
+  have hcond := And.intro (hf 0 (by decide)) <| And.intro (hf 1 (by decide)) <|
+    And.intro (hf 2 (by decide)) <| And.intro (hf 3 (by decide)) <|
+    And.intro (hf 4 (by decide)) <| And.intro (hf 5 (by decide)) <|
+    And.intro (hf 6 (by decide)) <| And.intro (hf 7 (by decide)) <|
+    And.intro (hf 8 (by decide)) <| And.intro (hf 9 (by decide)) <|
+    And.intro (hf 10 (by decide)) <| And.intro (hf 11 (by decide)) <|
+    And.intro (hf 12 (by decide)) <| And.intro (hf 13 (by decide)) <|
+    And.intro (hf 14 (by decide)) (hf 15 (by decide))
+  unfold transposeStep
+  split
+  swap
+  · rename_i hneg; exact absurd hcond hneg
+  simp only [line_pack]
+  rw [write16U_pack_cursor _ _ p ?hp0 ?hz0 ?hs0]
+  rw [write16U_pack_cursor _ _ (p + 16) ?hp1 ?hz1 ?hs1]
+  rw [write16U_pack_cursor _ _ (p + 32) ?hp2 ?hz2 ?hs2]
+  rw [write16U_pack_cursor _ _ (p + 48) ?hp3 ?hz3 ?hs3]
+  rw [write16U_pack_cursor _ _ (p + 64) ?hp4 ?hz4 ?hs4]
+  rw [write16U_pack_cursor _ _ (p + 80) ?hp5 ?hz5 ?hs5]
+  rw [write16U_pack_cursor _ _ (p + 96) ?hp6 ?hz6 ?hs6]
+  rw [write16U_pack_cursor _ _ (p + 112) ?hp7 ?hz7 ?hs7]
+  rw [write16U_pack_cursor _ _ (p + 128) ?hp8 ?hz8 ?hs8]
+  rw [write16U_pack_cursor _ _ (p + 144) ?hp9 ?hz9 ?hs9]
+  rw [write16U_pack_cursor _ _ (p + 160) ?hp10 ?hz10 ?hs10]
+  rw [write16U_pack_cursor _ _ (p + 176) ?hp11 ?hz11 ?hs11]
+  rw [write16U_pack_cursor _ _ (p + 192) ?hp12 ?hz12 ?hs12]
+  rw [write16U_pack_cursor _ _ (p + 208) ?hp13 ?hz13 ?hs13]
+  rw [write16U_pack_cursor _ _ (p + 224) ?hp14 ?hz14 ?hs14]
+  rw [write16U_pack_cursor _ _ (p + 240) ?hp15 ?hz15 ?hs15]
+  · simp only [extract_extract_tail, Nat.reduceAdd]
+    simp only [rows, lit16, Array.append_assoc, Array.empty_append]
+    rfl
+  all_goals (try rw [usize_add_numeral])
+  all_goals (try simp only [size_pack, Array.size_append, Array.size_extract, List.size_toArray,
+    List.length_cons, List.length_nil])
+  all_goals omega
+
+/-- Repeated transposed tiles append consecutive interleave rows to a written prefix. -/
 theorem transposeGo_pack (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : Array UInt32)
-    (count : Nat) (q : USize) (o : Array UInt32)
+    (count : Nat) (q p : USize) (o : Array UInt32)
     (h : ∀ c < 16, q.toNat + 16 * count ≤
       (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c).size)
     (hs : ∀ c < 16,
-      (pack (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c)).size < USize.size) :
+      (pack (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c)).size < USize.size)
+    (hp : p.toNat = o.size) (ho : 4 * (o.size + 256 * count) < USize.size) :
     transposeGo (pack v0) (pack v1) (pack v2) (pack v3) (pack v4) (pack v5) (pack v6) (pack v7)
       (pack v8) (pack v9) (pack v10) (pack v11) (pack v12) (pack v13) (pack v14) (pack v15)
-      count q (pack o) =
+      count q p (pack o) =
       pack (o ++ rows (fun u c ↦
         (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c).getD (q.toNat + u) 0)
         (16 * count)) := by
-  induction count generalizing q o with
+  induction count generalizing q p o with
   | zero => simp only [transposeGo, rows, Array.append_empty]
   | succ count ih =>
     have hq : q.toNat + 16 < USize.size := by
@@ -134,10 +191,23 @@ theorem transposeGo_pack (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 
       have hs0 := hs 0 (by decide)
       rw [size_pack] at hs0
       omega
-    rw [transposeGo, transposeStep_pack v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 o q
-        (fun c hc ↦ by have := h c hc; omega) hs,
-      ih (q + 16) _
-        (fun c hc ↦ by rw [usize_add_numeral q 16 (by decide) hq]; have := h c hc; omega),
+    have hZ : (Array.replicate 256 (0 : UInt32)).extract 256
+        (Array.replicate 256 (0 : UInt32)).size = #[] :=
+      Array.extract_eq_empty_of_le (by simp)
+    have hoZ : (pack (o ++ Array.replicate 256 0)).size < USize.size := by
+      rw [size_pack, Array.size_append, Array.size_replicate]
+      exact Nat.lt_of_le_of_lt (by omega) ho
+    rw [transposeGo, extendZeros_pack,
+      transposeStep_pack v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
+        o (Array.replicate 256 0) q p (fun c hc ↦ by have := h c hc; omega) hs hp
+        (by rw [Array.size_replicate]) hoZ,
+      hZ, Array.append_empty,
+      ih (q + 16) (p + 256) (o ++ rows (fun u c ↦
+          (sel16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 c).getD (q.toNat + u) 0) 16)
+        (fun c hc ↦ by rw [usize_add_numeral q 16 (by decide) hq]; have := h c hc; omega)
+        (by rw [usize_add_numeral p 256 (by decide) (by omega), Array.size_append, size_rows,
+          hp])
+        (by rw [Array.size_append, size_rows]; omega),
       show 16 * (count + 1) = 16 + 16 * count by omega, rows_add, Array.append_assoc,
       usize_add_numeral q 16 (by decide) hq]
     simp only [Nat.add_assoc]
@@ -170,12 +240,14 @@ theorem bitRevNat_add_low (m q u : Nat) (hm : 4 ≤ m) (hq : 16 ∣ q) (hu : u <
   ring
 
 /-- One reversal step appends sixteen consecutive locally reversed words. -/
-theorem leafRevStep_pack (w o : Array UInt32) (m : Nat) (f : UInt32) (sc : Bool)
+theorem leafRevStep_pack (w o Z : Array UInt32) (m : Nat) (f : UInt32) (sc : Bool)
     (hm4 : 4 ≤ m) (hm : m ≤ 32) (hw : w.size = 2 ^ m) (hs : (pack w).size < USize.size)
-    (q : USize) (hq16 : 16 ∣ q.toNat) (hq : q.toNat + 16 ≤ 2 ^ m) :
-    leafRevStep (pack w) (32 - m).toUInt32 f sc (2 ^ (m - 4)).toUSize q (pack o) =
-      pack (o ++ lit16 fun u ↦
-        scaleWord f sc (w.getD (NTT.Transform.bitRevNat m (q.toNat + u)) 0)) := by
+    (q : USize) (hq16 : 16 ∣ q.toNat) (hq : q.toNat + 16 ≤ 2 ^ m) (hqo : q.toNat = o.size)
+    (hZ : 16 ≤ Z.size) (ho : (pack (o ++ Z)).size < USize.size) :
+    leafRevStep (pack w) (32 - m).toUInt32 f sc (2 ^ (m - 4)).toUSize q (pack (o ++ Z)) =
+      pack (o ++ lit16 (fun u ↦
+        scaleWord f sc (w.getD (NTT.Transform.bitRevNat m (q.toNat + u)) 0)) ++
+        Z.extract 16 Z.size) := by
   have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
   have hsz := hs
   rw [size_pack, hw] at hsz
@@ -220,9 +292,9 @@ theorem leafRevStep_pack (w o : Array UInt32) (m : Nat) (f : UInt32) (sc : Bool)
     readWord_stride w _ 11 _ (by decide) (hk 11 (by decide)) hs,
     readWord_stride w _ 7 _ (by decide) (hk 7 (by decide)) hs,
     readWord_stride w _ 15 _ (by decide) (hk 15 (by decide)) hs]
-  simp only [storeWords_append_pack _ 0 16 (by decide), extract_literal16,
-    show (16 : UInt8).toNat = 16 from rfl, hr, hS]
-  congr 2
+  rw [write16U_pack_cursor o Z q hqo hZ ho]
+  simp only [hr, hS]
+  congr 3
   simp only [lit16]
   rw [hidx 0 (by decide), hidx 1 (by decide), hidx 2 (by decide), hidx 3 (by decide),
     hidx 4 (by decide), hidx 5 (by decide), hidx 6 (by decide), hidx 7 (by decide),
@@ -233,21 +305,27 @@ theorem leafRevStep_pack (w o : Array UInt32) (m : Nat) (f : UInt32) (sc : Bool)
 /-- Repeated reversal steps append consecutive locally reversed words. -/
 theorem leafRevGo_pack (w : Array UInt32) (m : Nat) (f : UInt32) (sc : Bool)
     (hm4 : 4 ≤ m) (hm : m ≤ 32) (hw : w.size = 2 ^ m) (hs : (pack w).size < USize.size)
-    (count : Nat) (q : USize) (o : Array UInt32) (hq16 : 16 ∣ q.toNat)
-    (hq : q.toNat + 16 * count ≤ 2 ^ m) :
-    leafRevGo (pack w) (32 - m).toUInt32 f sc (2 ^ (m - 4)).toUSize count q (pack o) =
+    (count : Nat) (q : USize) (o Z : Array UInt32) (hq16 : 16 ∣ q.toNat)
+    (hq : q.toNat + 16 * count ≤ 2 ^ m) (hqo : q.toNat = o.size) (hZ : 16 * count ≤ Z.size)
+    (ho : (pack (o ++ Z)).size < USize.size) :
+    leafRevGo (pack w) (32 - m).toUInt32 f sc (2 ^ (m - 4)).toUSize count q (pack (o ++ Z)) =
       pack (o ++ rows (fun j u ↦
         scaleWord f sc (w.getD (NTT.Transform.bitRevNat m (q.toNat + (16 * j + u))) 0))
-        count) := by
-  induction count generalizing q o with
-  | zero => simp only [leafRevGo, rows, Array.append_empty]
+        count ++ Z.extract (16 * count) Z.size) := by
+  induction count generalizing q o Z with
+  | zero => simp only [leafRevGo, rows, Array.append_empty, Nat.mul_zero, Array.extract_size]
   | succ count ih =>
     have hsz := hs
     rw [size_pack, hw] at hsz
+    have hsz' := ho
+    rw [size_pack, Array.size_append] at hsz'
     have h16 : (q + 16).toNat = q.toNat + 16 := usize_add_numeral q 16 (by decide) (by omega)
-    rw [leafRevGo, leafRevStep_pack w o m f sc hm4 hm hw hs q hq16 (by omega),
-      ih (q + 16) _ (by rw [h16]; exact Nat.dvd_add hq16 (dvd_refl 16)) (by rw [h16]; omega),
-      Nat.add_comm count 1, rows_add, Array.append_assoc, h16]
+    rw [leafRevGo, leafRevStep_pack w o Z m f sc hm4 hm hw hs q hq16 (by omega) hqo (by omega) ho,
+      ih (q + 16) _ _ (by rw [h16]; exact Nat.dvd_add hq16 (dvd_refl 16)) (by rw [h16]; omega)
+        (by rw [h16, Array.size_append, size_lit16]; omega)
+        (by simp only [Array.size_extract]; omega)
+        (by simp only [size_pack, Array.size_append, size_lit16, Array.size_extract]; omega),
+      extract_extract_tail, Nat.add_comm count 1, rows_add, Array.append_assoc, h16]
     have e1 : rows (fun j u ↦ scaleWord f sc
         (w.getD (NTT.Transform.bitRevNat m (q.toNat + (16 * j + u))) 0)) 1 =
         lit16 (fun u ↦ scaleWord f sc
@@ -259,7 +337,8 @@ theorem leafRevGo_pack (w : Array UInt32) (m : Nat) (f : UInt32) (sc : Bool)
           (w.getD (NTT.Transform.bitRevNat m (q.toNat + (16 * (1 + j) + u))) 0)) := by
       funext j u
       rw [show q.toNat + 16 + (16 * j + u) = q.toNat + (16 * (1 + j) + u) by omega]
-    rw [e1, e2]
+    rw [e1, e2, show 16 + 16 * count = 16 * (1 + count) by omega]
+    simp only [Array.append_assoc]
 
 /-- A complete reversed leaf: word `i` is leaf word `bitrev i`, optionally scaled. -/
 theorem leafRev_pack (w : Array UInt32) (m : Nat) (f : UInt32) (sc : Bool)
@@ -271,11 +350,19 @@ theorem leafRev_pack (w : Array UInt32) (m : Nat) (f : UInt32) (sc : Bool)
       rw [show m = 4 + (m - 4) by omega, Nat.pow_add]
       exact Nat.dvd_mul_right _ _
     omega
+  have hsz := hs
+  rw [size_pack, hw] at hsz
   unfold leafRev
-  rw [emptyWithCapacity_eq_pack, leafRevGo_pack w m f sc hm4 hm hw hs _ 0 #[]
+  rw [show zeroWords (2 ^ m) = pack (#[] ++ Array.replicate (2 ^ m) 0) by
+      rw [Array.empty_append, zeroWords_eq],
+    leafRevGo_pack w m f sc hm4 hm hw hs _ 0 #[] _
     (by simp only [USize.toNat_zero]; exact Nat.dvd_zero 16)
-    (by simp only [USize.toNat_zero, Nat.zero_add, hdiv, Nat.le_refl])]
-  simp only [Array.empty_append, USize.toNat_zero, Nat.zero_add]
+    (by simp only [USize.toNat_zero, Nat.zero_add, hdiv, Nat.le_refl])
+    (by simp only [USize.toNat_zero, Array.size_empty])
+    (by simp only [Array.size_replicate]; omega)
+    (by simp only [size_pack, Array.size_append, Array.size_replicate, Array.size_empty]; omega),
+    Array.extract_eq_empty_of_le (by simp only [Array.size_replicate]; omega)]
+  simp only [Array.empty_append, Array.append_empty, USize.toNat_zero, Nat.zero_add]
 
 /-- The interleave streams are the reversed leaves in four-bit reversed order. -/
 theorem sel16_bitRev (V : Nat → Array UInt32) (c : Nat) (hc : c < 16) :
@@ -285,7 +372,7 @@ theorem sel16_bitRev (V : Nat → Array UInt32) (c : Nat) (hc : c < 16) :
 
 /-- One interleave block: rows `q` up to `q + 16 * count` of the sixteen reversed leaves. -/
 theorem interleaveRange_pack (V : Nat → Array UInt32) (M q count : Nat)
-    (hV : ∀ l < 16, (V l).size = M) (hq : q + 16 * count ≤ M) (hs : 4 * M < USize.size) :
+    (hV : ∀ l < 16, (V l).size = M) (hq : q + 16 * count ≤ M) (hs : 64 * M < USize.size) :
     interleaveRange ((Array.range 16).map fun l ↦ pack (V l)) q count =
       pack (rows (fun u c ↦ (V (NTT.Transform.bitRevNat 4 c)).getD (q + u) 0) (16 * count)) := by
   have hsize : (2 : Nat) ^ System.Platform.numBits = USize.size := rfl
@@ -299,11 +386,13 @@ theorem interleaveRange_pack (V : Nat → Array UInt32) (M q count : Nat)
     getD_map_range _ 16 10 (by decide), getD_map_range _ 16 11 (by decide),
     getD_map_range _ 16 12 (by decide), getD_map_range _ 16 13 (by decide),
     getD_map_range _ 16 14 (by decide), getD_map_range _ 16 15 (by decide)]
-  rw [emptyWithCapacity_eq_pack, transposeGo_pack (V 0) (V 8) (V 4) (V 12) (V 2) (V 10) (V 6)
-    (V 14) (V 1) (V 9) (V 5) (V 13) (V 3) (V 11) (V 7) (V 15) count q.toUSize #[]
+  rw [show ByteArray.emptyWithCapacity (1024 * count) = pack #[] from rfl,
+    transposeGo_pack (V 0) (V 8) (V 4) (V 12) (V 2) (V 10) (V 6)
+    (V 14) (V 1) (V 9) (V 5) (V 13) (V 3) (V 11) (V 7) (V 15) count q.toUSize 0 #[]
     (fun c hc ↦ by rw [sel16_bitRev V c hc, hqu, hV _ (NTT.Transform.bitRevNat_lt 4 c)]; exact hq)
     (fun c hc ↦ by
-      rw [sel16_bitRev V c hc, size_pack, hV _ (NTT.Transform.bitRevNat_lt 4 c)]; exact hs),
+      rw [sel16_bitRev V c hc, size_pack, hV _ (NTT.Transform.bitRevNat_lt 4 c)]; omega)
+    rfl (by rw [Array.size_empty]; omega),
     Array.empty_append, hqu]
   congr 1
   exact rows_congr _ _ _ (fun j c hc ↦ by rw [sel16_bitRev V c hc])
