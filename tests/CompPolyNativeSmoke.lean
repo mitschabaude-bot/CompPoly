@@ -16,8 +16,8 @@ public import CompPolyTests.NTT.NativeStorage
 
 This executable checks canonical arithmetic in AES, BF64, its cubic extension, GHASH,
 and the binary tower, including packed coefficient evaluation. It also checks
-the packed FFT storage, and the backported `ByteArray` word accessors it uses, against
-independent bytewise Lean operations.
+the backported `ByteArray` word accessors under the packed FFT against independent bytewise
+Lean operations.
 The test guide documents resource limits for native initialization and execution.
 Unlike compile-time guards, this target exercises the linked executable's module initializers.
 The extension product uses the reference vector from the existing BF64 regression tests.

@@ -222,7 +222,7 @@ def spliceHalf (O : Array UInt32) (idx : Nat) (v0 v1 v2 v3 v4 v5 v6 v7 : UInt32)
 /-- A half-line store into packed words. -/
 theorem storeWords_half (O : Array UInt32) (off : USize) (idx : Nat) (ho : off.toNat = 4 * idx)
     (hs : (Storage.pack O).size < USize.size) (v0 v1 v2 v3 v4 v5 v6 v7 : UInt32) :
-    Native.storeWords (Storage.pack O) off 8 false v0 v1 v2 v3 v4 v5 v6 v7 0 0 0 0 0 0 0 0 =
+    Native.storeWords (Storage.pack O) off 8 v0 v1 v2 v3 v4 v5 v6 v7 0 0 0 0 0 0 0 0 =
       Storage.pack (spliceHalf O idx v0 v1 v2 v3 v4 v5 v6 v7) := by
   unfold spliceHalf
   split
@@ -231,7 +231,7 @@ theorem storeWords_half (O : Array UInt32) (off : USize) (idx : Nat) (ho : off.t
       _ _ _ _
   · rename_i hi
     have hf := (Native.storeWords_fits O off 8 idx (by decide) ho hs).not.mpr hi
-    simp only [Native.storeWords_eq, ↓reduceIte, Bool.false_eq_true,
+    simp only [Native.storeWords_eq, ↓reduceIte,
       show (8 : UInt8).toNat = 8 from rfl, show ¬(8 > 16) by decide] at hf ⊢
     exact ite_eq_right_iff.mpr (fun h ↦ absurd h hf)
 

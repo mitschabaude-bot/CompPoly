@@ -67,13 +67,6 @@ theorem size_putWords {n : Nat} (s : {x : ByteArray // x.size = n}) (off : USize
   unfold putWords
   dsimp only
   exact (putWord _ off c 15 60 (by rw [usize_numeral _ (by decide)]) v15 h).property
-/-- Sixty-four zero bytes, the source that grows a buffer before appended words are stored. -/
-def zeroBytes : ByteArray := ⟨Array.replicate 64 0⟩
-theorem size_grow (b : ByteArray) (m : Nat) (hm : m ≤ 64) :
-    (zeroBytes.copySlice 0 b b.size m false).size = b.size + m := by
-  simp only [ByteArray.copySlice, ByteArray.size, Array.size_append, Array.size_extract]
-  simp only [zeroBytes, Array.size_replicate]
-  omega
 theorem toNat_usize_le (b : ByteArray) : b.usize.toNat ≤ b.size := by
   simp only [ByteArray.usize, Nat.toUSize, USize.toNat_ofNat']
   exact Nat.mod_le _ _
@@ -89,36 +82,21 @@ theorem usize_add_toNat_of_le (x y : USize) (h : x ≤ x + y) :
   · exact Nat.mod_eq_of_lt hlt
   · rw [Nat.mod_eq_sub_mod (by omega), Nat.mod_eq_of_lt (by omega)] at h
     omega
-/-- Write or append at most sixteen little-endian words, preserving shared inputs. The range
-checks run on machine words. -/
-@[inline] def storeWords (b : ByteArray) (offset : USize) (count : UInt8) (append : Bool)
+/-- Overwrite at most sixteen little-endian words, preserving shared inputs. The range checks run
+on machine words. -/
+@[inline] def storeWords (b : ByteArray) (offset : USize) (count : UInt8)
     (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) : ByteArray :=
   if hc : count.toNat > 16 then b else
   have h4 : (4 * count.toNat).toUSize.toNat = 4 * count.toNat :=
     USize.toNat_ofNat_of_lt' (by have := USize.le_size; omega)
-  if append then
-    -- Read the end offset before the growth consumes `b`, so that `b` stays exclusive.
-    let n := b.usize
-    if h : n.toNat = b.size ∧ n ≤ n + (4 * count.toNat).toUSize then
-      have hn := usize_add_toNat_of_le _ _ h.2
-      putWords ⟨zeroBytes.copySlice 0 b b.size (4 * count.toNat) false, rfl⟩ n count.toNat
-        v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
-        (by
-          rw [h.1, size_grow b _ (by omega)]
-          have := (n + (4 * count.toNat).toUSize).toNat_lt_size
-          omega)
-    else
-      b ++ Storage.pack (#[v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14,
-        v15].extract 0 count.toNat)
-  else
-    if h : offset ≤ offset + (4 * count.toNat).toUSize ∧
-        offset + (4 * count.toNat).toUSize ≤ b.usize then
-      have hn := usize_add_toNat_of_le _ _ h.1
-      have hb := toNat_usize_le b
-      have he := USize.le_iff_toNat_le.mp h.2
-      putWords ⟨b, rfl⟩ offset count.toNat v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
-        ⟨by omega, by have := (offset + (4 * count.toNat).toUSize).toNat_lt_size; omega⟩
-    else b
+  if h : offset ≤ offset + (4 * count.toNat).toUSize ∧
+      offset + (4 * count.toNat).toUSize ≤ b.usize then
+    have hn := usize_add_toNat_of_le _ _ h.1
+    have hb := toNat_usize_le b
+    have he := USize.le_iff_toNat_le.mp h.2
+    putWords ⟨b, rfl⟩ offset count.toNat v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
+      ⟨by omega, by have := (offset + (4 * count.toNat).toUSize).toNat_lt_size; omega⟩
+  else b
 /-- Word `i + o`, or zero unless its four bytes are in range. -/
 @[inline] def readAt (b : @& ByteArray) (i o : USize) : UInt32 :=
   if h : 4 ≤ b.usize ∧ (i + o) * 4 ≤ b.usize - 4 then
@@ -133,16 +111,11 @@ checks run on machine words. -/
   readAt b i.toUSize 0
 /-- Single-word writes use the same batch storage primitive. -/
 @[inline] def write (b : ByteArray) (i : @& Nat) (v : UInt32) : ByteArray :=
-  storeWords b (i.toUSize * 4) 1 false v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-@[inline] def push (b : ByteArray) (v : UInt32) : ByteArray :=
-  storeWords b 0 1 true v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-@[inline] def write16 (b : ByteArray) (i : @& Nat) (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13
-  v14 v15 : UInt32) : ByteArray :=
-  storeWords b (i.toUSize * 4) 16 false v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
-/-- `write16` at a machine word index, without a natural-number round trip. -/
+  storeWords b (i.toUSize * 4) 1 v 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+/-- Overwrite sixteen words from word index `i`. -/
 @[inline] def write16U (b : ByteArray) (i : USize) (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13
   v14 v15 : UInt32) : ByteArray :=
-  storeWords b (i * 4) 16 false v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
+  storeWords b (i * 4) 16 v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
 /-- A 4 KiB zero block, the source of zero-buffer fills. -/
 def zeroBlock : ByteArray := ⟨Array.replicate 4096 0⟩
 /-- Append zero blocks to `b` until it holds `target` bytes, at most `fuel` times. The source is
@@ -157,17 +130,17 @@ def fillZeros (target : Nat) : Nat → ByteArray → ByteArray
 /-- A buffer of `n` zero words, for kernels that store their output words in place. -/
 def zeroWords (n : Nat) : ByteArray :=
   fillZeros (4 * n) (n / 1024 + 1) (ByteArray.emptyWithCapacity (4 * n))
-/-- Store words `i` up to `i + n` of `a`. -/
-def encodeGo (a : @& Array KoalaBear.Fast.Field) : Nat → Nat → ByteArray → ByteArray
+/-- Store `f i` up to `f (i + n - 1)` at words `i` up to `i + n - 1`. -/
+@[specialize] def generateGo (f : Nat → UInt32) : Nat → Nat → ByteArray → ByteArray
   | 0, _, b => b
-  | n + 1, i, b => encodeGo a n (i + 1) (write b i (a.getD i 0).val)
-/-- Pack a field array, overwriting a zero buffer word by word. -/
+  | n + 1, i, b => generateGo f n (i + 1) (write b i (f i))
+/-- The words `f 0, …, f (n - 1)`, overwriting a zero buffer word by word. -/
+@[specialize] def generate (n : Nat) (f : Nat → UInt32) : ByteArray :=
+  if 4 * n < USize.size then generateGo f n 0 (zeroWords n)
+  else Storage.pack (Array.ofFn fun i : Fin n ↦ f i.val)
+/-- Pack a field array. -/
 def encode (a : Array KoalaBear.Fast.Field) : ByteArray :=
-  if 4 * a.size < USize.size then encodeGo a a.size 0 (zeroWords a.size)
-  else Storage.pack (a.map Subtype.val)
-@[inline] def push16 (b : ByteArray) (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 :
-  UInt32) : ByteArray :=
-  storeWords b 0 16 true v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15
+  generate a.size fun i ↦ (a.getD i 0).val
 def inner (th tl : ByteArray) (q j i0 i1 i2 i3 : Nat) (b : ByteArray) : ByteArray :=
   if j < q then
     let x0 := read b i0
@@ -529,16 +502,15 @@ decreasing_by omega
   let b := write16U b i3 y3_0 y3_1 y3_2 y3_3 y3_4 y3_5 y3_6 y3_7 y3_8 y3_9 y3_10 y3_11 y3_12
     y3_13 y3_14 y3_15
   b
-/-- Overwriting stores keep the buffer size. -/
-theorem size_storeWords_overwrite (b : ByteArray) (offset : USize) (count : UInt8)
+/-- Batch stores keep the buffer size. -/
+theorem size_storeWords (b : ByteArray) (offset : USize) (count : UInt8)
     (v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 : UInt32) :
-    (storeWords b offset count false v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14
+    (storeWords b offset count v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14
       v15).size = b.size := by
   unfold storeWords
   split
   · rfl
-  · simp only [Bool.false_eq_true, ↓reduceIte]
-    split
+  · split
     · exact size_putWords _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     · rfl
 
@@ -546,7 +518,7 @@ theorem size_storeWords_overwrite (b : ByteArray) (offset : USize) (count : UInt
 theorem size_step16 (th tl : ByteArray) (j j1 i0 i1 i2 i3 : USize) (b : ByteArray) (h) :
     (step16 th tl j j1 i0 i1 i2 i3 b h).size = b.size := by
   unfold step16
-  simp only [write16U, size_storeWords_overwrite]
+  simp only [write16U, size_storeWords]
 
 /-- Advancing a machine index by one batch inside a buffer cannot wrap. -/
 theorem usize_add16 (i : USize) (n : Nat) (h : i.toNat + 16 ≤ n) (hn : n < USize.size) :
@@ -874,10 +846,6 @@ def stages (logN : Nat) (tw : Array ByteArray) (a : ByteArray) (nInv : UInt32) (
       let x := read a (2 * block)
       let y := read a (2 * block + 1)
       a := write (write a (2 * block) (add x y)) (2 * block + 1) (sub x y)
-  return a
-@[specialize] def generate (n : Nat) (f : Nat → UInt32) : ByteArray := Id.run do
-  let mut a := ByteArray.emptyWithCapacity (4 * n)
-  for i in [:n] do a := push a (f i)
   return a
 @[noinline] def splitStepLeft (a w : @& ByteArray) (i j : USize) (out : ByteArray) (p : USize)
     (h : 4 * (i.toNat + 15) + 3 < a.size ∧ 4 * (j.toNat + 15) + 3 < a.size ∧

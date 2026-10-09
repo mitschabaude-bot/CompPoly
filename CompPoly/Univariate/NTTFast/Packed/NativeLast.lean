@@ -719,102 +719,102 @@ runs them as vector lanes. -/
   let x7_4_14 := add x7_3_14 x7_3_15
   let x7_4_15 := sub x7_3_14 x7_3_15
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 0).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 0).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_0) (scaleWord factor scale x1_4_0) (scaleWord factor scale x2_4_0)
     (scaleWord factor scale x3_4_0) (scaleWord factor scale x4_4_0) (scaleWord factor scale x5_4_0)
     (scaleWord factor scale x6_4_0) (scaleWord factor scale x7_4_0)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 1).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 1).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_1) (scaleWord factor scale x1_4_1) (scaleWord factor scale x2_4_1)
     (scaleWord factor scale x3_4_1) (scaleWord factor scale x4_4_1) (scaleWord factor scale x5_4_1)
     (scaleWord factor scale x6_4_1) (scaleWord factor scale x7_4_1)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 2).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 2).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_2) (scaleWord factor scale x1_4_2) (scaleWord factor scale x2_4_2)
     (scaleWord factor scale x3_4_2) (scaleWord factor scale x4_4_2) (scaleWord factor scale x5_4_2)
     (scaleWord factor scale x6_4_2) (scaleWord factor scale x7_4_2)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 3).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 3).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_3) (scaleWord factor scale x1_4_3) (scaleWord factor scale x2_4_3)
     (scaleWord factor scale x3_4_3) (scaleWord factor scale x4_4_3) (scaleWord factor scale x5_4_3)
     (scaleWord factor scale x6_4_3) (scaleWord factor scale x7_4_3)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 4).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 4).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_4) (scaleWord factor scale x1_4_4) (scaleWord factor scale x2_4_4)
     (scaleWord factor scale x3_4_4) (scaleWord factor scale x4_4_4) (scaleWord factor scale x5_4_4)
     (scaleWord factor scale x6_4_4) (scaleWord factor scale x7_4_4)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 5).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 5).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_5) (scaleWord factor scale x1_4_5) (scaleWord factor scale x2_4_5)
     (scaleWord factor scale x3_4_5) (scaleWord factor scale x4_4_5) (scaleWord factor scale x5_4_5)
     (scaleWord factor scale x6_4_5) (scaleWord factor scale x7_4_5)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 6).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 6).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_6) (scaleWord factor scale x1_4_6) (scaleWord factor scale x2_4_6)
     (scaleWord factor scale x3_4_6) (scaleWord factor scale x4_4_6) (scaleWord factor scale x5_4_6)
     (scaleWord factor scale x6_4_6) (scaleWord factor scale x7_4_6)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 7).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 7).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_7) (scaleWord factor scale x1_4_7) (scaleWord factor scale x2_4_7)
     (scaleWord factor scale x3_4_7) (scaleWord factor scale x4_4_7) (scaleWord factor scale x5_4_7)
     (scaleWord factor scale x6_4_7) (scaleWord factor scale x7_4_7)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 8).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 8).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_8) (scaleWord factor scale x1_4_8) (scaleWord factor scale x2_4_8)
     (scaleWord factor scale x3_4_8) (scaleWord factor scale x4_4_8) (scaleWord factor scale x5_4_8)
     (scaleWord factor scale x6_4_8) (scaleWord factor scale x7_4_8)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 9).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 9).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_9) (scaleWord factor scale x1_4_9) (scaleWord factor scale x2_4_9)
     (scaleWord factor scale x3_4_9) (scaleWord factor scale x4_4_9) (scaleWord factor scale x5_4_9)
     (scaleWord factor scale x6_4_9) (scaleWord factor scale x7_4_9)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 10).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 10).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_10) (scaleWord factor scale x1_4_10)
     (scaleWord factor scale x2_4_10) (scaleWord factor scale x3_4_10)
     (scaleWord factor scale x4_4_10) (scaleWord factor scale x5_4_10)
     (scaleWord factor scale x6_4_10) (scaleWord factor scale x7_4_10)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 11).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 11).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_11) (scaleWord factor scale x1_4_11)
     (scaleWord factor scale x2_4_11) (scaleWord factor scale x3_4_11)
     (scaleWord factor scale x4_4_11) (scaleWord factor scale x5_4_11)
     (scaleWord factor scale x6_4_11) (scaleWord factor scale x7_4_11)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 12).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 12).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_12) (scaleWord factor scale x1_4_12)
     (scaleWord factor scale x2_4_12) (scaleWord factor scale x3_4_12)
     (scaleWord factor scale x4_4_12) (scaleWord factor scale x5_4_12)
     (scaleWord factor scale x6_4_12) (scaleWord factor scale x7_4_12)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 13).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 13).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_13) (scaleWord factor scale x1_4_13)
     (scaleWord factor scale x2_4_13) (scaleWord factor scale x3_4_13)
     (scaleWord factor scale x4_4_13) (scaleWord factor scale x5_4_13)
     (scaleWord factor scale x6_4_13) (scaleWord factor scale x7_4_13)
     0 0 0 0 0 0 0 0
   let out := storeWords out
-    (4 * (16 * (reverse32 (16 * c + 14).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 14).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_14) (scaleWord factor scale x1_4_14)
     (scaleWord factor scale x2_4_14) (scaleWord factor scale x3_4_14)
     (scaleWord factor scale x4_4_14) (scaleWord factor scale x5_4_14)
     (scaleWord factor scale x6_4_14) (scaleWord factor scale x7_4_14)
     0 0 0 0 0 0 0 0
   storeWords out
-    (4 * (16 * (reverse32 (16 * c + 15).toUInt32 >>> shift).toUSize + 8 * half)) 8 false
+    (4 * (16 * (reverse32 (16 * c + 15).toUInt32 >>> shift).toUSize + 8 * half)) 8
     (scaleWord factor scale x0_4_15) (scaleWord factor scale x1_4_15)
     (scaleWord factor scale x2_4_15) (scaleWord factor scale x3_4_15)
     (scaleWord factor scale x4_4_15) (scaleWord factor scale x5_4_15)

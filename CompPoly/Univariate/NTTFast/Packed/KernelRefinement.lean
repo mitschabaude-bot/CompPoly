@@ -26,10 +26,10 @@ theorem Native.step16_packFields (th tl : Array KoalaBear.Fast.Field)
   have h3 : i3.toNat + 16 ≤ a.size := by rw [size_packFields] at hi3; omega
   rw [size_packFields] at ha
   unfold Native.step16
-  simp only [Native.readUOffset_packFields, add_val, sub_val, mul_val, Native.write16U_eq]
+  simp only [Native.readUOffset_packFields, add_val, sub_val, mul_val]
   simp (config := { maxDischargeDepth := 8 })
     (disch := (simp_all (config := { maxDischargeDepth := 8 }) only
-      [size_packFields, size_splice16])) only [Native.write16_packFields]
+      [size_packFields, size_splice16])) only [Native.write16U_packFields]
   rfl
 
 /-- Loading a boxed field coordinate returns its exact unboxed Montgomery word. -/
@@ -51,8 +51,8 @@ theorem Native.leaf16_packFields (t3 t2 t1 : Array KoalaBear.Fast.Field) (i : US
     rw [size_packFields] at hh
     omega
   unfold Native.leaf16
-  simp only [Native.readUOffset_packFields, add_val, sub_val, mul_val, Native.write16U_eq]
-  rw [Native.write16_packFields _ _ h.2.1 hi]
+  simp only [Native.readUOffset_packFields, add_val, sub_val, mul_val]
+  rw [Native.write16U_packFields _ _ h.2.1 hi]
   rfl
 
 /-- The fused final-layer word kernel agrees with its field expression graph. -/
@@ -66,8 +66,8 @@ theorem Native.leaf16Scaled_packFields (t3 t2 t1 : Array KoalaBear.Fast.Field) (
     rw [size_packFields] at hh
     omega
   unfold Native.leaf16Scaled
-  simp only [Native.readUOffset_packFields, add_val, sub_val, mul_val, Native.write16U_eq]
-  rw [Native.write16_packFields _ _ h.2.1 hi]
+  simp only [Native.readUOffset_packFields, add_val, sub_val, mul_val]
+  rw [Native.write16U_packFields _ _ h.2.1 hi]
   rfl
 
 /-- The unrolled partition kernel preserves the represented field array. -/
