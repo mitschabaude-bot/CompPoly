@@ -528,6 +528,12 @@ Known answers from Plonky3's `BinomialExtensionField<KoalaBear, 4>` and `Binomia
 
 Known answers from Plonky3's `QuinticTrinomialExtensionField<KoalaBear>` are checked in [`tests/CompPolyTests/Fields/KoalaBear/FastExt5.lean`](../../tests/CompPolyTests/Fields/KoalaBear/FastExt5.lean).
 
+### Vectors over the fast fields: word kernels and quartic planes
+
+[`Montgomery/Native32Words.lean`](../../CompPoly/Fields/Montgomery/Native32Words.lean) holds vectors over any `Mont32Field p` as packed Montgomery words in a `ByteArray`: elementwise sums, differences, products and multiply-adds by a word, in-place multiply-adds of one or four rows into one or four planes, dot products, batch inversion (`batchInvRange`, and `batchInvWords` over parallel ranges) and the zero-masked inversion `invWords`. Whole blocks of sixteen words go through straight-line `@[noinline, specialize]` kernels that the C compiler vectorizes, the rest word by word. Every function takes the modulus `p` and is specialized, so a consumer that instantiates it for a concrete field in a CPU-targeted library gets the field's constants as immediates. [`Native32WordsCorrectness.lean`](../../CompPoly/Fields/Montgomery/Native32WordsCorrectness.lean) proves each kernel equal to the field operations on `PackedRepr.encode`d arrays.
+
+`Ext4Planes p` ([`Native32Ext4Planes.lean`](../../CompPoly/Fields/Montgomery/Native32Ext4Planes.lean)) is a vector of `Ext4 p` as four coordinate planes, so every extension operation is a few word-kernel passes and allocates no extension element. `invDenoms z xs` inverts `z - x` for base points `x` with the constants of the coset interpolation: for `t = z₀ - x`, `(z - x)⁻¹ = (b₀ + t b₁ + t² b₂ + t³) / N(t)` with extension constants `bₖ` of `z` and the norm `N(t)` of `z - x` (`Ext4.inv_sub_ofBase`), so the points share one base-field batch inversion. `Ext4Planes.Rel v a` states that the planes encode the coordinates of `a`, and [`Native32Ext4PlanesCorrectness.lean`](../../CompPoly/Fields/Montgomery/Native32Ext4PlanesCorrectness.lean) proves every operation against `Ext4`'s (`mul_rel`, `smul_rel`, `inv_rel`, `invDenoms_rel`, …). A quintic counterpart reuses the word kernels and needs its own products and inverse. The kernels and planes are checked compiled over KoalaBear and BabyBear in `lake exe CompPolyNativeSmoke` ([`tests/CompPolyTests/Fields/Montgomery/Ext4Planes.lean`](../../tests/CompPolyTests/Fields/Montgomery/Ext4Planes.lean)).
+
 ## Base Field Caveats
 
 `Hachi` (`2^32 - 99`) has no `FastField` Montgomery path: `Mont32Field` requires

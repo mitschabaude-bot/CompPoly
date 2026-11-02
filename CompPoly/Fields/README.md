@@ -62,6 +62,10 @@ This directory contains formally verified field infrastructure used in zero-know
 | **Montgomery/InterpolateCoset.lean** | Plonky3's `interpolate_coset` over `FastField p` and `Ext4 p`: barycentric evaluation from coset values at an extension point, proved equal to `aeval`. |
 | **Montgomery/InterpolateCosetPacked.lean** | The packed-word implementation: base-field weights in blocks, lazy column sums, parallel row ranges; dispatched through the class `PackedInterpolation p`. |
 | **Montgomery/InterpolateCosetPackedCorrectness.lean** | `interpolateCosetPacked_eq`: the packed implementation equals the reference off the coset. |
+| **Montgomery/Native32Words.lean** | Vectors of packed Montgomery words over any `Mont32Field p`: sums, differences, products and multiply-adds in sixteen-word kernels, in-place row multiply-adds, dot products, batch inversion and zero-masked inversion, `@[specialize]`d on the modulus. |
+| **Montgomery/Native32WordsCorrectness.lean** | Every word kernel equals the field operations on the encoded arrays (`addWords_encode`, `batchInvWords_encode`, `invWords_tab`, …). |
+| **Montgomery/Native32Ext4Planes.lean** | `Ext4Planes p`: vectors of `Ext4 p` as four coordinate planes of words, with sums, base and extension scalings, products, inverses, and `invDenoms`, the inverses of `z - x` over base points by the norm with one shared base-field batch inversion. |
+| **Montgomery/Native32Ext4PlanesCorrectness.lean** | Every plane operation represents the extension's operation on the represented arrays (`Ext4Planes.Rel`; `mul_rel`, `inv_rel`, `invDenoms_rel`, …). |
 | **Montgomery/Native64x4Defs.lean** | Zero-import runtime definitions of the four-limb (64-bit-radix) Montgomery arithmetic, for `precompileModules` consumers. |
 | **Montgomery/Native64x4.lean** | Word-level specifications and add/sub/negate correctness for the four-limb arithmetic. |
 | **Montgomery/Native64x4Mul.lean** | Correctness of the four-limb CIOS Montgomery multiplication. |

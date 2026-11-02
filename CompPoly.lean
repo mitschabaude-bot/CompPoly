@@ -62,6 +62,7 @@ public import CompPoly.Bivariate.GuruswamiSudan.Root.ShiftedSubstitution.Lemmas
 public import CompPoly.Bivariate.GuruswamiSudan.Util
 public import CompPoly.Bivariate.Kronecker
 public import CompPoly.Bivariate.ToPoly
+public import CompPoly.Data.Array.BatchInv
 public import CompPoly.Data.Array.Involution
 public import CompPoly.Data.Array.Lemmas
 public import CompPoly.Data.ByteArray.Pack
@@ -212,7 +213,11 @@ public import CompPoly.Fields.Montgomery.InterpolateCosetPackedCorrectness
 public import CompPoly.Fields.Montgomery.Native32
 public import CompPoly.Fields.Montgomery.Native32Bytes
 public import CompPoly.Fields.Montgomery.Native32Ext4
+public import CompPoly.Fields.Montgomery.Native32Ext4Planes
+public import CompPoly.Fields.Montgomery.Native32Ext4PlanesCorrectness
 public import CompPoly.Fields.Montgomery.Native32Field
+public import CompPoly.Fields.Montgomery.Native32Words
+public import CompPoly.Fields.Montgomery.Native32WordsCorrectness
 public import CompPoly.Fields.Montgomery.Native64x4
 public import CompPoly.Fields.Montgomery.Native64x4Bytes
 public import CompPoly.Fields.Montgomery.Native64x4Defs
