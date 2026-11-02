@@ -54,9 +54,12 @@ private def planesInputs {E : Type} (d : Nat) (mk : (Nat → KoalaBear.Fast.Fiel
      s := elem (2 * planesSize * d)
      z := elem ((2 * planesSize + 1) * d) }, gen)
 
-/-- One plane operation as a single-record group; the result is its last plane. -/
-private def runPlanesOp (groupKey title name method fieldName : String) (op : Nat → ByteArray)
-    (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+/-- One plane operation as a single-record group, its inputs prepared outside timing; the result
+is its last plane. -/
+private def runPlanesOp (groupKey title name method fieldName : String)
+    (mkOp : IO (Nat → ByteArray)) (preset : BenchPreset) (gen : StdGen) :
+    IO (BenchGroup × StdGen) := do
+  let op ← mkOp
   let record ← runTimedSpec
     { name := name, representation := "ExtPlanes", method := method, field := fieldName,
       inputShape := s!"{planesSize} elements", digestIterations := 2 }
@@ -64,31 +67,31 @@ private def runPlanesOp (groupKey title name method fieldName : String) (op : Na
   pure ({ groupKey := groupKey, title := title, records := #[record] }, gen)
 
 /-- The four plane groups of an extension. -/
-private def planesTasksFor {p : ℕ} [Mont32Field p] {E : Type} [FastExt p E] [PlanesInv p E]
-    (key fieldName : String) (d : Nat) (mk : (Nat → KoalaBear.Fast.Field) → E)
+@[specialize] private def planesTasksFor {p : ℕ} [Mont32Field p] {E : Type} [FastExt p E]
+    [PlanesInv p E] (key fieldName : String) (d : Nat) (mk : (Nat → KoalaBear.Fast.Field) → E)
     (last : ExtPlanes p E → ByteArray)
     (base : Array KoalaBear.Fast.Field → ByteArray) : List BenchTask :=
   let inputs (gen : StdGen) := planesInputs d mk gen
-  let task (op title method : String) (f : PlanesInputs E → Nat → ByteArray) : BenchTask :=
+  let task (op title method : String) (f : PlanesInputs E → IO (Nat → ByteArray)) : BenchTask :=
     BenchTask.fromGroupRunner ⟨s!"fields-planes-{key}-{op}", title⟩ fun preset gen ↦
       let (inp, gen) := inputs gen
       runPlanesOp s!"fields-planes-{key}-{op}" title s!"planes-{op}" method fieldName
         (f inp) preset gen
-  [task "mul" s!"Elementwise products of planes ({fieldName})" "mul" fun inp ↦
-      let a : ExtPlanes p E := ExtPlanes.ofArray inp.xs
-      let b : ExtPlanes p E := ExtPlanes.ofArray inp.ys
-      fun i ↦ last (if i % 2 = 0 then a.mul b else b.mul a),
-    task "smul" s!"Products of planes by a scalar ({fieldName})" "smul" fun inp ↦
-      let a : ExtPlanes p E := ExtPlanes.ofArray inp.xs
-      let b : ExtPlanes p E := ExtPlanes.ofArray inp.ys
-      fun i ↦ last ((if i % 2 = 0 then a else b).smul inp.s),
-    task "inv" s!"Inverses of planes ({fieldName})" "PlanesInv.inv" fun inp ↦
-      let a : ExtPlanes p E := ExtPlanes.ofArray inp.xs
-      let b : ExtPlanes p E := ExtPlanes.ofArray inp.ys
-      fun i ↦ last (PlanesInv.inv (if i % 2 = 0 then a else b)),
-    task "invdenoms" s!"Inverses of z - x over base points ({fieldName})" "invDenoms" fun inp ↦
-      let xs := base inp.pts
-      fun i ↦ last (ExtPlanes.invDenoms (if i % 2 = 0 then inp.z else inp.s) xs planesSize)]
+  [task "mul" s!"Elementwise products of planes ({fieldName})" "mul" fun inp ↦ do
+      let a : ExtPlanes p E ← IO.lazyPure fun _ ↦ ExtPlanes.ofArray inp.xs
+      let b : ExtPlanes p E ← IO.lazyPure fun _ ↦ ExtPlanes.ofArray inp.ys
+      pure fun i ↦ last (if i % 2 = 0 then a.mul b else b.mul a),
+    task "smul" s!"Products of planes by a scalar ({fieldName})" "smul" fun inp ↦ do
+      let a : ExtPlanes p E ← IO.lazyPure fun _ ↦ ExtPlanes.ofArray inp.xs
+      let b : ExtPlanes p E ← IO.lazyPure fun _ ↦ ExtPlanes.ofArray inp.ys
+      pure fun i ↦ last ((if i % 2 = 0 then a else b).smul inp.s),
+    task "inv" s!"Inverses of planes ({fieldName})" "PlanesInv.inv" fun inp ↦ do
+      let a : ExtPlanes p E ← IO.lazyPure fun _ ↦ ExtPlanes.ofArray inp.xs
+      let b : ExtPlanes p E ← IO.lazyPure fun _ ↦ ExtPlanes.ofArray inp.ys
+      pure fun i ↦ last (PlanesInv.inv (if i % 2 = 0 then a else b)),
+    task "invdenoms" s!"Inverses of z - x over base points ({fieldName})" "invDenoms" fun inp ↦ do
+      let xs ← IO.lazyPure fun _ ↦ base inp.pts
+      pure fun i ↦ last (ExtPlanes.invDenoms (if i % 2 = 0 then inp.z else inp.s) xs planesSize)]
 
 /-- Registry entries for the coordinate-plane benchmarks. -/
 def planesTasks : List BenchTask :=

@@ -254,29 +254,46 @@ theorem join_rel (n parts : Nat) (V : Nat → ExtPlanes p E) (A : Nat → Array 
 /-! ### Products -/
 
 /-- Multiply-adds of tabulated planes by the nonzero scalars. -/
-theorem combine_filterMap {B : Nat} (hB : 4 * B < USize.size) {ι : Type} (l : List ι)
-    (P : ι → ByteArray) (f : ι → Nat → F) (s : ι → F) (hP : ∀ i ∈ l, P i = encode (tab B (f i))) :
-    combine p B (l.filterMap fun i ↦ if s i = 0 then none else some (P i, (s i).val)) =
-      encode (tab B fun x ↦ (l.map fun i ↦ f i x * s i).sum) := by
+theorem combine_tab {B : Nat} (hB : 4 * B < USize.size) (k : Nat) (P : Nat → ByteArray)
+    (f : Nat → Nat → F) (s : Nat → F) (hP : ∀ i, P i = encode (tab B (f i)))
+    (hs : ∀ i, k ≤ i → s i = 0) :
+    combine p B k P s = encode (tab B fun x ↦ ∑ i ∈ Finset.range k, f i x * s i) := by
   unfold combine
-  suffices ∀ g : Nat → F,
-      (l.filterMap fun i ↦ if s i = 0 then none else some (P i, (s i).val)).foldl
-      (fun acc (x, c) ↦ mulAddWords p acc x c B) (encode (tab B g)) =
-      encode (tab B fun x ↦ g x + (l.map fun i ↦ f i x * s i).sum) by
-    rw [zeroWords_tab (p := p), this]
-    simp only [zero_add]
-  intro g
-  induction l generalizing g with
-  | nil => simp only [List.filterMap_nil, List.foldl_nil, List.map_nil, List.sum_nil, add_zero]
-  | cons i l ih =>
-    have hl : ∀ j ∈ l, P j = encode (tab B (f j)) := fun j hj ↦ hP j (List.mem_cons_of_mem _ hj)
-    by_cases hs : s i = 0
-    · rw [List.filterMap_cons, ite_eq_left hs, ih hl]
-      simp only [List.map_cons, List.sum_cons, hs, mul_zero, zero_add]
-    · rw [List.filterMap_cons, ite_eq_right hs, List.foldl_cons, hP i List.mem_cons_self]
-      dsimp only
-      rw [mulAddWords_tab hB, ih hl]
-      simp only [List.map_cons, List.sum_cons, add_assoc]
+  -- After `G` groups, the sum of the first `4 G` terms.
+  have key : ∀ G, (List.range G).foldl (fun acc g ↦
+      mulAdd4Into p acc (P (4 * g)) (P (4 * g + 1)) (P (4 * g + 2)) (P (4 * g + 3)) 0 0 0 0
+        (s (4 * g)).val (s (4 * g + 1)).val (s (4 * g + 2)).val (s (4 * g + 3)).val B)
+      (zeroWords B) = encode (tab B fun x ↦ ∑ i ∈ Finset.range (4 * G), f i x * s i) := by
+    intro G
+    induction G with
+    | zero =>
+      rw [List.range_zero, List.foldl_nil, zeroWords_tab (p := p)]
+      simp only [Nat.mul_zero, Finset.range_zero, Finset.sum_empty]
+    | succ G ih =>
+      rw [List.range_succ, List.foldl_append, ih, List.foldl_cons, List.foldl_nil, hP, hP, hP, hP]
+      have e := mulAdd4Into_encode (p := p) (tab B fun x ↦ ∑ i ∈ Finset.range (4 * G), f i x * s i)
+        (tab B (f (4 * G))) (tab B (f (4 * G + 1))) (tab B (f (4 * G + 2)))
+        (tab B (f (4 * G + 3))) 0 0 0 0 (s (4 * G)) (s (4 * G + 1)) (s (4 * G + 2))
+        (s (4 * G + 3)) (by rw [size_tab, size_tab]; omega) (by rw [size_tab, size_tab]; omega)
+        (by rw [size_tab, size_tab]; omega) (by rw [size_tab, size_tab]; omega)
+        (by rw [size_tab]; exact hB) (by rw [size_tab]; exact hB) (by rw [size_tab]; exact hB)
+        (by rw [size_tab]; exact hB) (by rw [size_tab]; exact hB)
+      rw [size_tab] at e
+      rw [e]
+      refine congrArg encode (Array.ext (by simp only [Array.size_ofFn, size_tab])
+        fun x hx _ ↦ ?_)
+      simp only [Array.size_ofFn] at hx
+      rw [Array.getElem_ofFn, getElem_tab]
+      rw [getD_tab _ _ _ hx, Nat.zero_add, getD_tab _ _ _ hx, getD_tab _ _ _ hx,
+        getD_tab _ _ _ hx, getD_tab _ _ _ hx, show 4 * (G + 1) = 4 * G + 1 + 1 + 1 + 1 by ring,
+        Finset.sum_range_succ, Finset.sum_range_succ, Finset.sum_range_succ,
+        Finset.sum_range_succ]
+      ring
+  rw [key]
+  refine congrArg encode (tab_congr fun x _ ↦ ?_)
+  rw [show 4 * ((k + 3) / 4) = k + (4 * ((k + 3) / 4) - k) by omega, Finset.sum_range_add]
+  rw [Finset.sum_eq_zero (s := Finset.range (4 * ((k + 3) / 4) - k))
+    fun i _ ↦ by rw [hs _ (Nat.le_add_right _ _), mul_zero], add_zero]
 
 /-- Sums of tabulated planes. -/
 theorem sumWords_map {B : Nat} (hB : 4 * B < USize.size) (L : List (Nat → F)) :
@@ -416,12 +433,18 @@ theorem smul_rel {B : Nat} (hB : 4 * B < USize.size) {v : ExtPlanes p E} {f : Na
   simp only [smul, hvn]
   refine rel_mk _ _ fun m ↦ ?_
   rw [getElem_ofFn_fin]
-  simp only [getElem_ofFn_fin]
-  rw [combine_filterMap hB (List.finRange d) (fun i ↦ v.c[i])
-    (fun i x ↦ FastExt.coord (f x) i) (fun i ↦ FastExt.coord (FastExt.pow FastExt.gen i * s) m)
-    fun i _ ↦ hvc i]
+  have hd := (FastExt.params (p := p) (E := E)).d_pos
+  rw [combine_tab hB d _
+    (fun i x ↦ if h : i < d then FastExt.coord (f x) ⟨i, h⟩ else FastExt.coord (f x) ⟨0, hd⟩) _
+    (fun i ↦ by
+      by_cases h : i < d
+      · simp only [h, dite_true]; exact hvc ⟨i, h⟩
+      · simp only [h, dite_false]; exact hvc ⟨0, hd⟩)
+    (fun i hi ↦ by simp only [show ¬i < d by omega, dite_false])]
   refine congrArg encode (tab_congr fun x _ ↦ ?_)
-  rw [sum_finRange, FastExt.coord_mul_eq_sum]
+  rw [FastExt.coord_mul_eq_sum, ← Fin.sum_univ_eq_sum_range]
+  refine Finset.sum_congr rfl fun i _ ↦ ?_
+  simp only [i.isLt, dite_true, Fin.eta, Vector.getElem_ofFn]
 
 /-- Inverses, zero to zero, by batch inversion of the elements. -/
 theorem batchInv_rel {v : ExtPlanes p E} {a : Array E} (hv : Rel v a)

@@ -536,7 +536,7 @@ Known answers from Plonky3's `QuinticTrinomialExtensionField<KoalaBear>` are che
 
 `ExtPlanes p E` ([`Native32ExtPlanes.lean`](../../CompPoly/Fields/Montgomery/Native32ExtPlanes.lean)) is a vector of a `FastExt` as `d` coordinate planes, so every extension operation is a few word-kernel passes and allocates no extension element. Every operation is generic over the modulus and the degree:
 
-* `smul` combines the planes with the coordinates of `Xⁱ s` as scalars.
+* `smul` combines the planes with the coordinates of `Xⁱ s` as scalars, four planes per pass with one reduction per word (`Words.mulAdd4Into`).
 * `mul` follows `Ext.mulTbl`: the `2d - 1` planes of the unreduced product, then each coordinate reduced against the table `Ext.red` of `X^k mod f`, a multiply-add per nonzero entry and an addition or subtraction for `±1`. On `X^4 - W` this is the quartic kernel's 16 products and 3 multiply-adds by `W`.
 * `invDenoms z xs` inverts `z - x` for base points `x` by the norm: with `adj(Y) = ∏_{1 ≤ j < d} (z^(p^j) - Y)` and `N(Y) = (z - Y) adj(Y)`, computed once from `z`, `N(x)` is the norm of `z - x` and lies in the base field (`FiniteField.algebraMap_norm_eq_prod_pow`), so `1 / (z - x) = adj(x) / N(x)` costs base-field products and one shared batch inversion. It matches the quartic's specialized form in speed.
 * Inversion is the extension's choice (`PlanesInv`). The quartic extensions invert by their norm (`Ext4.planesInv`, [`Native32Ext4Planes.lean`](../../CompPoly/Fields/Montgomery/Native32Ext4Planes.lean)); KoalaBear's quintic by Montgomery's batch inversion of the elements (`PlanesInv.ofBatch`), which measured faster than a Frobenius norm on planes.

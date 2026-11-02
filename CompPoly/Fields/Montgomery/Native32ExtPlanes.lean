@@ -41,7 +41,7 @@ namespace Montgomery.Native32
 open CompPoly.Extension
 open CompPoly.CPolynomial.NTTFast.Packed (ofWord)
 open CompPoly.CPolynomial.NTTFast.Packed.Native (read zeroWords encodeFields)
-open Words (addWords subWords mulWords mulAddWords replicateWord batchInvWords invWords)
+open Words (addWords subWords mulWords mulAddWords mulAdd4Into replicateWord batchInvWords invWords)
 
 /-- `n` elements of the fast extension `E` as `d` coordinate planes of words. -/
 structure ExtPlanes (p : ℕ) [Mont32Field p] (E : Type) [FastExt p E] where
@@ -94,23 +94,28 @@ def rsub (s : E) (a : ExtPlanes p E) : ExtPlanes p E :=
 def mulBase (a : ExtPlanes p E) (b : ByteArray) : ExtPlanes p E :=
   ⟨a.n, Vector.ofFn fun k ↦ mulWords p a.c[k] b a.n⟩
 
-/-- `∑ⱼ planes[j] · s[j]` for scalar words `s`. -/
-def combine (p : ℕ) [Mont32Field p] (n : Nat) (terms : List (ByteArray × UInt32)) : ByteArray :=
-  terms.foldl (fun acc (x, s) ↦ mulAddWords p acc x s n) (zeroWords n)
+/-- `∑_{i < k} planes i · s i`: four planes multiply-added at a time, every word reduced once
+per four planes (`Words.mulAdd4Into`); the planes past `k` are ones of the right size with zero
+scalars. -/
+def combine (p : ℕ) [Mont32Field p] (n k : Nat) (planes : Nat → ByteArray)
+    (s : Nat → FastField p) : ByteArray :=
+  (List.range ((k + 3) / 4)).foldl (fun acc g ↦
+    mulAdd4Into p acc (planes (4 * g)) (planes (4 * g + 1)) (planes (4 * g + 2))
+      (planes (4 * g + 3)) 0 0 0 0 (s (4 * g)).val (s (4 * g + 1)).val (s (4 * g + 2)).val
+      (s (4 * g + 3)).val n) (zeroWords n)
 
 /-- Concatenate the planes of parallel pieces, each piece its `d` planes. -/
 def join (n : Nat) (pieces : Array (Task (Array ByteArray))) : ExtPlanes p E :=
   ⟨n, Vector.ofFn fun k ↦ pieces.foldl (fun acc t ↦ acc ++ t.get.getD k .empty)
     (ByteArray.emptyWithCapacity (4 * n))⟩
 
-/-- Every element times an extension scalar `s`: coordinate `m` is `∑ᵢ aᵢ [Xⁱ s]ₘ`, one
-multiply-add per nonzero coordinate. -/
+/-- Every element times an extension scalar `s`: coordinate `m` is `∑ᵢ aᵢ [Xⁱ s]ₘ`, the planes
+multiply-added four at a time (`combine`). -/
 def smul (a : ExtPlanes p E) (s : E) : ExtPlanes p E :=
   let cols : Vector E d := Vector.ofFn fun i ↦ FastExt.pow FastExt.gen (i : ℕ) * s
-  ⟨a.n, Vector.ofFn fun m ↦ combine p a.n
-    ((List.finRange d).filterMap fun (i : Fin d) ↦
-      let x := FastExt.coord cols[i] m
-      if x = 0 then none else some (a.c[i], x.val))⟩
+  ⟨a.n, Vector.ofFn fun m ↦ combine p a.n d
+    (fun i ↦ if h : i < d then a.c[i] else a.c[0]'(FastExt.params (p := p) (E := E)).d_pos)
+    fun i ↦ if h : i < d then FastExt.coord cols[i] m else 0⟩
 
 /-- The sum of planes, the first one if any. -/
 def sumWords (p : ℕ) [Mont32Field p] (n : Nat) : List ByteArray → ByteArray
