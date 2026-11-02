@@ -200,6 +200,7 @@ public import CompPoly.Fields.KoalaBear.Ext6.SexticIrreducible
 public import CompPoly.Fields.KoalaBear.Fast
 public import CompPoly.Fields.KoalaBear.FastExt4
 public import CompPoly.Fields.KoalaBear.FastExt5
+public import CompPoly.Fields.KoalaBear.FastExt5Planes
 public import CompPoly.Fields.KoalaBear.InterpolateCoset
 public import CompPoly.Fields.Mersenne31
 public import CompPoly.Fields.Mersenne31.Basic
@@ -207,6 +208,7 @@ public import CompPoly.Fields.Mersenne31.Bytes
 public import CompPoly.Fields.Mersenne31.Circle
 public import CompPoly.Fields.Mersenne31.Fast
 public import CompPoly.Fields.Montgomery.Basic
+public import CompPoly.Fields.Montgomery.FastExt
 public import CompPoly.Fields.Montgomery.InterpolateCoset
 public import CompPoly.Fields.Montgomery.InterpolateCosetPacked
 public import CompPoly.Fields.Montgomery.InterpolateCosetPackedCorrectness
@@ -215,6 +217,8 @@ public import CompPoly.Fields.Montgomery.Native32Bytes
 public import CompPoly.Fields.Montgomery.Native32Ext4
 public import CompPoly.Fields.Montgomery.Native32Ext4Planes
 public import CompPoly.Fields.Montgomery.Native32Ext4PlanesCorrectness
+public import CompPoly.Fields.Montgomery.Native32ExtPlanes
+public import CompPoly.Fields.Montgomery.Native32ExtPlanesCorrectness
 public import CompPoly.Fields.Montgomery.Native32Field
 public import CompPoly.Fields.Montgomery.Native32Words
 public import CompPoly.Fields.Montgomery.Native32WordsCorrectness

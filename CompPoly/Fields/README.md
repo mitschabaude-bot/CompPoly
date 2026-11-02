@@ -32,6 +32,7 @@ This directory contains formally verified field infrastructure used in zero-know
 | **BabyBear/FastExt4.lean** | The `Binomial4` instance `X^4 - 11` over the fast BabyBear carrier and `BabyBear.Fast.Ext4`; irreducibility transferred from `BabyBear/Ext4.lean`. |
 | **BabyBear/InterpolateCoset.lean** | The compiled `PackedInterpolation` instance for BabyBear, in `CompPolyInterpolateNative`. |
 | **KoalaBear/Ext4.lean** | \(\mathrm{KoalaBear}[X]/(X^4 - 3)\). |
+| **KoalaBear/FastExt5Planes.lean** | `KoalaBear.Fast.Ext5` inverts coordinate planes by batch inversion of the elements (`PlanesInv.ofBatch`). |
 | **KoalaBear/FastExt4.lean** | The `Binomial4` instance `X^4 - 3` over the fast KoalaBear carrier, with `mulW x = x + x + x`, and `KoalaBear.Fast.Ext4`; irreducibility transferred from `KoalaBear/Ext4.lean`. |
 | **KoalaBear/InterpolateCoset.lean** | The compiled `PackedInterpolation` instance for KoalaBear, in `CompPolyInterpolateNative`. |
 | **KoalaBear/Ext5.lean** | \(\mathrm{KoalaBear}[X]/(X^5 + X^2 - 1)\) — first non-binomial modulus; no degree-5 binomial exists since \(\gcd(5, p-1) = 1\). |
@@ -64,8 +65,11 @@ This directory contains formally verified field infrastructure used in zero-know
 | **Montgomery/InterpolateCosetPackedCorrectness.lean** | `interpolateCosetPacked_eq`: the packed implementation equals the reference off the coset. |
 | **Montgomery/Native32Words.lean** | Vectors of packed Montgomery words over any `Mont32Field p`: sums, differences, products and multiply-adds in sixteen-word kernels, in-place row multiply-adds, dot products, batch inversion and zero-masked inversion, `@[specialize]`d on the modulus. |
 | **Montgomery/Native32WordsCorrectness.lean** | Every word kernel equals the field operations on the encoded arrays (`addWords_encode`, `batchInvWords_encode`, `invWords_tab`, …). |
-| **Montgomery/Native32Ext4Planes.lean** | `Ext4Planes p`: vectors of `Ext4 p` as four coordinate planes of words, with sums, base and extension scalings, products, inverses, and `invDenoms`, the inverses of `z - x` over base points by the norm with one shared base-field batch inversion. |
-| **Montgomery/Native32Ext4PlanesCorrectness.lean** | Every plane operation represents the extension's operation on the represented arrays (`Ext4Planes.Rel`; `mul_rel`, `inv_rel`, `invDenoms_rel`, …). |
+| **Montgomery/FastExt.lean** | The class `FastExt p E` of fast extensions of `FastField p` given by their coordinates in the power basis of a monic modulus, with the spec field's operations (`specEquiv`, `coord_mul`); instances for `Ext4 p` and `KoalaBear.Fast.Ext5`. |
+| **Montgomery/Native32ExtPlanes.lean** | `ExtPlanes p E`: vectors of a `FastExt` as `d` coordinate planes of words, generic over the modulus and the degree: sums, base and extension scalings, products by the spec's reduction table, batch inversion, and `invDenoms`, the inverses of `z - x` over base points by the norm polynomial with one shared base-field batch inversion; `PlanesInv`, the extension's choice of plane inversion. |
+| **Montgomery/Native32ExtPlanesCorrectness.lean** | Every plane operation represents the extension's operation on the represented arrays (`ExtPlanes.Rel`; `mul_rel`, `smul_rel`, `batchInv_rel`, `invDenoms_rel`, …). |
+| **Montgomery/Native32Ext4Planes.lean** | The norm inversion of quartic planes, `Ext4.planesInv`. |
+| **Montgomery/Native32Ext4PlanesCorrectness.lean** | The coordinates of quartic products, and `Ext4.planesInv_rel`, making the norm inversion the quartic extensions' `PlanesInv`. |
 | **Montgomery/Native64x4Defs.lean** | Zero-import runtime definitions of the four-limb (64-bit-radix) Montgomery arithmetic, for `precompileModules` consumers. |
 | **Montgomery/Native64x4.lean** | Word-level specifications and add/sub/negate correctness for the four-limb arithmetic. |
 | **Montgomery/Native64x4Mul.lean** | Correctness of the four-limb CIOS Montgomery multiplication. |

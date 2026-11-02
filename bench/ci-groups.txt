@@ -55,6 +55,14 @@ fields-extension-koalabear-ext4-mul
 fields-extension-koalabear-ext4-inv
 fields-extension-babybear-ext4-mul
 fields-extension-babybear-ext4-inv
+fields-planes-koalabear-ext4-mul
+fields-planes-koalabear-ext4-smul
+fields-planes-koalabear-ext4-inv
+fields-planes-koalabear-ext4-invdenoms
+fields-planes-koalabear-ext5-mul
+fields-planes-koalabear-ext5-smul
+fields-planes-koalabear-ext5-inv
+fields-planes-koalabear-ext5-invdenoms
 fields-mont64x8-bn254-inv
 fields-mont64x8-bls12-381-inv
 fields-mont64x8-bls12-377-inv

@@ -10,6 +10,7 @@ public import CompPoly.Fields.Extension.Map
 public import CompPoly.Fields.KoalaBear.Ext5
 public import CompPoly.Fields.KoalaBear.Fast
 public import CompPoly.Fields.Montgomery.Native32Bytes
+public import CompPoly.Fields.Montgomery.FastExt
 
 /-!
 # The degree-5 extension of KoalaBear over the fast carrier
@@ -327,6 +328,45 @@ theorem toBytes_toSpec (a : Ext5) : ByteCodec.toBytes (toSpec a) = ByteCodec.toB
   apply Vector.toList_inj.mp
   rw [Ext.toBytes_eq, ByteCodec.toList_toBytes_vector, hc]
   rfl
+
+/-- KoalaBear's quintic extension as a fast extension. Inlined, so that code specialized to it runs
+the extension's arithmetic directly. -/
+@[inline] instance instFastExt : FastExt KoalaBear.fieldSize Ext5 where
+  params := P
+  coord a i := coord a i
+  ofCoords f := ⟨f ⟨0, by decide⟩, f ⟨1, by decide⟩, f ⟨2, by decide⟩, f ⟨3, by decide⟩,
+    f ⟨4, by decide⟩⟩
+  coord_ofCoords f := by
+    funext ⟨i, hi⟩
+    have hi : i < 5 := hi
+    interval_cases i <;> rfl
+  coord_injective a b h := by
+    have e (k : Nat) (hk : k < 5) : coord a k = coord b k := congrFun h ⟨k, hk⟩
+    exact ext' (e 0 (by decide)) (e 1 (by decide)) (e 2 (by decide)) (e 3 (by decide))
+      (e 4 (by decide))
+  coord_zero := by
+    funext ⟨i, hi⟩
+    have hi : i < 5 := hi
+    interval_cases i <;> rfl
+  ofFn_one := toSpec_one
+  coord_add a b := by
+    funext ⟨i, hi⟩
+    have hi : i < 5 := hi
+    interval_cases i <;> rfl
+  coord_sub a b := by
+    funext ⟨i, hi⟩
+    have hi : i < 5 := hi
+    interval_cases i <;> rfl
+  coord_neg a := by
+    funext ⟨i, hi⟩
+    have hi : i < 5 := hi
+    interval_cases i <;> rfl
+  ofFn_mul := toSpec_mul
+  ofFn_inv := toSpec_inv
+
+theorem toSpec_fastExt (a : Ext5) : FastExt.toSpec a = toSpec a := rfl
+
+@[simp] theorem d_fastExt : FastExt.d KoalaBear.fieldSize Ext5 = 5 := rfl
 
 end Ext5
 

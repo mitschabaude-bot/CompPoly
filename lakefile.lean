@@ -41,7 +41,8 @@ lean_lib CompPolyPackedNative where
     `CompPoly.Univariate.NTTFast.Packed.CosetLde,
     `CompPoly.Univariate.NTTFast.Packed.Instances,
     `CompPoly.Fields.Montgomery.Native32Words,
-    `CompPoly.Fields.Montgomery.Native32Ext4Planes]
+    `CompPoly.Fields.Montgomery.Native32Ext4Planes,
+    `CompPoly.Fields.Montgomery.Native32ExtPlanes]
   platformIndependent := true
   -- The kernels spill AVX registers; realigning the stack keeps the spill slots 32-byte
   -- aligned whatever the caller's frame, which otherwise moved timings by 20% between builds.
