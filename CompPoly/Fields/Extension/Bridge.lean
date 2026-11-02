@@ -444,4 +444,71 @@ theorem gen_pow_d_binomial (P : BinomialParams F) :
     (gen : Ext P.toExtensionParams) ^ P.d = ofBase P.W :=
   toQuot_injective (by rw [toQuot_pow, toQuot_gen, toQuot_ofBase, rt_pow_d_binomial])
 
+/-! ### Products by the reduction table
+
+A product's coefficient `m` is coefficient `m` of the unreduced product plus the higher unreduced
+coefficients `k ≥ d` times `[X^k mod f]_m`: the form kernels on coordinates reduce products in.
+-/
+
+/-- Coefficient `k` of the unreduced product of `x` and `y`: `∑_{i + j = k} xᵢ yⱼ`. -/
+def conv (x y : Ext P) (k : ℕ) : F :=
+  ∑ i : Fin P.d, if h : (i : ℕ) ≤ k ∧ k - (i : ℕ) < P.d then
+    coeff x i * coeff y ⟨k - (i : ℕ), h.2⟩ else 0
+
+/-- `X^k mod f` is `X^k` for `k < d`. -/
+theorem monomialMod_of_lt {k : ℕ} (hk : k < P.d) :
+    (monomialMod k : Ext P) = ofFn fun i => if (i : ℕ) = k then 1 else 0 := by
+  rw [← gen_pow_of_lt hk]
+  apply toQuot_injective
+  rw [toQuot_monomialMod, toQuot_pow, toQuot_gen]
+
+theorem sum_range_eq_list_sum (f : ℕ → F) (n : ℕ) :
+    ∑ i ∈ Finset.range n, f i = ((List.range n).map f).sum := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+    rw [Finset.sum_range_succ, ih, List.range_succ, List.map_append, List.sum_append]
+    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, add_zero]
+
+/-- **Coefficients of products**, reduced against the table of `X^k mod f`. -/
+theorem coeff_mul_reduce (x y : Ext P) (m : Fin P.d) :
+    coeff (x * y) m = conv x y m +
+      ((List.range' P.d (P.d - 1)).map fun k => conv x y k * coeff (monomialMod k : Ext P) m).sum
+    := by
+  let M (k : ℕ) : F := coeff (monomialMod k : Ext P) m
+  let yN (n : ℕ) : F := if h : n < P.d then coeff y ⟨n, h⟩ else 0
+  have hstep : ∀ i : Fin P.d, ∑ j : Fin P.d, coeff x i * coeff y j * M ((i : ℕ) + (j : ℕ)) =
+      ∑ k : Fin (2 * P.d - 1), if (i : ℕ) ≤ (k : ℕ) ∧ (k : ℕ) - (i : ℕ) < P.d then
+        coeff x i * yN ((k : ℕ) - (i : ℕ)) * M k else 0 := fun i => by
+    refine (Finset.sum_congr rfl fun j _ => ?_).trans
+      (sum_fin_add_eq_sum_fin_ite i fun k => coeff x i * yN (k - (i : ℕ)) * M k)
+    simp only [Nat.add_sub_cancel_left, yN, dite_eq_left j.isLt]
+  have hconv : ∀ k : ℕ, (∑ i : Fin P.d, if (i : ℕ) ≤ k ∧ k - (i : ℕ) < P.d then
+      coeff x i * yN (k - (i : ℕ)) * M k else 0) = conv x y k * M k := by
+    intro k
+    rw [conv, Finset.sum_mul]
+    refine Finset.sum_congr rfl fun i _ => ?_
+    by_cases h : (i : ℕ) ≤ k ∧ k - (i : ℕ) < P.d
+    · rw [ite_eq_left h, dite_eq_left h]
+      simp only [yN, dite_eq_left h.2]
+    · rw [ite_eq_right h, dite_eq_right h, zero_mul]
+  have hsum : coeff (x * y) m = ∑ k ∈ Finset.range (2 * P.d - 1), conv x y k * M k := by
+    rw [← Fin.sum_univ_eq_sum_range (fun k => conv x y k * M k)]
+    change coeff (mul x y) m = _
+    rw [mul, coeff_ofFn]
+    change ∑ i : Fin P.d, ∑ j : Fin P.d, coeff x i * coeff y j * M ((i : ℕ) + (j : ℕ)) = _
+    simp only [hstep]
+    rw [Finset.sum_comm]
+    exact Finset.sum_congr rfl fun k _ => hconv k
+  have hd : 2 * P.d - 1 = P.d + (P.d - 1) := by have := P.d_pos; omega
+  rw [hsum, hd, Finset.sum_range_add]
+  refine congrArg₂ (· + ·) ?_ ?_
+  · rw [← Fin.sum_univ_eq_sum_range (fun k => conv x y k * M k)]
+    simp only [M, monomialMod_of_lt (Fin.isLt _), coeff_ofFn, mul_ite, mul_one, mul_zero,
+      Fin.val_inj]
+    rw [Finset.sum_ite_eq Finset.univ m]
+    simp only [Finset.mem_univ, ite_true]
+  · rw [List.range'_eq_map_range, List.map_map, sum_range_eq_list_sum]
+    rfl
+
 end CompPoly.Extension.Ext

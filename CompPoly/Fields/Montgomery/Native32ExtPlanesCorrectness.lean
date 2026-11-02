@@ -65,13 +65,6 @@ theorem coord_ofBase (x : F) (k : Fin d) :
     coord (ofBase (E := E) x) k = if (k : ℕ) = 0 then x else 0 := by
   rw [← coeff_toSpec, toSpec_ofBase, Ext.coeff_ofBase]
 
-/-- `X^k mod f` is `X^k` for `k < d`. -/
-theorem monomialMod_of_lt {k : ℕ} (hk : k < d) :
-    (Ext.monomialMod k : Spec p E) = Ext.ofFn fun i ↦ if (i : ℕ) = k then 1 else 0 := by
-  rw [← Ext.gen_pow_of_lt hk]
-  apply Ext.toQuot_injective
-  rw [Ext.toQuot_monomialMod, Ext.toQuot_pow, Ext.toQuot_gen]
-
 /-- A coordinate of the spec field, as an additive map. -/
 def coeffHom (m : Fin d) : Spec p E →+ F where
   toFun x := Ext.coeff x m
@@ -103,14 +96,6 @@ theorem coord_mul_eq_sum (a s : E) (m : Fin d) :
   rw [← coeff_toSpec, h, coeff_sum]
   simp only [Ext.coeff_smul, coeff_toSpec]
 
-theorem sum_range_eq_list (f : ℕ → F) (n : ℕ) :
-    ∑ i ∈ Finset.range n, f i = ((List.range n).map f).sum := by
-  induction n with
-  | zero => rfl
-  | succ n ih =>
-    rw [Finset.sum_range_succ, ih, List.range_succ, List.map_append, List.sum_append]
-    simp only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, add_zero]
-
 /-- Coordinate `k` of the unreduced product of the coordinates `x` and `y`. -/
 def conv (x y : Fin d → F) (k : ℕ) : F :=
   ∑ i : Fin d, if h : (i : ℕ) ≤ k ∧ k - (i : ℕ) < d then x i * y ⟨k - (i : ℕ), h.2⟩ else 0
@@ -121,40 +106,8 @@ theorem coord_mul_reduce (a b : E) (m : Fin d) :
     coord (a * b) m = conv (coord a) (coord b) m +
       ((List.range' d (d - 1)).map fun k ↦
         conv (coord a) (coord b) k * Ext.coeff (Ext.monomialMod k : Spec p E) m).sum := by
-  let M (k : ℕ) : F := Ext.coeff (Ext.monomialMod k : Spec p E) m
-  let bN (n : ℕ) : F := if h : n < d then coord b ⟨n, h⟩ else 0
-  have hstep : ∀ i : Fin d, ∑ j : Fin d, coord a i * coord b j * M ((i : ℕ) + (j : ℕ)) =
-      ∑ k : Fin (2 * d - 1), if (i : ℕ) ≤ (k : ℕ) ∧ (k : ℕ) - (i : ℕ) < d then
-        coord a i * bN ((k : ℕ) - (i : ℕ)) * M k else 0 := fun i ↦ by
-    refine (Finset.sum_congr rfl fun j _ ↦ ?_).trans
-      (Ext.sum_fin_add_eq_sum_fin_ite i fun k ↦ coord a i * bN (k - (i : ℕ)) * M k)
-    simp only [Nat.add_sub_cancel_left, bN, dite_eq_left j.isLt]
-  have hconv : ∀ k : ℕ, (∑ i : Fin d, if (i : ℕ) ≤ k ∧ k - (i : ℕ) < d then
-      coord a i * bN (k - (i : ℕ)) * M k else 0) = conv (coord a) (coord b) k * M k := by
-    intro k
-    rw [conv, Finset.sum_mul]
-    refine Finset.sum_congr rfl fun i _ ↦ ?_
-    by_cases h : (i : ℕ) ≤ k ∧ k - (i : ℕ) < d
-    · rw [ite_eq_left h, dite_eq_left h]
-      simp only [bN, dite_eq_left h.2]
-    · rw [ite_eq_right h, dite_eq_right h, zero_mul]
-  have hsum :
-      coord (a * b) m = ∑ k ∈ Finset.range (2 * d - 1), conv (coord a) (coord b) k * M k := by
-    rw [coord_mul, ← Fin.sum_univ_eq_sum_range (fun k ↦ conv (coord a) (coord b) k * M k)]
-    change ∑ i : Fin d, ∑ j : Fin d, coord a i * coord b j * M ((i : ℕ) + (j : ℕ)) = _
-    simp only [hstep]
-    rw [Finset.sum_comm]
-    exact Finset.sum_congr rfl fun k _ ↦ hconv k
-  have hd : 2 * d - 1 = d + (d - 1) := by have := (params (p := p) (E := E)).d_pos; omega
-  rw [hsum, hd, Finset.sum_range_add]
-  congr 1
-  · rw [← Fin.sum_univ_eq_sum_range (fun k ↦ conv (coord a) (coord b) k * M k)]
-    simp only [M, monomialMod_of_lt (Fin.isLt _), Ext.coeff_ofFn, mul_ite, mul_one, mul_zero,
-      Fin.val_inj]
-    rw [Finset.sum_ite_eq Finset.univ m]
-    simp only [Finset.mem_univ, ite_true]
-  · rw [List.range'_eq_map_range, List.map_map, sum_range_eq_list]
-    rfl
+  rw [← coeff_toSpec, toSpec_mul, Ext.coeff_mul_reduce]
+  simp only [Ext.conv, conv, coeff_toSpec]
 
 end FastExt
 
