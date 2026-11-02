@@ -472,9 +472,8 @@ theorem sum_range_eq_list_sum (f : ℕ → F) (n : ℕ) :
 
 /-- **Coefficients of products**, reduced against the table of `X^k mod f`. -/
 theorem coeff_mul_reduce (x y : Ext P) (m : Fin P.d) :
-    coeff (x * y) m = conv x y m +
-      ((List.range' P.d (P.d - 1)).map fun k => conv x y k * coeff (monomialMod k : Ext P) m).sum
-    := by
+    coeff (x * y) m = conv x y m + ((List.range' P.d (P.d - 1)).map fun k =>
+      conv x y k * coeff (monomialMod k : Ext P) m).sum := by
   let M (k : ℕ) : F := coeff (monomialMod k : Ext P) m
   let yN (n : ℕ) : F := if h : n < P.d then coeff y ⟨n, h⟩ else 0
   have hstep : ∀ i : Fin P.d, ∑ j : Fin P.d, coeff x i * coeff y j * M ((i : ℕ) + (j : ℕ)) =
