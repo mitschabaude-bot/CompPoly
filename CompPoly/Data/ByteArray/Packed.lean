@@ -353,6 +353,37 @@ theorem getElem_decode_eq_get (b : ByteArray) (j : Nat) (hj : j < (decode (R := 
     (decode (R := R) b)[j] = get b j :=
   getElem_decode b j hj
 
+theorem slot_fits (b : ByteArray) (i : Nat) (hi : i < b.size / width R) :
+    width R * i + width R ≤ b.size := by
+  have := Nat.mul_le_of_le_div (width R) (i + 1) b.size hi
+  rw [Nat.succ_mul, Nat.mul_comm] at this
+  exact this
+
+theorem toNat_slot (b : ByteArray) (i : Nat) (hi : i < b.size / width R)
+    (hu : b.size < USize.size) : (width R * i).toUSize.toNat = width R * i := by
+  have := slot_fits b i hi
+  have := (width_pos (R := R))
+  exact USize.toNat_ofNat_of_lt' (by omega)
+
+/-- `decode` by the fast accesses `read`, which it is (`decode_eq_decodeRead`). -/
+def decodeRead (b : ByteArray) : Array R :=
+  if hu : b.size < USize.size then
+    Array.ofFn (n := b.size / width R) fun i ↦ read b (width R * i.val).toUSize
+      (by rw [toNat_slot b i.val i.isLt hu]; exact slot_fits b i.val i.isLt) hu
+  else decode b
+
+@[csimp] theorem decode_eq_decodeRead : @decode = @decodeRead := by
+  funext R _ b
+  unfold decodeRead
+  split
+  · rename_i hu
+    apply Array.ext
+    · simp only [decode, Array.size_ofFn]
+    · intro i h1 h2
+      simp only [decode, Array.getElem_ofFn, read_eq, toNat_slot b i (by simpa only
+        [decode, Array.size_ofFn] using h1) hu]
+  · rfl
+
 /-- Slot `k` of a buffer of `n` bytes with at least `k + 1` slots, at a machine offset. -/
 theorem slot_toNat (k : USize) (n : Nat) (hk : k.toNat < n / width R) (hu : n < USize.size) :
     (k * (width R).toUSize).toNat = width R * k.toNat ∧ width R * k.toNat + width R ≤ n := by
