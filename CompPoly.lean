@@ -417,6 +417,9 @@ public import CompPoly.Univariate.NTTFast.Packed.Radix2Refinement
 public import CompPoly.Univariate.NTTFast.Packed.Radix4Lemmas
 public import CompPoly.Univariate.NTTFast.Packed.Rows
 public import CompPoly.Univariate.NTTFast.Packed.StorageLemmas
+public import CompPoly.Univariate.NTTFast.Packed.StripBlocksCorrectness
+public import CompPoly.Univariate.NTTFast.Packed.Strips
+public import CompPoly.Univariate.NTTFast.Packed.StripsCorrectness
 public import CompPoly.Univariate.NTTFast.Packed.Twiddles
 public import CompPoly.Univariate.NTTFast.Packed.Unrolled
 public import CompPoly.Univariate.NTTFast.Parallel
