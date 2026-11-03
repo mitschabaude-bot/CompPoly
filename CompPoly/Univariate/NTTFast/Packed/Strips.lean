@@ -331,18 +331,22 @@ def stripLayers (p : ℕ) [Mont32Field p] (tw : @& Array ByteArray) (m : Nat) (b
 
 /-! ### Coset blocks -/
 
+/-- The ranges a scaled first radix-four row from row `k` needs, quarters of `q` rows. -/
+abbrev ScaledQuadFits (th tl T src out : ByteArray) (q k : USize) : Prop :=
+  4 * (8 * (k.toNat + 3 * q.toNat) + 8) ≤ out.size ∧ out.size < USize.size ∧
+    src.size < USize.size ∧ 4 * (k.toNat + 3 * q.toNat + 1) ≤ T.size ∧ T.size < USize.size ∧
+    4 * (k.toNat + q.toNat + 1) ≤ th.size ∧ th.size < USize.size ∧
+    4 * (k.toNat + 1) ≤ tl.size ∧ tl.size < USize.size
+
 /-- Row `k` of the scaled first radix-four pass of a block with quarters of `q` rows: row
 `k + c q` of `out` is row `bitrev (k + c q) = R + bitrev c` of `src`, `R = bitrev k` (the shift
 `sh` reverses the block's bits), times word `k + c q` of `T`, through the butterflies with
-twiddles `th[k]`, `th[k + q]`, `tl[k]`. A row whose words do not fit is skipped. -/
+twiddles `th[k]`, `th[k + q]`, `tl[k]`. A row whose source does not fit is skipped. -/
 @[inline] def stripScaledQuadCell (p : ℕ) [Mont32Field p] (th tl T src : @& ByteArray) (q : USize)
-    (sh : UInt32) (k : USize) (out : ByteArray) : ByteArray :=
+    (sh : UInt32) (k : USize) (out : ByteArray) (h : ScaledQuadFits th tl T src out q k) :
+    ByteArray :=
   let R := 8 * (reverse32 k.toUInt32 >>> sh).toUSize
-  if h : 4 * (8 * (k.toNat + 3 * q.toNat) + 8) ≤ out.size ∧ out.size < USize.size ∧
-      4 * (R.toNat + 32) ≤ src.size ∧ src.size < USize.size ∧
-      4 * (k.toNat + 3 * q.toNat + 1) ≤ T.size ∧ T.size < USize.size ∧
-      4 * (k.toNat + q.toNat + 1) ≤ th.size ∧ th.size < USize.size ∧
-      4 * (k.toNat + 1) ≤ tl.size ∧ tl.size < USize.size then
+  if hs : 4 * (R.toNat + 32) ≤ src.size then
     have hq1 : (k + q).toNat = k.toNat + q.toNat := usize_add_toNat _ _ (by omega)
     have hq2 : (k + 2 * q).toNat = k.toNat + 2 * q.toNat := by
       rw [usize_add_toNat _ _ (by rw [usize_mul_small 2 q (by decide) (by omega)]; omega),
@@ -361,29 +365,53 @@ twiddles `th[k]`, `th[k + q]`, `tl[k]`. A row whose words do not fit is skipped.
       (R + 8) (R + 24) (8 * k) (8 * (k + q)) (8 * (k + 2 * q)) (8 * (k + 3 * q)) out
       (hrow k (by omega)) (hrow _ (by rw [hq1]; omega)) (hrow _ (by rw [hq2]; omega))
       (hrow _ (by rw [hq3]; omega)) h.2.1 (by omega) (by rw [hR 16 (by decide)]; omega)
-      (by rw [hR 8 (by decide)]; omega) (by rw [hR 24 (by decide)]; omega) h.2.2.2.1
-      (by omega) (by rw [hq1]; omega) (by rw [hq2]; omega) (by rw [hq3]; omega) h.2.2.2.2.2.1
-      (by omega) (by rw [hq1]; omega) h.2.2.2.2.2.2.2.1 (by omega) h.2.2.2.2.2.2.2.2.2).1
+      (by rw [hR 8 (by decide)]; omega) (by rw [hR 24 (by decide)]; omega) h.2.2.1
+      (by omega) (by rw [hq1]; omega) (by rw [hq2]; omega) (by rw [hq3]; omega) h.2.2.2.2.1
+      (by omega) (by rw [hq1]; omega) h.2.2.2.2.2.2.1 (by omega) h.2.2.2.2.2.2.2.2).1
   else out
 
-/-- Rows `k, …, k + n - 1` of the scaled first radix-four pass (`stripScaledQuadCell`). -/
+theorem size_stripScaledQuadCell (th tl T src : ByteArray) (q : USize) (sh : UInt32)
+    (k : USize) (out : ByteArray) (h) :
+    (stripScaledQuadCell p th tl T src q sh k out h).size = out.size := by
+  unfold stripScaledQuadCell
+  dsimp only
+  split
+  · exact size_buf _
+  · rfl
+
+/-- Rows `k, …, k + n - 1` of the scaled first radix-four pass (`stripScaledQuadCell`), after
+one range check. -/
 @[specialize]
 def stripScaledQuadRows (p : ℕ) [Mont32Field p] (th tl T src : @& ByteArray) (q : USize)
-    (sh : UInt32) : Nat → USize → ByteArray → ByteArray
-  | 0, _, out => out
-  | n + 1, k, out => stripScaledQuadRows p th tl T src q sh n (k + 1)
-    (stripScaledQuadCell p th tl T src q sh k out)
+    (sh : UInt32) : (n : Nat) → (k : USize) → (out : ByteArray) →
+    4 * (8 * (k.toNat + 3 * q.toNat + n)) ≤ out.size ∧ out.size < USize.size ∧
+      src.size < USize.size ∧ 4 * (k.toNat + 3 * q.toNat + n) ≤ T.size ∧ T.size < USize.size ∧
+      4 * (k.toNat + q.toNat + n) ≤ th.size ∧ th.size < USize.size ∧
+      4 * (k.toNat + n) ≤ tl.size ∧ tl.size < USize.size → ByteArray
+  | 0, _, out, _ => out
+  | n + 1, k, out, h =>
+    have hk1 : (k + 1).toNat = k.toNat + 1 := by
+      rw [usize_add_toNat _ _ (by rw [usize_numeral 1 (by decide)]; omega),
+        usize_numeral 1 (by decide)]
+    stripScaledQuadRows p th tl T src q sh n (k + 1)
+      (stripScaledQuadCell p th tl T src q sh k out (by omega)) (by
+        rw [size_stripScaledQuadCell, hk1]
+        omega)
+
+/-- The ranges a scaled first radix-two row from row `k` needs, halves of `q` rows. -/
+abbrev ScaledPairFits (tw T src out : ByteArray) (q k : USize) : Prop :=
+  4 * (8 * (k.toNat + q.toNat) + 8) ≤ out.size ∧ out.size < USize.size ∧
+    src.size < USize.size ∧ 4 * (k.toNat + q.toNat + 1) ≤ T.size ∧ T.size < USize.size ∧
+    4 * (k.toNat + 1) ≤ tw.size ∧ tw.size < USize.size
 
 /-- Row `k` of the scaled first radix-two layer of a block with halves of `q` rows: row `k + c q`
 of `out` is row `bitrev (k + c q) = R + c` of `src`, `R = bitrev k`, times word `k + c q` of `T`,
-through the butterfly with twiddle `tw[k]`. A row whose words do not fit is skipped. -/
+through the butterfly with twiddle `tw[k]`. A row whose source does not fit is skipped. -/
 @[inline] def stripScaledPairCell (p : ℕ) [Mont32Field p] (tw T src : @& ByteArray) (q : USize)
-    (sh : UInt32) (k : USize) (out : ByteArray) : ByteArray :=
+    (sh : UInt32) (k : USize) (out : ByteArray) (h : ScaledPairFits tw T src out q k) :
+    ByteArray :=
   let R := 8 * (reverse32 k.toUInt32 >>> sh).toUSize
-  if h : 4 * (8 * (k.toNat + q.toNat) + 8) ≤ out.size ∧ out.size < USize.size ∧
-      4 * (R.toNat + 16) ≤ src.size ∧ src.size < USize.size ∧
-      4 * (k.toNat + q.toNat + 1) ≤ T.size ∧ T.size < USize.size ∧
-      4 * (k.toNat + 1) ≤ tw.size ∧ tw.size < USize.size then
+  if hs : 4 * (R.toNat + 16) ≤ src.size then
     have hq1 : (k + q).toNat = k.toNat + q.toNat := usize_add_toNat _ _ (by omega)
     have hrow (x : USize) (hx : 4 * (8 * x.toNat + 8) ≤ out.size) :
         4 * ((8 * x).toNat + 8) ≤ out.size := by
@@ -394,16 +422,35 @@ through the butterfly with twiddle `tw[k]`. A row whose words do not fit is skip
         usize_numeral 8 (by decide)]
     (stripScaledPair p tw T src k k (k + q) R (R + 8) (8 * k) (8 * (k + q)) out
       (hrow k (by omega)) (hrow _ (by rw [hq1]; omega)) h.2.1 (by omega) (by rw [hR]; omega)
-      h.2.2.2.1 (by omega) (by rw [hq1]; omega) h.2.2.2.2.2.1 (by omega) h.2.2.2.2.2.2.2).1
+      h.2.2.1 (by omega) (by rw [hq1]; omega) h.2.2.2.2.1 (by omega) h.2.2.2.2.2.2).1
   else out
 
-/-- Rows `k, …, k + n - 1` of the scaled first radix-two layer (`stripScaledPairCell`). -/
+theorem size_stripScaledPairCell (tw T src : ByteArray) (q : USize) (sh : UInt32)
+    (k : USize) (out : ByteArray) (h) :
+    (stripScaledPairCell p tw T src q sh k out h).size = out.size := by
+  unfold stripScaledPairCell
+  dsimp only
+  split
+  · exact size_buf _
+  · rfl
+
+/-- Rows `k, …, k + n - 1` of the scaled first radix-two layer (`stripScaledPairCell`), after one
+range check. -/
 @[specialize]
 def stripScaledPairRows (p : ℕ) [Mont32Field p] (tw T src : @& ByteArray) (q : USize)
-    (sh : UInt32) : Nat → USize → ByteArray → ByteArray
-  | 0, _, out => out
-  | n + 1, k, out => stripScaledPairRows p tw T src q sh n (k + 1)
-    (stripScaledPairCell p tw T src q sh k out)
+    (sh : UInt32) : (n : Nat) → (k : USize) → (out : ByteArray) →
+    4 * (8 * (k.toNat + q.toNat + n)) ≤ out.size ∧ out.size < USize.size ∧
+      src.size < USize.size ∧ 4 * (k.toNat + q.toNat + n) ≤ T.size ∧ T.size < USize.size ∧
+      4 * (k.toNat + n) ≤ tw.size ∧ tw.size < USize.size → ByteArray
+  | 0, _, out, _ => out
+  | n + 1, k, out, h =>
+    have hk1 : (k + 1).toNat = k.toNat + 1 := by
+      rw [usize_add_toNat _ _ (by rw [usize_numeral 1 (by decide)]; omega),
+        usize_numeral 1 (by decide)]
+    stripScaledPairRows p tw T src q sh n (k + 1)
+      (stripScaledPairCell p tw T src q sh k out (by omega)) (by
+        rw [size_stripScaledPairCell, hk1]
+        omega)
 
 /-- The coset product with `T` of the coefficients `C` of a `2 ^ m`-row strip, in bit-reversed
 order, and the first layers of its DIF transform with twiddle tables `tw`, out of place: the
@@ -414,11 +461,26 @@ def stripScaled (p : ℕ) [Mont32Field p] (tw : @& Array ByteArray) (T C : @& By
   let out := zeroWords (8 * 2 ^ m)
   let sh := (32 - m).toUInt32
   if m % 2 = 1 then
-    stripScaledPairRows p (tw.getD (m - 1) .empty) T C (2 ^ (m - 1)).toUSize sh (2 ^ (m - 1)) 0
-      out
+    let tw1 := tw.getD (m - 1) .empty
+    let q := 2 ^ (m - 1)
+    if h : 4 * (8 * (2 * q)) ≤ out.size ∧ out.size < USize.size ∧ C.size < USize.size ∧
+        4 * (2 * q) ≤ T.size ∧ T.size < USize.size ∧ 4 * q ≤ tw1.size ∧
+        tw1.size < USize.size then
+      stripScaledPairRows p tw1 T C (USize.ofNatLT q (by omega)) sh q 0 out (by
+        rw [USize.toNat_ofNatLT, USize.toNat_zero]
+        omega)
+    else out
   else
-    stripScaledQuadRows p (tw.getD (m - 1) .empty) (tw.getD (m - 2) .empty) T C
-      (2 ^ (m - 2)).toUSize sh (2 ^ (m - 2)) 0 out
+    let th := tw.getD (m - 1) .empty
+    let tl := tw.getD (m - 2) .empty
+    let q := 2 ^ (m - 2)
+    if h : 4 * (8 * (4 * q)) ≤ out.size ∧ out.size < USize.size ∧ C.size < USize.size ∧
+        4 * (4 * q) ≤ T.size ∧ T.size < USize.size ∧ 4 * (2 * q) ≤ th.size ∧
+        th.size < USize.size ∧ 4 * q ≤ tl.size ∧ tl.size < USize.size then
+      stripScaledQuadRows p th tl T C (USize.ofNatLT q (by omega)) sh q 0 out (by
+        rw [USize.toNat_ofNatLT, USize.toNat_zero]
+        omega)
+    else out
 
 /-! ### Gathering and splitting -/
 

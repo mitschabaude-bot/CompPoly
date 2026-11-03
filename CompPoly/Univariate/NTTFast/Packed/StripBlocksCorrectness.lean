@@ -123,18 +123,13 @@ set_option maxRecDepth 16384 in
 set_option maxHeartbeats 4000000 in
 /-- A scaled first radix-four row whose words fit stores its four rows. -/
 theorem Native.stripScaledQuadCell_eq (th tl T C : Array (FastField p)) (q k : USize)
-    (sh : UInt32) (out : ByteArray)
-    (h : 4 * (8 * (k.toNat + 3 * q.toNat) + 8) ≤ out.size ∧ out.size < USize.size ∧
-      4 * ((8 * (reverse32 k.toUInt32 >>> sh).toUSize).toNat + 32) ≤ (encode C).size ∧
-      (encode C).size < USize.size ∧
-      4 * (k.toNat + 3 * q.toNat + 1) ≤ (encode T).size ∧ (encode T).size < USize.size ∧
-      4 * (k.toNat + q.toNat + 1) ≤ (encode th).size ∧ (encode th).size < USize.size ∧
-      4 * (k.toNat + 1) ≤ (encode tl).size ∧ (encode tl).size < USize.size) :
-    Native.stripScaledQuadCell p (encode th) (encode tl) (encode T) (encode C) q sh k out =
+    (sh : UInt32) (out : ByteArray) (h)
+    (hs : 4 * ((8 * (reverse32 k.toUInt32 >>> sh).toUSize).toNat + 32) ≤ (encode C).size) :
+    Native.stripScaledQuadCell p (encode th) (encode tl) (encode T) (encode C) q sh k out h =
       rows4 (scaledQuadValues th tl T C q k (8 * (reverse32 k.toUInt32 >>> sh).toUSize))
         (8 * k) (8 * (k + q)) (8 * (k + 2 * q)) (8 * (k + 3 * q)) out := by
   unfold Native.stripScaledQuadCell
-  rw [dite_eq_left_of_eq_true (eq_true h)]
+  rw [dite_eq_left_of_eq_true (eq_true hs)]
   unfold Native.stripScaledQuad
   simp only [Native.store8_val _ _ _ _ _ _ _ _ _ _ _ h.2.1, Native.touchLast, Native.touch_eq,
     Native.readUOffset_encode, add_val, sub_val, mul_val]
@@ -267,17 +262,13 @@ set_option maxRecDepth 16384 in
 set_option maxHeartbeats 4000000 in
 /-- A scaled first radix-two row whose words fit stores its two rows. -/
 theorem Native.stripScaledPairCell_eq (tw T C : Array (FastField p)) (q k : USize)
-    (sh : UInt32) (out : ByteArray)
-    (h : 4 * (8 * (k.toNat + q.toNat) + 8) ≤ out.size ∧ out.size < USize.size ∧
-      4 * ((8 * (reverse32 k.toUInt32 >>> sh).toUSize).toNat + 16) ≤ (encode C).size ∧
-      (encode C).size < USize.size ∧
-      4 * (k.toNat + q.toNat + 1) ≤ (encode T).size ∧ (encode T).size < USize.size ∧
-      4 * (k.toNat + 1) ≤ (encode tw).size ∧ (encode tw).size < USize.size) :
-    Native.stripScaledPairCell p (encode tw) (encode T) (encode C) q sh k out =
+    (sh : UInt32) (out : ByteArray) (h)
+    (hs : 4 * ((8 * (reverse32 k.toUInt32 >>> sh).toUSize).toNat + 16) ≤ (encode C).size) :
+    Native.stripScaledPairCell p (encode tw) (encode T) (encode C) q sh k out h =
       rows2 (scaledPairValues tw T C q k (8 * (reverse32 k.toUInt32 >>> sh).toUSize))
         (8 * k) (8 * (k + q)) out := by
   unfold Native.stripScaledPairCell
-  rw [dite_eq_left_of_eq_true (eq_true h)]
+  rw [dite_eq_left_of_eq_true (eq_true hs)]
   unfold Native.stripScaledPair
   simp only [Native.store8_val _ _ _ _ _ _ _ _ _ _ _ h.2.1, Native.touchLast, Native.touch_eq,
     Native.readUOffset_encode, add_val, sub_val, mul_val]
@@ -355,6 +346,22 @@ theorem scaledPairValues_eq (tw : Array (Array (FastField p))) (m : Nat) (hm1 : 
     rw [e1, e2, Nat.zero_add, hx0, hx1, getD_expand8, div8_add _ _ hl]
     rfl
 
+/-- The scaled radix-two row loop depends only on its arguments' values. -/
+theorem Native.stripScaledPairRows_congr {tw T src : ByteArray} {q q' : USize} {sh : UInt32}
+    {n : Nat} {k k' : USize} {out : ByteArray} (h) (eq : q = q') (ek : k = k') :
+    Native.stripScaledPairRows p tw T src q sh n k out h =
+      Native.stripScaledPairRows p tw T src q' sh n k' out (eq ▸ ek ▸ h) := by
+  subst eq ek
+  rfl
+
+/-- The scaled radix-four row loop depends only on its arguments' values. -/
+theorem Native.stripScaledQuadRows_congr {th tl T src : ByteArray} {q q' : USize} {sh : UInt32}
+    {n : Nat} {k k' : USize} {out : ByteArray} (h) (eq : q = q') (ek : k = k') :
+    Native.stripScaledQuadRows p th tl T src q sh n k out h =
+      Native.stripScaledQuadRows p th tl T src q' sh n k' out (eq ▸ ek ▸ h) := by
+  subst eq ek
+  rfl
+
 /-- **The scaled first layers on packed words** are the first layers of the coset product. -/
 theorem Native.stripScaled_encode (tw : Array (Array (FastField p))) (m : Nat) (hm : 1 ≤ m)
     (h32 : m ≤ 32) (htw : TwiddleSizes m tw) (T C : Array (FastField p)) (hT : T.size = 2 ^ m)
@@ -390,11 +397,14 @@ theorem Native.stripScaled_encode (tw : Array (Array (FastField p))) (m : Nat) (
     have hqU : q.toUSize.toNat = q := USize.toNat_ofNat_of_lt' (by omega)
     have htws : (encode (tw.getD (m - 1) #[])).size = 4 * q := by
       rw [size_encode_fields, htw _ (by omega)]
+    let tw1 := encode (tw.getD (m - 1) #[])
     have hcell (k : Nat) (hk : k < q) :
         Native.Fill Tg (fun i ↦ (8 * k ≤ i ∧ i < 8 * k + 8) ∨
-          (8 * (k + q) ≤ i ∧ i < 8 * (k + q) + 8)) N
-          (Native.stripScaledPairCell p (encode (tw.getD (m - 1) #[])) (encode T) (encode C)
-            q.toUSize (32 - m).toUInt32 k.toUSize) := by
+          (8 * (k + q) ≤ i ∧ i < 8 * (k + q) + 8)) N (fun out ↦
+          if h : Native.ScaledPairFits tw1 (encode T) (encode C) out q.toUSize k.toUSize then
+            Native.stripScaledPairCell p tw1 (encode T) (encode C) q.toUSize (32 - m).toUInt32
+              k.toUSize out h
+          else out) := by
       have hkU : k.toUSize.toNat = k := USize.toNat_ofNat_of_lt' (by omega)
       have hkq : (k.toUSize + q.toUSize).toNat = k + q := by
         rw [Native.usize_add_toNat _ _ (by rw [hkU, hqU]; omega), hkU, hqU]
@@ -421,44 +431,81 @@ theorem Native.stripScaled_encode (tw : Array (Array (FastField p))) (m : Nat) (
           rw [hr1, scaledPairValues_eq tw m hm hodd h32 T C hT hu k hk 1 (by decide) l hl]
           simp only [Tg, Nat.one_mul, ← hqd])
       refine (hf.congr_encode fun o ho ↦ ?_).mono ?_
-      · apply Eq.symm
-        apply Native.stripScaledPairCell_eq
-        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-          simp only [size_encode_uint32, ho, hkU, hqU, hCs, hTs, htws, hR, hrk, N] <;> omega
+      · have hfit : Native.ScaledPairFits tw1 (encode T) (encode C) (encode o) q.toUSize
+            k.toUSize := by
+          refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+            simp only [size_encode_uint32, ho, hkU, hqU, hCs, hTs, htws, N, tw1] <;> omega
+        rw [dite_eq_left_of_eq_true (eq_true hfit)]
+        exact (Native.stripScaledPairCell_eq _ T C _ _ _ _ hfit (by
+          rw [hCs, hR, hrk]; omega)).symm
       · intro i hi
         simpa only [hr0, hr1] using hi
+    let H (n : Nat) (k : USize) (out : ByteArray) : Prop :=
+      4 * (8 * (k.toNat + q.toUSize.toNat + n)) ≤ out.size ∧ out.size < USize.size ∧
+        (encode C).size < USize.size ∧ 4 * (k.toNat + q.toUSize.toNat + n) ≤ (encode T).size ∧
+        (encode T).size < USize.size ∧ 4 * (k.toNat + n) ≤ tw1.size ∧ tw1.size < USize.size
     have hloop : ∀ n k, k + n ≤ q → Native.Fill Tg (fun i ↦ ∃ j, k ≤ j ∧ j < k + n ∧
         ((8 * j ≤ i ∧ i < 8 * j + 8) ∨ (8 * (j + q) ≤ i ∧ i < 8 * (j + q) + 8))) N
-        (Native.stripScaledPairRows p (encode (tw.getD (m - 1) #[])) (encode T) (encode C)
-          q.toUSize (32 - m).toUInt32 n k.toUSize) := by
+        (fun out ↦ if h : H n k.toUSize out then Native.stripScaledPairRows p tw1 (encode T)
+          (encode C) q.toUSize (32 - m).toUInt32 n k.toUSize out h else out) := by
       intro n
       induction n with
       | zero =>
         intro k _
-        exact (Native.Fill.id Tg N).mono fun i ⟨j, h1, h2, _⟩ ↦ by omega
+        refine ((Native.Fill.id Tg N).congr fun b ↦ ?_).mono fun i ⟨j, h1, h2, _⟩ ↦ by omega
+        split <;> rfl
       | succ n ih =>
         intro k hk
+        have hkU : k.toUSize.toNat = k := USize.toNat_ofNat_of_lt' (by omega)
         have hk1 : k.toUSize + 1 = (k + 1).toUSize := by
           apply USize.toNat_inj.mp
-          rw [Native.usize_add_toNat _ _ (by rw [USize.toNat_ofNat_of_lt' (by omega),
-            Native.usize_numeral 1 (by decide)]; omega), USize.toNat_ofNat_of_lt' (by omega),
-            Native.usize_numeral 1 (by decide), USize.toNat_ofNat_of_lt' (by omega)]
-        refine (((hcell k (by omega)).comp (ih (k + 1) (by omega))).congr fun b ↦ ?_).mono ?_
-        · rw [Native.stripScaledPairRows, hk1]
-          rfl
+          rw [Native.usize_add_toNat _ _ (by rw [hkU, Native.usize_numeral 1 (by decide)]; omega),
+            hkU, Native.usize_numeral 1 (by decide), USize.toNat_ofNat_of_lt' (by omega)]
+        refine (((hcell k (by omega)).comp (ih (k + 1) (by omega))).congr_encode
+          fun o ho ↦ ?_).mono ?_
+        · have hA : H (n + 1) k.toUSize (encode o) := by
+            refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+              simp only [size_encode_uint32, ho, hkU, hqU, hCs, hTs, htws, N, tw1] <;> omega
+          have hfit : Native.ScaledPairFits tw1 (encode T) (encode C) (encode o) q.toUSize
+              k.toUSize := by
+            refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+              simp only [size_encode_uint32, ho, hkU, hqU, hCs, hTs, htws, N, tw1] <;> omega
+          have hB : H n (k + 1).toUSize (Native.stripScaledPairCell p tw1 (encode T) (encode C)
+              q.toUSize (32 - m).toUInt32 k.toUSize (encode o) hfit) := by
+            have hk1N : (k + 1).toUSize.toNat = k + 1 := USize.toNat_ofNat_of_lt' (by omega)
+            refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+              simp only [Native.size_stripScaledPairCell, size_encode_uint32, ho, hqU, hCs, hTs,
+                htws, hk1N, tw1] <;> omega
+          simp only [Function.comp_apply]
+          rw [dite_eq_left_of_eq_true (eq_true hfit), dite_eq_left_of_eq_true (eq_true hB),
+            dite_eq_left_of_eq_true (eq_true hA), Native.stripScaledPairRows]
+          exact (Native.stripScaledPairRows_congr _ rfl hk1).symm
         · rintro i ⟨j, h1, h2, h3⟩
           by_cases hj : j = k
           · subst hj; exact Or.inl h3
           · exact Or.inr ⟨j, by omega, by omega, h3⟩
     have hl0 := hloop q 0 (by omega)
-    rw [show (0 : Nat).toUSize = 0 from rfl] at hl0
-    refine hfin _ _ hl0 fun i hi ↦ ?_
-    obtain ⟨j, l, hl, rfl⟩ : ∃ j l, l < 8 ∧ i = 8 * j + l :=
-      ⟨i / 8, i % 8, Nat.mod_lt _ (by decide), by omega⟩
-    by_cases hj : j < q
-    · exact ⟨j, by omega, by omega, Or.inl ⟨by omega, by omega⟩⟩
-    · exact ⟨j - q, by omega, by simp only [N] at hi; omega,
-        Or.inr ⟨by omega, by omega⟩⟩
+    have hA0 : H q (0 : Nat).toUSize (zeroWords (8 * 2 ^ m)) := by
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+        simp only [Native.zeroWords_eq, size_encode_uint32, Array.size_replicate,
+          show (0 : Nat).toUSize.toNat = 0 from rfl, hqU, hCs, hTs, htws, tw1] <;> omega
+    have hcover : ∀ i < N, ∃ j, 0 ≤ j ∧ j < 0 + q ∧
+        ((8 * j ≤ i ∧ i < 8 * j + 8) ∨ (8 * (j + q) ≤ i ∧ i < 8 * (j + q) + 8)) := by
+      intro i hi
+      obtain ⟨j, l, hl, rfl⟩ : ∃ j l, l < 8 ∧ i = 8 * j + l :=
+        ⟨i / 8, i % 8, Nat.mod_lt _ (by decide), by omega⟩
+      by_cases hj : j < q
+      · exact ⟨j, by omega, by omega, Or.inl ⟨by omega, by omega⟩⟩
+      · exact ⟨j - q, by omega, by simp only [N] at hi; omega,
+          Or.inr ⟨by omega, by omega⟩⟩
+    have hfin' := hfin _ _ hl0 hcover
+    rw [dite_eq_left_of_eq_true (eq_true hA0)] at hfin'
+    rw [dite_eq_left_of_eq_true (eq_true (by
+      simp only [Native.zeroWords_eq, size_encode_uint32, Array.size_replicate, hCs, hTs, htws]
+      omega))]
+    refine Eq.trans ?_ hfin'
+    exact Native.stripScaledPairRows_congr _ (USize.toNat_inj.mp (by
+      rw [USize.toNat_ofNatLT, hqU])) rfl
   · rename_i heven
     have hm2 : 2 ≤ m := by omega
     set q := 2 ^ (m - 2) with hqd
@@ -471,13 +518,17 @@ theorem Native.stripScaled_encode (tw : Array (Array (FastField p))) (m : Nat) (
       rw [size_encode_fields, htw _ (by omega), h2q]
     have htls : (encode (tw.getD (m - 2) #[])).size = 4 * q := by
       rw [size_encode_fields, htw _ (by omega)]
+    let th1 := encode (tw.getD (m - 1) #[])
+    let tl1 := encode (tw.getD (m - 2) #[])
     have hcell (k : Nat) (hk : k < q) :
         Native.Fill Tg (fun i ↦ ((8 * k ≤ i ∧ i < 8 * k + 8) ∨
           (8 * (k + q) ≤ i ∧ i < 8 * (k + q) + 8)) ∨ (8 * (k + 2 * q) ≤ i ∧
             i < 8 * (k + 2 * q) + 8) ∨ (8 * (k + 3 * q) ≤ i ∧ i < 8 * (k + 3 * q) + 8)) N
-          (Native.stripScaledQuadCell p (encode (tw.getD (m - 1) #[]))
-            (encode (tw.getD (m - 2) #[])) (encode T) (encode C) q.toUSize (32 - m).toUInt32
-            k.toUSize) := by
+          (fun out ↦ if h : Native.ScaledQuadFits th1 tl1 (encode T) (encode C) out q.toUSize
+              k.toUSize then
+            Native.stripScaledQuadCell p th1 tl1 (encode T) (encode C) q.toUSize
+              (32 - m).toUInt32 k.toUSize out h
+          else out) := by
       have hkU : k.toUSize.toNat = k := USize.toNat_ofNat_of_lt' (by omega)
       have hkc (c : Nat) (hc : c < 4) :
           (k.toUSize + OfNat.ofNat c * q.toUSize).toNat = k + c * q := by
@@ -513,52 +564,95 @@ theorem Native.stripScaled_encode (tw : Array (Array (FastField p))) (m : Nat) (
         (fun l hl ↦ by rw [hr2, hv 2 (by decide) l hl])
         (fun l hl ↦ by rw [hr3, hv 3 (by decide) l hl])
       refine (hf.congr_encode fun o ho ↦ ?_).mono ?_
-      · apply Eq.symm
-        apply Native.stripScaledQuadCell_eq
-        refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-          simp only [size_encode_uint32, ho, hkU, hqU, hCs, hTs, hths, htls, hR, hrk, N] <;>
-          omega
+      · have hfit : Native.ScaledQuadFits th1 tl1 (encode T) (encode C) (encode o) q.toUSize
+            k.toUSize := by
+          refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+            simp only [size_encode_uint32, ho, hkU, hqU, hCs, hTs, hths, htls, N, th1, tl1] <;>
+            omega
+        rw [dite_eq_left_of_eq_true (eq_true hfit)]
+        exact (Native.stripScaledQuadCell_eq _ _ T C _ _ _ _ hfit (by
+          rw [hCs, hR, hrk]; omega)).symm
       · intro i hi
         simpa only [hr0, hr1, hr2, hr3] using hi
+    let H (n : Nat) (k : USize) (out : ByteArray) : Prop :=
+      4 * (8 * (k.toNat + 3 * q.toUSize.toNat + n)) ≤ out.size ∧ out.size < USize.size ∧
+        (encode C).size < USize.size ∧ 4 * (k.toNat + 3 * q.toUSize.toNat + n) ≤ (encode T).size ∧
+        (encode T).size < USize.size ∧ 4 * (k.toNat + q.toUSize.toNat + n) ≤ th1.size ∧
+        th1.size < USize.size ∧ 4 * (k.toNat + n) ≤ tl1.size ∧ tl1.size < USize.size
     have hloop : ∀ n k, k + n ≤ q → Native.Fill Tg (fun i ↦ ∃ j, k ≤ j ∧ j < k + n ∧
         (((8 * j ≤ i ∧ i < 8 * j + 8) ∨ (8 * (j + q) ≤ i ∧ i < 8 * (j + q) + 8)) ∨
           (8 * (j + 2 * q) ≤ i ∧ i < 8 * (j + 2 * q) + 8) ∨
           (8 * (j + 3 * q) ≤ i ∧ i < 8 * (j + 3 * q) + 8))) N
-        (Native.stripScaledQuadRows p (encode (tw.getD (m - 1) #[]))
-          (encode (tw.getD (m - 2) #[])) (encode T) (encode C) q.toUSize (32 - m).toUInt32 n
-          k.toUSize) := by
+        (fun out ↦ if h : H n k.toUSize out then Native.stripScaledQuadRows p th1 tl1 (encode T)
+          (encode C) q.toUSize (32 - m).toUInt32 n k.toUSize out h else out) := by
       intro n
       induction n with
       | zero =>
         intro k _
-        exact (Native.Fill.id Tg N).mono fun i ⟨j, h1, h2, _⟩ ↦ by omega
+        refine ((Native.Fill.id Tg N).congr fun b ↦ ?_).mono fun i ⟨j, h1, h2, _⟩ ↦ by omega
+        split <;> rfl
       | succ n ih =>
         intro k hk
+        have hkU : k.toUSize.toNat = k := USize.toNat_ofNat_of_lt' (by omega)
         have hk1 : k.toUSize + 1 = (k + 1).toUSize := by
           apply USize.toNat_inj.mp
-          rw [Native.usize_add_toNat _ _ (by rw [USize.toNat_ofNat_of_lt' (by omega),
-            Native.usize_numeral 1 (by decide)]; omega), USize.toNat_ofNat_of_lt' (by omega),
-            Native.usize_numeral 1 (by decide), USize.toNat_ofNat_of_lt' (by omega)]
-        refine (((hcell k (by omega)).comp (ih (k + 1) (by omega))).congr fun b ↦ ?_).mono ?_
-        · rw [Native.stripScaledQuadRows, hk1]
-          rfl
+          rw [Native.usize_add_toNat _ _ (by rw [hkU, Native.usize_numeral 1 (by decide)]; omega),
+            hkU, Native.usize_numeral 1 (by decide), USize.toNat_ofNat_of_lt' (by omega)]
+        refine (((hcell k (by omega)).comp (ih (k + 1) (by omega))).congr_encode
+          fun o ho ↦ ?_).mono ?_
+        · have hA : H (n + 1) k.toUSize (encode o) := by
+            refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+              simp only [size_encode_uint32, ho, hkU, hqU, hCs, hTs, hths, htls, N, th1, tl1] <;>
+              omega
+          have hfit : Native.ScaledQuadFits th1 tl1 (encode T) (encode C) (encode o) q.toUSize
+              k.toUSize := by
+            refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+              simp only [size_encode_uint32, ho, hkU, hqU, hCs, hTs, hths, htls, N, th1, tl1] <;>
+              omega
+          have hB : H n (k + 1).toUSize (Native.stripScaledQuadCell p th1 tl1 (encode T)
+              (encode C) q.toUSize (32 - m).toUInt32 k.toUSize (encode o) hfit) := by
+            have hk1N : (k + 1).toUSize.toNat = k + 1 := USize.toNat_ofNat_of_lt' (by omega)
+            refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+              simp only [Native.size_stripScaledQuadCell, size_encode_uint32, ho, hqU, hCs, hTs,
+                hths, htls, hk1N, th1, tl1] <;> omega
+          simp only [Function.comp_apply]
+          rw [dite_eq_left_of_eq_true (eq_true hfit), dite_eq_left_of_eq_true (eq_true hB),
+            dite_eq_left_of_eq_true (eq_true hA), Native.stripScaledQuadRows]
+          exact (Native.stripScaledQuadRows_congr _ rfl hk1).symm
         · rintro i ⟨j, h1, h2, h3⟩
           by_cases hj : j = k
           · subst hj; exact Or.inl h3
           · exact Or.inr ⟨j, by omega, by omega, h3⟩
     have hl0 := hloop q 0 (by omega)
-    rw [show (0 : Nat).toUSize = 0 from rfl] at hl0
-    refine hfin _ _ hl0 fun i hi ↦ ?_
-    obtain ⟨j, l, hl, rfl⟩ : ∃ j l, l < 8 ∧ i = 8 * j + l :=
-      ⟨i / 8, i % 8, Nat.mod_lt _ (by decide), by omega⟩
-    have hj : j < 4 * q := by simp only [N] at hi; omega
-    by_cases j0 : j < q
-    · exact ⟨j, by omega, by omega, Or.inl (Or.inl ⟨by omega, by omega⟩)⟩
-    · by_cases j1 : j < 2 * q
-      · exact ⟨j - q, by omega, by omega, Or.inl (Or.inr ⟨by omega, by omega⟩)⟩
-      · by_cases j2 : j < 3 * q
-        · exact ⟨j - 2 * q, by omega, by omega, Or.inr (Or.inl ⟨by omega, by omega⟩)⟩
-        · exact ⟨j - 3 * q, by omega, by omega, Or.inr (Or.inr ⟨by omega, by omega⟩)⟩
+    have hA0 : H q (0 : Nat).toUSize (zeroWords (8 * 2 ^ m)) := by
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+        simp only [Native.zeroWords_eq, size_encode_uint32, Array.size_replicate,
+          show (0 : Nat).toUSize.toNat = 0 from rfl, hqU, hCs, hTs, hths, htls, th1, tl1] <;>
+        omega
+    have hcover : ∀ i < N, ∃ j, 0 ≤ j ∧ j < 0 + q ∧
+        (((8 * j ≤ i ∧ i < 8 * j + 8) ∨ (8 * (j + q) ≤ i ∧ i < 8 * (j + q) + 8)) ∨
+          (8 * (j + 2 * q) ≤ i ∧ i < 8 * (j + 2 * q) + 8) ∨
+          (8 * (j + 3 * q) ≤ i ∧ i < 8 * (j + 3 * q) + 8)) := by
+      intro i hi
+      obtain ⟨j, l, hl, rfl⟩ : ∃ j l, l < 8 ∧ i = 8 * j + l :=
+        ⟨i / 8, i % 8, Nat.mod_lt _ (by decide), by omega⟩
+      have hj : j < 4 * q := by simp only [N] at hi; omega
+      by_cases j0 : j < q
+      · exact ⟨j, by omega, by omega, Or.inl (Or.inl ⟨by omega, by omega⟩)⟩
+      · by_cases j1 : j < 2 * q
+        · exact ⟨j - q, by omega, by omega, Or.inl (Or.inr ⟨by omega, by omega⟩)⟩
+        · by_cases j2 : j < 3 * q
+          · exact ⟨j - 2 * q, by omega, by omega, Or.inr (Or.inl ⟨by omega, by omega⟩)⟩
+          · exact ⟨j - 3 * q, by omega, by omega, Or.inr (Or.inr ⟨by omega, by omega⟩)⟩
+    have hfin' := hfin _ _ hl0 hcover
+    rw [dite_eq_left_of_eq_true (eq_true hA0)] at hfin'
+    rw [dite_eq_left_of_eq_true (eq_true (by
+      simp only [Native.zeroWords_eq, size_encode_uint32, Array.size_replicate, hCs, hTs, hths,
+        htls]
+      omega))]
+    refine Eq.trans ?_ hfin'
+    exact Native.stripScaledQuadRows_congr _ (USize.toNat_inj.mp (by
+      rw [USize.toNat_ofNatLT, hqU])) rfl
 
 
 /-! ### Eight-row kernels -/
