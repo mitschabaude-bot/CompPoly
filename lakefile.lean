@@ -39,7 +39,6 @@ lean_lib CompPolyPackedNative where
     `CompPoly.Univariate.NTTFast.Packed.NativeLast,
     `CompPoly.Univariate.NTTFast.Packed.Columns,
     `CompPoly.Univariate.NTTFast.Packed.CosetLde,
-    `CompPoly.Univariate.NTTFast.Packed.Strips,
     `CompPoly.Univariate.NTTFast.Packed.Instances,
     `CompPoly.Fields.Montgomery.Native32Words,
     `CompPoly.Fields.Montgomery.Native32Ext4Planes,

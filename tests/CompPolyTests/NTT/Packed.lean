@@ -7,7 +7,6 @@ module
 
 public import CompPoly.Univariate.NTTFast.Packed.CosetLdeCorrectness
 public import CompPoly.Univariate.NTTFast.Packed.Instances
-public import CompPoly.Univariate.NTTFast.Packed.Strips
 public import CompPoly.Univariate.NTT.BabyBear
 public import CompPoly.Univariate.NTT.KoalaBear
 
@@ -64,22 +63,6 @@ def ldeAgrees (p : ℕ) [Mont32Field p] [PackedCosetLde p] (D : NTT.Domain (Fast
     (P.cosetLde 3 (CPolynomial.NTTFast.Packed.Native.rowChunks M 3 P.logH k)) ==
       encode (ldeSpec P 3 M)
 
-/-- The strips of a `2 ^ logH × 17` matrix with blowup `2`, gathered from four chunks of rows, have
-the specification's columns as their coset blocks. -/
-def stripsAgree (p : ℕ) [Mont32Field p] (D : NTT.Domain (FastField p))
-    (hb : 1 ≤ D.logN) (h32 : D.logN ≤ 32) (hu : 4 * D.n < USize.size) : Bool :=
-  let P := LdePlan.ofDomain D 1 hb 3 h32 hu
-  let h := 2 ^ P.logH
-  let M := input p (h * 17)
-  let S := ldeSpec P 17 M
-  [0, 1].all fun s ↦
-    let C := CPolynomial.NTTFast.Packed.Native.stripCoefficients P
-      (CPolynomial.NTTFast.Packed.Native.stripOfChunks
-        (CPolynomial.NTTFast.Packed.Native.rowChunks M 17 P.logH 2) 17 s (h / 4))
-    [0, 1].all fun t ↦ CPolynomial.NTTFast.Packed.Native.stripBlock P C t ==
-      (Array.range 8).map fun l ↦ encode (Array.ofFn (n := h) fun i ↦
-        S.getD ((t * h + i.val) * 17 + 8 * s + l) 0)
-
 def koalaBear (logN : ℕ) (h : logN ≤ KoalaBear.twoAdicity) : NTT.Domain KoalaBear.Fast.Field :=
   NTT.KoalaBear.fastDomainOfLogN logN h
 
@@ -104,12 +87,6 @@ def run : IO Unit := do
     (ldeAgrees _ (koalaBear 6 (by decide)) (by decide) (by decide) (hu (by decide)))
   check "BabyBear LDE"
     (ldeAgrees _ (babyBear 6 (by decide)) (by decide) (by decide) (hu (by decide)))
-  check "KoalaBear strips 2^5"
-    (stripsAgree _ (koalaBear 6 (by decide)) (by decide) (by decide) (hu (by decide)))
-  check "KoalaBear strips 2^6"
-    (stripsAgree _ (koalaBear 7 (by decide)) (by decide) (by decide) (hu (by decide)))
-  check "BabyBear strips 2^5"
-    (stripsAgree _ (babyBear 6 (by decide)) (by decide) (by decide) (hu (by decide)))
   IO.println "packed NTT: KoalaBear and BabyBear checks passed"
 
 end CompPolyTests.NTT.Packed
