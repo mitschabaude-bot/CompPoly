@@ -192,7 +192,10 @@ and reduced once (`Montgomery.Native32.mulAdd4`). -/
 /-- `n` copies of the word `c`. -/
 def replicateWord (c : UInt32) (n : Nat) : ByteArray := Id.run do
   let mut out := zeroWords n
-  for k in [0:n] do
+  for block in [:n / 16] do
+    if h : 16 * block < USize.size then
+      out := write16U out (USize.ofNatLT (16 * block) h) c c c c c c c c c c c c c c c c
+  for k in [16 * (n / 16):n] do
     out := write out k c
   return out
 
