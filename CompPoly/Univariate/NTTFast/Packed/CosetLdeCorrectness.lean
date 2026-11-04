@@ -267,10 +267,12 @@ theorem Native.leafStage8Loop_encode (t a : Array (FastField p)) (count : Nat) (
       (fun b base hb ↦ Expressions.leafStage8Field_eq t b base hb)
       (fun b base _ ↦ size_layer16_8 t b base)]
 
-/-- The second stage's pass over `4 count` blocks is the second final layer on each block. -/
+/-- The second stage's pass over `4 count` blocks is the second final layer on each block, each
+block stored as `swap23` lays it out. -/
 theorem Native.leafStage4Loop_encode (t a : Array (FastField p)) (count : Nat) (h) :
     Native.leafStageLoop 4 (Native.leafStage4 p) (encode t) count 0 (encode a) h =
-      encode ((List.range (4 * count)).foldl (fun b blk ↦ layer16_4 t b (blk * 16)) a) := by
+      encode ((List.range (4 * count)).foldl (fun b blk ↦
+        perm16 swap23 (blk * 16) (layer16_4 t b (blk * 16))) a) := by
   have hb := h.1
   rw [size_encode_fields, USize.toNat_zero] at hb
   rw [Native.leafStageLoop_encode _ _ (fun b base ↦ Expressions.leafStage4Field t base b)
@@ -278,12 +280,14 @@ theorem Native.leafStage4Loop_encode (t a : Array (FastField p)) (count : Nat) (
     ← List.range_eq_range',
     foldl_blocks_congr _ _ _ a (by omega)
       (fun b base hb ↦ Expressions.leafStage4Field_eq t b base hb)
-      (fun b base _ ↦ size_layer16_4 t b base)]
+      (fun b base _ ↦ by rw [size_perm16, size_layer16_4])]
 
-/-- The third stage's pass over `4 count` blocks is the third final layer on each block. -/
+/-- The third stage's pass over `4 count` blocks is the third final layer on each block laid out by
+`swap23`, each block stored as `swap13` lays it out. -/
 theorem Native.leafStage2Loop_encode (t a : Array (FastField p)) (count : Nat) (h) :
     Native.leafStageLoop 2 (Native.leafStage2 p) (encode t) count 0 (encode a) h =
-      encode ((List.range (4 * count)).foldl (fun b blk ↦ layer16_2 t b (blk * 16)) a) := by
+      encode ((List.range (4 * count)).foldl (fun b blk ↦ perm16 swap13 (blk * 16)
+        (layer16_2 t (perm16 swap23 (blk * 16) b) (blk * 16))) a) := by
   have hb := h.1
   rw [size_encode_fields, USize.toNat_zero] at hb
   rw [Native.leafStageLoop_encode _ _ (fun b base ↦ Expressions.leafStage2Field t base b)
@@ -291,12 +295,14 @@ theorem Native.leafStage2Loop_encode (t a : Array (FastField p)) (count : Nat) (
     ← List.range_eq_range',
     foldl_blocks_congr _ _ _ a (by omega)
       (fun b base hb ↦ Expressions.leafStage2Field_eq t b base hb)
-      (fun b base _ ↦ size_layer16_2 t b base)]
+      (fun b base _ ↦ by rw [size_perm16, size_layer16_2, size_perm16])]
 
-/-- The last stage's pass over `4 count` blocks is the last final layer on each block. -/
+/-- The last stage's pass over `4 count` blocks is the last final layer on each block laid out by
+`swap13`, in natural order. -/
 theorem Native.leafStage1Loop_encode (t : ByteArray) (a : Array (FastField p)) (count : Nat) (h) :
     Native.leafStageLoop 0 (Native.leafStage1 p) t count 0 (encode a) h =
-      encode ((List.range (4 * count)).foldl (fun b blk ↦ layer16_1 #[1] b (blk * 16)) a) := by
+      encode ((List.range (4 * count)).foldl (fun b blk ↦
+        layer16_1 #[1] (perm16 swap13 (blk * 16) b) (blk * 16)) a) := by
   have hb := h.1
   rw [size_encode_fields, USize.toNat_zero] at hb
   rw [Native.leafStageLoop_encode _ _ (fun b base ↦ Expressions.leafStage1Field base b)
@@ -304,7 +310,19 @@ theorem Native.leafStage1Loop_encode (t : ByteArray) (a : Array (FastField p)) (
     ← List.range_eq_range',
     foldl_blocks_congr _ _ _ a (by omega)
       (fun b base hb ↦ Expressions.leafStage1Field_eq b base hb)
-      (fun b base _ ↦ size_layer16_1 #[1] b base)]
+      (fun b base _ ↦ by rw [size_layer16_1, size_perm16])]
+
+/-- The four stage models on a block, the layouts between them undone, are the four final
+layers. -/
+theorem stages_eq_leaf16Stages [Field R] (t3 t2 t1 b : Array R) (base : Nat)
+    (hs : base + 16 ≤ b.size) :
+    layer16_1 #[1] (perm16 swap13 base (perm16 swap13 base (layer16_2 t1
+      (perm16 swap23 base (perm16 swap23 base (layer16_4 t2 (layer16_8 t3 b base) base))) base)))
+      base = Expressions.leaf16Stages t3 t2 t1 b base := by
+  rw [perm16_perm16 swap23 swap23_invol _ _ (by simp only [size_layer16_4, size_layer16_8]; omega),
+    perm16_perm16 swap13 swap13_invol _ _
+      (by simp only [size_layer16_2, size_layer16_4, size_layer16_8]; omega)]
+  rfl
 
 /-- The final layers of `blocks` sixteen-word blocks. -/
 theorem Native.leaf16Blocks_encode (t3 t2 t1 : Array (FastField p)) (blocks : Nat) (a : Array
@@ -326,12 +344,36 @@ theorem Native.leaf16Blocks_encode (t3 t2 t1 : Array (FastField p)) (blocks : Na
       have := USize.le_size
       omega))]
   simp only [Native.leafStage8Loop_encode, Native.leafStage4Loop_encode,
-    Native.leafStage2Loop_encode, Native.leafStage1Loop_encode, layer16_8_eq_localLayer,
-    layer16_4_eq_localLayer, layer16_2_eq_localLayer, layer16_1_eq_localLayer]
-  rw [fold_localLayer _ 8 1 _ (by decide), fold_localLayer _ 4 2 _ (by decide),
-    fold_localLayer _ 2 4 _ (by decide), fold_localLayer _ 1 8 _ (by decide)]
-  simp only [Nat.reduceMul, Nat.one_mul]
-  rw [← fold_leaf16Stages]
+    Native.leafStage2Loop_encode, Native.leafStage1Loop_encode]
+  have hn4 : 16 * (4 * (blocks / 4)) ≤ a.size := by omega
+  have c1 := foldl_local16_comp (fun blk b ↦ layer16_8 t3 b (blk * 16))
+    (fun blk b ↦ perm16 swap23 (blk * 16) (layer16_4 t2 b (blk * 16)))
+    (fun blk ↦ Local16.layer16_8 t3 (blk * 16))
+    (fun blk ↦ (Local16.perm16 swap23 (fun o ho ↦ (swap23_invol o ho).1) _).comp
+      (Local16.layer16_4 t2 (blk * 16))) _ a hn4
+  have c2 := foldl_local16_comp
+    (fun blk b ↦ perm16 swap23 (blk * 16) (layer16_4 t2 (layer16_8 t3 b (blk * 16)) (blk * 16)))
+    (fun blk b ↦ perm16 swap13 (blk * 16) (layer16_2 t1 (perm16 swap23 (blk * 16) b) (blk * 16)))
+    (fun blk ↦ ((Local16.perm16 swap23 (fun o ho ↦ (swap23_invol o ho).1) _).comp
+      (Local16.layer16_4 t2 (blk * 16))).comp (Local16.layer16_8 t3 (blk * 16)))
+    (fun blk ↦ ((Local16.perm16 swap13 (fun o ho ↦ (swap13_invol o ho).1) _).comp
+      (Local16.layer16_2 t1 (blk * 16))).comp
+      (Local16.perm16 swap23 (fun o ho ↦ (swap23_invol o ho).1) _)) _ a hn4
+  have c3 := foldl_local16_comp
+    (fun blk b ↦ perm16 swap13 (blk * 16) (layer16_2 t1 (perm16 swap23 (blk * 16)
+      (perm16 swap23 (blk * 16) (layer16_4 t2 (layer16_8 t3 b (blk * 16)) (blk * 16))))
+      (blk * 16)))
+    (fun blk b ↦ layer16_1 #[1] (perm16 swap13 (blk * 16) b) (blk * 16))
+    (fun blk ↦ (((((Local16.perm16 swap13 (fun o ho ↦ (swap13_invol o ho).1) _).comp
+      (Local16.layer16_2 t1 (blk * 16))).comp
+      (Local16.perm16 swap23 (fun o ho ↦ (swap23_invol o ho).1) _)).comp
+      (Local16.perm16 swap23 (fun o ho ↦ (swap23_invol o ho).1) _)).comp
+      (Local16.layer16_4 t2 (blk * 16))).comp (Local16.layer16_8 t3 (blk * 16)))
+    (fun blk ↦ (Local16.layer16_1 #[1] (blk * 16)).comp
+      (Local16.perm16 swap13 (fun o ho ↦ (swap13_invol o ho).1) _)) _ a hn4
+  rw [c1, c2, c3, foldl_blocks_congr _ (fun b base ↦ Expressions.leaf16Stages t3 t2 t1 b base) _
+    a (by omega) (fun b base hb ↦ stages_eq_leaf16Stages t3 t2 t1 b base hb)
+    (fun b base _ ↦ Expressions.size_leaf16Stages ..)]
   rw [foldl_encode _ (fun b ↦ b.size = a.size) _ st (fun block hblock b hb ↦ by
       have hblock := List.mem_range'_1.mp hblock
       have hc : 4 * (16 * block + 15) + 3 < (encode b).size ∧ (encode b).size < USize.size ∧

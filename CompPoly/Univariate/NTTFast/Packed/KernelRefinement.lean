@@ -31,7 +31,7 @@ theorem Native.step16_encode (th tl : Array (FastField p))
   have h3 : i3.toNat + 16 ≤ a.size := by rw [size_encode_fields] at hi3; omega
   rw [size_encode_fields] at ha
   unfold Native.step16
-  simp only [Native.readUOffset_encode, add_val, mul_subL, sub_val, mul_val]
+  simp only [Native.readUOffset_encode, add_val, mul_subL]
   simp (config := { maxDischargeDepth := 8 })
     (disch := (simp_all (config := { maxDischargeDepth := 8 }) only
       [size_encode_fields, size_splice16])) only [Native.write16U_encode]

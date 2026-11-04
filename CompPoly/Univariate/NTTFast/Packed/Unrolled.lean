@@ -290,7 +290,8 @@ and `hi[l]` and keeps their sum at `lo[l]` and their difference at `hi[l]`, mult
 `tw[l]` of `t` if there are twiddles. The words dialect runs the four blocks from word `i` of `b`:
 it touches the buffer, reads every block, then stores each block as two halves, with the range
 checks proved from `h`. The fields dialect runs one block at word `base`. -/
-meta def leafStage (d : Dialect) (lo hi : List Nat) (tw : Option (List Nat)) : MacroM Term := do
+meta def leafStage (d : Dialect) (lo hi : List Nat) (tw : Option (List Nat))
+    (outLo : List Nat := lo) (outHi : List Nat := hi) : MacroM Term := do
   let blocks := match d with | .words => 4 | .fields => 1
   let mut bs := #[]
   let word (v k : Nat) : MacroM Term := match d with
@@ -319,8 +320,8 @@ meta def leafStage (d : Dialect) (lo hi : List Nat) (tw : Option (List Nat)) : M
   for v in [0:blocks] do
     let mut vals : Array Term := Array.replicate 16 (name s!"s{v}_0")
     for l in [0:8] do
-      vals := vals.set! lo[l]! (name s!"s{v}_{l}")
-      vals := vals.set! hi[l]! (name s!"d{v}_{l}")
+      vals := vals.set! outLo[l]! (name s!"s{v}_{l}")
+      vals := vals.set! outHi[l]! (name s!"d{v}_{l}")
     for half in [0, 8] do
       let vs := vals[half:half + 8].toArray
       match d with
@@ -403,38 +404,46 @@ macro "leafStage8_fields%" : term =>
     (some [0, 1, 2, 3, 4, 5, 6, 7])
 
 open CompPoly.CPolynomial.NTTFast.Packed.Unrolled in
-/-- Layer two of four in place: words `k` and `k + 4` of every half block. -/
+/-- Layer two of four in place: words `k` and `k + 4` of every half block, the sums stored in the
+first eight words and the products in the last eight (`swap23`). -/
 macro "leafStage4_words%" : term =>
   leafStage .words [0, 1, 2, 3, 8, 9, 10, 11] [4, 5, 6, 7, 12, 13, 14, 15]
-    (some [0, 1, 2, 3, 0, 1, 2, 3])
+    (some [0, 1, 2, 3, 0, 1, 2, 3]) [0, 1, 2, 3, 4, 5, 6, 7] [8, 9, 10, 11, 12, 13, 14, 15]
 
 open CompPoly.CPolynomial.NTTFast.Packed.Unrolled in
 /-- Layer two of four on one block of field values. -/
 macro "leafStage4_fields%" : term =>
   leafStage .fields [0, 1, 2, 3, 8, 9, 10, 11] [4, 5, 6, 7, 12, 13, 14, 15]
     (some [0, 1, 2, 3, 0, 1, 2, 3])
+    [0, 1, 2, 3, 4, 5, 6, 7] [8, 9, 10, 11, 12, 13, 14, 15]
 
 open CompPoly.CPolynomial.NTTFast.Packed.Unrolled in
-/-- Layer three of four in place: words `k` and `k + 2` of every quarter block. -/
+/-- Layer three of four in place on blocks laid out by `swap23`: words `k` and `k + 2` of every
+quarter block, the sums stored in the first eight words and the products in the last eight
+(`swap13`). -/
 macro "leafStage2_words%" : term =>
   leafStage .words [0, 1, 4, 5, 8, 9, 12, 13] [2, 3, 6, 7, 10, 11, 14, 15]
-    (some [0, 1, 0, 1, 0, 1, 0, 1])
+    (some [0, 1, 0, 1, 0, 1, 0, 1]) [0, 1, 2, 3, 4, 5, 6, 7] [8, 9, 10, 11, 12, 13, 14, 15]
 
 open CompPoly.CPolynomial.NTTFast.Packed.Unrolled in
 /-- Layer three of four on one block of field values. -/
 macro "leafStage2_fields%" : term =>
   leafStage .fields [0, 1, 4, 5, 8, 9, 12, 13] [2, 3, 6, 7, 10, 11, 14, 15]
     (some [0, 1, 0, 1, 0, 1, 0, 1])
+    [0, 1, 2, 3, 4, 5, 6, 7] [8, 9, 10, 11, 12, 13, 14, 15]
 
 open CompPoly.CPolynomial.NTTFast.Packed.Unrolled in
-/-- Layer four of four in place: words `2 k` and `2 k + 1`, without twiddles. -/
+/-- Layer four of four in place on blocks laid out by `swap13`: words `2 k` and `2 k + 1`, without
+twiddles, stored in natural order. -/
 macro "leafStage1_words%" : term =>
   leafStage .words [0, 2, 4, 6, 8, 10, 12, 14] [1, 3, 5, 7, 9, 11, 13, 15] none
+    [0, 8, 4, 12, 2, 10, 6, 14] [1, 9, 5, 13, 3, 11, 7, 15]
 
 open CompPoly.CPolynomial.NTTFast.Packed.Unrolled in
 /-- Layer four of four on one block of field values. -/
 macro "leafStage1_fields%" : term =>
   leafStage .fields [0, 2, 4, 6, 8, 10, 12, 14] [1, 3, 5, 7, 9, 11, 13, 15] none
+    [0, 8, 4, 12, 2, 10, 6, 14] [1, 9, 5, 13, 3, 11, 7, 15]
 
 open CompPoly.CPolynomial.NTTFast.Packed.Unrolled in
 /-- The body of the scaled out-of-place radix-two kernel. -/
