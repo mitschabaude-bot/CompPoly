@@ -272,6 +272,13 @@ theorem divMod_add (a b n : Nat) (hb : b < n) : (a * n + b) / n = a ∧ (a * n +
 
 /-- Rows `r0, …, r0 + rows - 1` of columns `c0, …, c0 + n - 1` of a row-major matrix of width
 `w`, transposed: word `j * rows + r` is entry `(r0 + r, c0 + j)`. -/
+theorem tileColumn_add_le {n ct : Nat} (h : ct < tileColumns n) : tileColumn n ct + 16 ≤ n := by
+  unfold tileColumn
+  unfold tileColumns at h
+  split
+  · omega
+  · split at h <;> omega
+
 theorem transposeRows_encodeWords (M : Array UInt32) (w c0 n r0 rows : Nat) (hn : c0 + n ≤ w)
     (hM : (r0 + rows) * w ≤ M.size) (hs : 4 * M.size < USize.size) :
     transposeRows (encode M) w c0 n r0 rows = encode (Array.ofFn (n := n * rows) fun k ↦
@@ -283,32 +290,34 @@ theorem transposeRows_encodeWords (M : Array UInt32) (w c0 n r0 rows : Nat) (hn 
   have hN : 4 * (n * rows) < USize.size := by omega
   have hu (n : Nat) (hn : n ≤ M.size) : n.toUSize.toNat = n := USize.toNat_ofNat_of_lt' (by omega)
   have htile (rt : Nat) (hrt : rt < rows / 16) (ct : Nat)
-      (hct : ct ∈ List.range (n / 16)) :
-      Fill T (fun k ↦ ∃ u < 16, ∃ t < 16, k = (16 * ct + u) * rows + (16 * rt + t)) (n * rows)
-        (fun b ↦ tileStrided (encode M) ((r0 + 16 * rt) * w + c0 + 16 * ct).toUSize w.toUSize b
-          (16 * ct * rows + 16 * rt).toUSize rows.toUSize) := by
-    have hct := List.mem_range.mp hct
+      (hct : ct ∈ List.range (tileColumns n)) :
+      Fill T (fun k ↦ ∃ u < 16, ∃ t < 16, k = (tileColumn n ct + u) * rows + (16 * rt + t))
+        (n * rows)
+        (fun b ↦ tileStrided (encode M) ((r0 + 16 * rt) * w + c0 + tileColumn n ct).toUSize
+          w.toUSize b (tileColumn n ct * rows + 16 * rt).toUSize rows.toUSize) := by
+    have hcc := tileColumn_add_le (List.mem_range.mp hct)
+    generalize tileColumn n ct = cc at hcc ⊢
     have h1 : (r0 + 16 * rt + 16) * w ≤ (r0 + rows) * w := Nat.mul_le_mul_right w (by omega)
-    have h2 : (16 * ct + 16) * rows ≤ n * rows := Nat.mul_le_mul_right rows (by omega)
+    have h2 : (cc + 16) * rows ≤ n * rows := Nat.mul_le_mul_right rows (by omega)
     have e1 : (r0 + 16 * rt + 16) * w = (r0 + 16 * rt) * w + 16 * w := by ring
-    have e2 : (16 * ct + 16) * rows = 16 * ct * rows + 16 * rows := by ring
-    have hq : (r0 + 16 * rt) * w + c0 + 16 * ct ≤ M.size := by omega
-    have hp : 16 * ct * rows + 16 * rt ≤ M.size := by omega
+    have e2 : (cc + 16) * rows = cc * rows + 16 * rows := by ring
+    have hq : (r0 + 16 * rt) * w + c0 + cc ≤ M.size := by omega
+    have hp : cc * rows + 16 * rt ≤ M.size := by omega
     refine (fill_tileStrided T (n * rows) M _ _ _ _ (by omega) hN ?_ ?_ ?_).mono ?_
     · rw [hu _ hq, hu _ (by omega)]; omega
     · rw [hu _ hp, hu _ (by omega)]; omega
     · intro u hu' t ht
       rw [hu _ hq, hu _ (by omega), hu _ hp, hu _ (by omega)]
-      have hd := divMod_add (16 * ct + u) (16 * rt + t) rows (by omega)
-      simp only [T, show 16 * ct * rows + 16 * rt + u * rows + t =
-        (16 * ct + u) * rows + (16 * rt + t) by ring, hd.1, hd.2]
+      have hd := divMod_add (cc + u) (16 * rt + t) rows (by omega)
+      simp only [T, show cc * rows + 16 * rt + u * rows + t =
+        (cc + u) * rows + (16 * rt + t) by ring, hd.1, hd.2]
       congr 1
       ring
     · rintro k ⟨u, hu', t, ht, rfl⟩
       exact ⟨u, hu', t, ht, by rw [hu _ hp, hu _ (by omega)]; ring⟩
   have hedge (j : Nat) (hj : j ∈ List.range n) (r : Nat)
-      (hr : r ∈ List.range' (if j < 16 * (n / 16) then 16 * (rows / 16) else 0)
-        (rows - if j < 16 * (n / 16) then 16 * (rows / 16) else 0)) :
+      (hr : r ∈ List.range' (if 16 ≤ n then 16 * (rows / 16) else 0)
+        (rows - if 16 ≤ n then 16 * (rows / 16) else 0)) :
       Fill T (· = j * rows + r) (n * rows)
         (fun b ↦ write b (j * rows + r) (read (encode M) ((r0 + r) * w + c0 + j))) := by
     have hj := List.mem_range.mp hj
@@ -335,11 +344,27 @@ theorem transposeRows_encodeWords (M : Array UInt32) (w c0 n r0 rows : Nat) (hn 
   have hk' := Nat.div_add_mod k rows
   have hj : k / rows < n := (Nat.div_lt_iff_lt_mul hrows).mpr hk
   have hr := Nat.mod_lt k hrows
-  by_cases hin : k / rows < 16 * (n / 16) ∧ k % rows < 16 * (rows / 16)
-  · refine Or.inl ⟨k % rows / 16 / 64, List.mem_range.mpr (by omega), k / rows / 16,
-      List.mem_range.mpr (by omega), k % rows / 16, List.mem_range'_1.mpr (by omega),
-      k / rows % 16, Nat.mod_lt _ (by decide), k % rows % 16, Nat.mod_lt _ (by decide), ?_⟩
-    rw [show 16 * (k / rows / 16) + k / rows % 16 = k / rows by omega,
+  by_cases hin : 16 ≤ n ∧ k % rows < 16 * (rows / 16)
+  · -- A tile: the block of its column, or for a column past the whole blocks the last sixteen.
+    have hcover : ∃ ct < tileColumns n, tileColumn n ct ≤ k / rows ∧
+        k / rows < tileColumn n ct + 16 := by
+      by_cases hb : k / rows < 16 * (n / 16)
+      · refine ⟨k / rows / 16, ?_, ?_⟩
+        · unfold tileColumns; split <;> omega
+        · unfold tileColumn
+          rw [ite_eq_left_of_eq_true _ _ (eq_true (by omega))]
+          omega
+      · refine ⟨n / 16, ?_, ?_⟩
+        · unfold tileColumns
+          rw [ite_eq_left_of_eq_true _ _ (eq_true ⟨hin.1, by omega⟩)]; omega
+        · unfold tileColumn
+          rw [ite_eq_right_of_eq_false _ _ (eq_false (by omega))]
+          omega
+    obtain ⟨ct, hct, hlo, hhi⟩ := hcover
+    refine Or.inl ⟨k % rows / 16 / 64, List.mem_range.mpr (by omega), ct,
+      List.mem_range.mpr hct, k % rows / 16, List.mem_range'_1.mpr (by omega),
+      k / rows - tileColumn n ct, by omega, k % rows % 16, Nat.mod_lt _ (by decide), ?_⟩
+    rw [show tileColumn n ct + (k / rows - tileColumn n ct) = k / rows by omega,
       show 16 * (k % rows / 16) + k % rows % 16 = k % rows by omega, Nat.mul_comm]
     omega
   · refine Or.inr ⟨k / rows, List.mem_range.mpr hj, k % rows, List.mem_range'_1.mpr ?_, ?_⟩
