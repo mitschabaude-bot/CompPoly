@@ -547,21 +547,26 @@ once per block of 64 words (`dotBlocks`), then their total and the remaining wor
 
 /-! ### Inversion -/
 
+/-- Words `k, …, k + rem - 1` of `pre` the running products of words `i0 + k, …` of `a` from
+`acc`, and the product after them. The loop carries its product as an unboxed word. -/
+def prefixProducts (p : ℕ) [Mont32Field p] (a : @& ByteArray) (i0 : Nat) (pre : ByteArray)
+    (acc : UInt32) (k : Nat) : Nat → ByteArray × UInt32
+  | 0 => (pre, acc)
+  | rem + 1 => prefixProducts p a i0 (write pre k acc) (Packed.mul p acc (read a (i0 + k))) (k + 1)
+      rem
+
+/-- Words `i - 1, …, 0` of `out` the inverses of words `i0 + i - 1, …, i0` of `a`, from the
+inverse `inv` of the product of the first `i` and the prefix products `pre`. -/
+def suffixInverses (p : ℕ) [Mont32Field p] (a pre : @& ByteArray) (i0 : Nat) (out : ByteArray)
+    (inv : UInt32) : Nat → ByteArray
+  | 0 => out
+  | i + 1 => suffixInverses p a pre i0 (write out i (Packed.mul p inv (read pre i)))
+      (Packed.mul p inv (read a (i0 + i))) i
+
 /-- The inverses of words `i0, …, i0 + len - 1` of `a`, with one inversion, by prefix products. -/
 def batchInvRange (p : ℕ) [Mont32Field p] (a : @& ByteArray) (i0 len : Nat) : ByteArray :=
-  Id.run do
-  let mut pre := zeroWords len
-  let mut acc : UInt32 := (1 : FastField p).val
-  for k in [0:len] do
-    pre := write pre k acc
-    acc := Packed.mul p acc (read a (i0 + k))
-  let mut inv := (ofWord p acc)⁻¹.val
-  let mut out := zeroWords len
-  for k in [0:len] do
-    let i := len - 1 - k
-    out := write out i (Packed.mul p inv (read pre i))
-    inv := Packed.mul p inv (read a (i0 + i))
-  return out
+  let (pre, acc) := prefixProducts p a i0 (zeroWords len) (1 : FastField p).val 0 len
+  suffixInverses p a pre i0 (zeroWords len) (ofWord p acc)⁻¹.val len
 
 /-- The inverses of the first `n` words of `a`, by parallel ranges. -/
 def batchInvWords (p : ℕ) [Mont32Field p] (a : ByteArray) (n : Nat) : ByteArray :=

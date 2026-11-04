@@ -1035,64 +1035,45 @@ theorem batchInvRange_encode (a : Array F) (i0 len : Nat) (ha : i0 + len ≤ a.s
     (hs : 4 * a.size < USize.size) (hnz : ∀ k < len, a.getD (i0 + k) 0 ≠ 0) :
     batchInvRange p (encode a) i0 len =
       encode (Array.ofFn (n := len) fun k ↦ (a.getD (i0 + k.val) 0)⁻¹) := by
-  unfold batchInvRange
-  simp only [Std.Legacy.Range.forIn_eq_forIn_range', Std.Legacy.Range.size,
-    Nat.sub_zero, Nat.add_sub_cancel, Nat.div_one, ← List.range_eq_range',
-    pure_bind, List.forIn_pure_yield_eq_foldl, Id.run_pure]
   have hl : 4 * len < USize.size := by omega
   let x (j : Nat) : F := a.getD (i0 + j) 0
   let P (k : Nat) : F := ∏ j ∈ Finset.range k, x j
   have hP : ∀ k ≤ len, P k ≠ 0 := fun k hk ↦
     Finset.prod_ne_zero_iff.mpr fun j hj ↦ hnz j (by rw [Finset.mem_range] at hj; omega)
-  have h1 : ∀ K ≤ len, (List.range K).foldl (fun b k ↦ (write b.1 k b.2,
-      Packed.mul p b.2 (read (encode a) (i0 + k)))) (zeroWords len, (1 : F).val) =
-      (encode (upto (Array.replicate len 0) P K), (P K).val) := by
-    intro K hK
-    induction K with
-    | zero => rw [List.range_zero, List.foldl_nil, zeroWords_eq (p := p), upto_zero]; rfl
-    | succ K ih =>
-      rw [List.range_succ, List.foldl_append, ih (by omega), List.foldl_cons, List.foldl_nil]
-      simp only
-      rw [write_upto _ P K (by rw [Array.size_replicate]; omega)
+  have h1 : ∀ rem k, k + rem ≤ len → prefixProducts p (encode a) i0
+      (encode (upto (Array.replicate len 0) P k)) (P k).val k rem =
+      (encode (upto (Array.replicate len 0) P (k + rem)), (P (k + rem)).val) := by
+    intro rem
+    induction rem with
+    | zero => intro k _; rfl
+    | succ rem ih =>
+      intro k hk
+      rw [prefixProducts, write_upto _ P k (by rw [Array.size_replicate]; omega)
         (by rw [Array.size_replicate]; omega), read_encode a _ hs (by omega), mul_val,
-        show P (K + 1) = P K * x K from Finset.prod_range_succ _ _]
+        show P k * x k = P (k + 1) from (Finset.prod_range_succ _ _).symm, ih (k + 1) (by omega),
+        Nat.add_right_comm, Nat.add_assoc]
   have hpre : 4 * (upto (Array.replicate len 0) P len).size < USize.size := by
     rw [size_upto, Array.size_replicate]; exact hl
-  let o (K : Nat) : Array F := Array.ofFn (n := len) fun j ↦ if len - K ≤ j.val then (x j)⁻¹ else 0
-  have h2 : ∀ K ≤ len, (List.range K).foldl (fun b k ↦
-      (Packed.mul p b.1 (read (encode a) (i0 + (len - 1 - k))),
-        write b.2 (len - 1 - k)
-          (Packed.mul p b.1 (read (encode (upto (Array.replicate len 0) P len))
-          (len - 1 - k))))) (((P len)⁻¹).val, zeroWords len) =
-      (((P (len - K))⁻¹).val, encode (o K)) := by
-    intro K hK
-    induction K with
-    | zero =>
-      rw [List.range_zero, List.foldl_nil, Nat.sub_zero, zeroWords_eq (p := p)]
-      refine Prod.ext rfl (congrArg encode ?_)
-      apply Array.ext (by rw [Array.size_ofFn, Array.size_replicate])
-      intro j h _
-      rw [Array.size_replicate] at h
-      simp only [o, Array.getElem_replicate, Array.getElem_ofFn, Nat.sub_zero,
-        ite_eq_right_of_eq_false _ _ (eq_false (Nat.not_le_of_lt h))]
-    | succ K ih =>
-      rw [List.range_succ, List.foldl_append, ih (by omega), List.foldl_cons, List.foldl_nil]
-      have hj : len - 1 - K < len := by omega
-      have hPs : P (len - K) = P (len - 1 - K) * x (len - 1 - K) := by
-        rw [show len - K = (len - 1 - K) + 1 by omega]
-        exact Finset.prod_range_succ _ _
-      have hx : x (len - 1 - K) ≠ 0 := hnz _ hj
-      have hP' : P (len - 1 - K) ≠ 0 := hP _ (by omega)
-      simp only
-      rw [read_encode a _ hs (by omega), read_encode _ _ hpre (by
+  let o (i : Nat) : Array F := Array.ofFn (n := len) fun j ↦ if i ≤ j.val then (x j)⁻¹ else 0
+  have h2 : ∀ i ≤ len, suffixInverses p (encode a) (encode (upto (Array.replicate len 0) P len))
+      i0 (encode (o i)) ((P i)⁻¹).val i = encode (o 0) := by
+    intro i
+    induction i with
+    | zero => intro _; rfl
+    | succ i ih =>
+      intro hi
+      have hj : i < len := by omega
+      have hPs : P (i + 1) = P i * x i := Finset.prod_range_succ _ _
+      have hx : x i ≠ 0 := hnz _ hj
+      have hP' : P i ≠ 0 := hP _ (by omega)
+      rw [suffixInverses, read_encode a _ hs (by omega), read_encode _ _ hpre (by
           rw [size_upto, Array.size_replicate]; exact hj), getD_upto, Array.size_replicate,
         ite_eq_left_of_eq_true _ _ (eq_true hj), ite_eq_left_of_eq_true _ _ (eq_true hj),
         mul_val, mul_val]
-      refine Prod.ext ?_ ?_
-      · simp only
-        rw [show len - (K + 1) = len - 1 - K by omega, hPs, mul_inv, mul_assoc,
-          inv_mul_cancel₀ hx, mul_one]
-      · simp only
+      have hinv : (P (i + 1))⁻¹ * x i = (P i)⁻¹ := by
+        rw [hPs, mul_inv, mul_assoc, inv_mul_cancel₀ hx, mul_one]
+      have hout : CompPoly.CPolynomial.NTTFast.Packed.Native.write (encode (o (i + 1))) i
+          ((P (i + 1))⁻¹ * P i).val = encode (o i) := by
         rw [CompPoly.CPolynomial.NTTFast.Packed.Native.write_encode _ _ (by
           rw [size_encode_fields, Array.size_ofFn]; exact hl) (by rw [Array.size_ofFn]; exact hj)]
         refine congrArg encode ?_
@@ -1102,22 +1083,36 @@ theorem batchInvRange_encode (a : Array F) (i0 len : Nat) (ha : i0 + len ≤ a.s
         simp only [o]
         rw [getD_setIfInBounds _ _ _ _ _ (by rw [Array.size_ofFn]; exact hj), getD_ofFn',
           getD_ofFn']
-        by_cases hjj : j = len - 1 - K
+        by_cases hjj : j = i
         · subst hjj
           rw [ite_eq_left_of_eq_true _ _ (eq_true rfl), dite_eq_left_of_eq_true (eq_true hj)]
-          simp only [show len - (K + 1) ≤ len - 1 - K by omega, ite_true]
+          simp only [Nat.le_refl, ite_true]
           rw [hPs, mul_inv, mul_comm (P _)⁻¹, mul_assoc, inv_mul_cancel₀ hP', mul_one]
         · rw [ite_eq_right_of_eq_false _ _ (eq_false hjj)]
           by_cases hjl : j < len
           · rw [dite_eq_left_of_eq_true (eq_true hjl), dite_eq_left_of_eq_true (eq_true hjl)]
-            simp only [show (len - (K + 1) ≤ j) = (len - K ≤ j) from propext ⟨fun h ↦ by omega,
+            simp only [show (i + 1 ≤ j) = (i ≤ j) from propext ⟨fun h ↦ by omega,
               fun h ↦ by omega⟩]
           · rw [dite_eq_right_of_eq_false (eq_false hjl), dite_eq_right_of_eq_false (eq_false hjl)]
-  rw [h1 len (Nat.le_refl _), ofWord_val, h2 len (Nat.le_refl _)]
+      rw [hout, hinv]
+      exact ih (by omega)
+  have hz : zeroWords len = encode (upto (Array.replicate len (0 : F)) P 0) := by
+    rw [zeroWords_eq (p := p), upto_zero]
+  have hzo : encode (upto (Array.replicate len (0 : F)) P 0) = encode (o len) := by
+    rw [upto_zero]
+    refine congrArg encode (Array.ext (by rw [Array.size_ofFn, Array.size_replicate]) ?_)
+    intro j h _
+    rw [Array.size_replicate] at h
+    simp only [o, Array.getElem_replicate, Array.getElem_ofFn,
+      ite_eq_right_of_eq_false _ _ (eq_false (Nat.not_le_of_lt h))]
+  unfold batchInvRange
+  rw [hz, show (1 : F).val = (P 0).val from rfl, h1 len 0 (by omega), Nat.zero_add]
+  dsimp only
+  rw [ofWord_val, hzo, h2 len (Nat.le_refl _)]
   refine congrArg encode ?_
   apply Array.ext (by rw [Array.size_ofFn, Array.size_ofFn])
   intro j h _
-  simp only [o, Array.getElem_ofFn, Nat.sub_self, Nat.zero_le, ite_true, x]
+  simp only [o, Array.getElem_ofFn, Nat.zero_le, ite_true, x]
 
 /-! ### Parallel pieces -/
 
