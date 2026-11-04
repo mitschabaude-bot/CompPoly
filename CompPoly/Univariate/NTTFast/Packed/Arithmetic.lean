@@ -46,6 +46,10 @@ the difference needs no 64-bit comparison. -/
   let q := x * y * (0 - P.montgomeryNegInv)
   sub p ((x.toUInt64 * y.toUInt64) >>> 32).toUInt32 ((q.toUInt64 * P.modulus64) >>> 32).toUInt32
 
+/-- The difference `x - y + p` of canonical residues, below `2 p`: an operand of `mul` needs no
+reduction. -/
+@[inline] def subL (x y : UInt32) : UInt32 := x - y + P.modulus32
+
 /-- Decode a Montgomery coordinate, rejecting a noncanonical word. -/
 @[inline] def ofWord (x : UInt32) : FastField p :=
   if h : x.toNat < p then ⟨x, h⟩ else 0
@@ -112,7 +116,7 @@ theorem mont_quotients (L n m : Nat) (hn : n < 2 ^ 32) (hnp : n * m % 2 ^ 32 = 2
 
 /-- On canonical residues, `mul` is the Montgomery reduction `(z + (z n mod 2 ^ 32) p) / 2 ^ 32`
 of the product `z`, reduced once. -/
-theorem mul_eq_reduceOnce (x y : UInt32) (hx : x.toNat < p) (hy : y.toNat < p) :
+theorem mul_eq_reduceOnce (x y : UInt32) (hx : x.toNat < p) (hy : y.toNat < 2 * p) :
     mul p x y = reduceOnce p (((x.toUInt64 * y.toUInt64 + ((x.toUInt64 * y.toUInt64).toUInt32 *
       P.montgomeryNegInv).toUInt64 * P.modulus64) >>> 32).toUInt32) := by
   have hp31 := P.modulus_lt_two_pow_31
@@ -207,7 +211,142 @@ theorem mul_eq_reduceOnce (x y : UInt32) (hx : x.toNat < p) (hy : y.toNat < p) :
 
 /-- The raw multiplication is exactly the carrier's verified multiplication. -/
 theorem mul_val (x y : FastField p) : mul p x.val y.val = (x * y).val := by
-  rw [mul_eq_reduceOnce _ _ x.property y.property, reduceOnce_eq]
+  rw [mul_eq_reduceOnce _ _ x.property (by have := y.property; omega), reduceOnce_eq]
   rfl
+
+/-- `mul` of a canonical residue and a word below `2 p` is canonical and its value times `2 ^ 32`
+is the product modulo `p`. -/
+theorem mul_residue (x y : UInt32) (hx : x.toNat < p) (hy : y.toNat < 2 * p) :
+    (mul p x y).toNat < p ∧ (mul p x y).toNat * 2 ^ 32 % p = x.toNat * y.toNat % p := by
+  have hp31 := P.modulus_lt_two_pow_31
+  have hp32 := P.modulus32_toNat
+  have hp64 := P.modulus64_toNat
+  have hp2 := P.two_lt_modulus
+  have hnp := P.montgomeryNegInv_mul_modulus_mod_two_pow_32
+  have hn := P.montgomeryNegInv.toNat_lt
+  set n := P.montgomeryNegInv.toNat with hn_def
+  have hz : x.toNat * y.toNat < p * 2 ^ 32 :=
+    lt_of_lt_of_le (Nat.mul_lt_mul_of_lt_of_le hx hy.le (by omega))
+      (Nat.mul_le_mul_left _ (by omega))
+  set z := x.toNat * y.toNat with hz_def
+  have e32 : (32 : UInt64).toNat % 64 = 32 := rfl
+  have hz64 : (x.toUInt64 * y.toUInt64).toNat = z := by
+    rw [UInt64.toNat_mul, UInt32.toNat_toUInt64, UInt32.toNat_toUInt64]
+    exact Nat.mod_eq_of_lt (by omega)
+  set L := z % 2 ^ 32 with hL
+  set q1 := L * n % 2 ^ 32 with hq1
+  set q2 := L * ((2 ^ 32 - n) % 2 ^ 32) % 2 ^ 32 with hq2
+  obtain ⟨c1, c2⟩ := mont_quotients L n p hn hnp
+  rw [← hq1, ← hq2] at c2
+  rw [← hq1] at c1
+  have hq1R : q1 < 2 ^ 32 := Nat.mod_lt _ (by decide)
+  have hq2R : q2 < 2 ^ 32 := Nat.mod_lt _ (by decide)
+  have hq2p : q2 * p < 2 ^ 32 * p := Nat.mul_lt_mul_of_pos_right hq2R (by omega)
+  have hH : ((x.toUInt64 * y.toUInt64) >>> 32).toUInt32.toNat = z / 2 ^ 32 := by
+    rw [UInt64.toNat_toUInt32, UInt64.toNat_shiftRight, hz64, e32, Nat.shiftRight_eq_div_pow]
+    exact Nat.mod_eq_of_lt (by omega)
+  have hH2 : (((x * y * (0 - P.montgomeryNegInv)).toUInt64 * P.modulus64) >>> 32).toUInt32.toNat =
+      q2 * p / 2 ^ 32 := by
+    simp only [UInt64.toNat_toUInt32, UInt64.toNat_shiftRight, UInt64.toNat_mul,
+      UInt32.toNat_toUInt64, UInt32.toNat_mul, UInt32.toNat_sub, UInt32.toNat_zero, Nat.add_zero,
+      e32, hp64, ← hn_def]
+    rw [← hz_def, ← hL, ← hq2, Nat.mod_eq_of_lt (show q2 * p < 2 ^ 64 by omega),
+      Nat.shiftRight_eq_div_pow]
+    exact Nat.mod_eq_of_lt (by omega)
+  -- `q₂ p` and `z` agree modulo `2 ^ 32`, so their high words differ by the exact quotient.
+  have hlow : q2 * p % 2 ^ 32 = L := by
+    have h1 : (q1 * p + q2 * p) % 2 ^ 32 = 0 := by
+      rw [← Nat.add_mul, Nat.mul_mod, c2, Nat.zero_mul, Nat.zero_mod]
+    have h2 : (L + q1 * p) % 2 ^ 32 = 0 := c1
+    have hLR : L < 2 ^ 32 := Nat.mod_lt _ (by decide)
+    omega
+  have hzq : z = z / 2 ^ 32 * 2 ^ 32 + L := by omega
+  have hqq : q2 * p = q2 * p / 2 ^ 32 * 2 ^ 32 + L := by omega
+  have hres : (mul p x y).toNat = if q2 * p / 2 ^ 32 ≤ z / 2 ^ 32 then
+      z / 2 ^ 32 - q2 * p / 2 ^ 32 else z / 2 ^ 32 + p - q2 * p / 2 ^ 32 := by
+    unfold mul
+    dsimp only
+    rw [sub_eq _ _ (by rw [hH]; omega) (by rw [hH2]; omega)]
+    split
+    · rename_i h
+      rw [UInt32.le_iff_toNat_le, hH, hH2] at h
+      rw [UInt32.toNat_sub_of_le _ _ (UInt32.le_iff_toNat_le.mpr (by rw [hH, hH2]; omega)), hH,
+        hH2, ite_eq_left_of_eq_true _ _ (eq_true h)]
+    · rename_i h
+      rw [UInt32.le_iff_toNat_le, hH, hH2] at h
+      have hs : (((x.toUInt64 * y.toUInt64) >>> 32).toUInt32 + P.modulus32).toNat =
+          z / 2 ^ 32 + p := by
+        rw [UInt32.toNat_add, hH, hp32]; exact Nat.mod_eq_of_lt (by omega)
+      rw [UInt32.toNat_sub_of_le _ _ (UInt32.le_iff_toNat_le.mpr (by rw [hs, hH2]; omega)), hs,
+        hH2, ite_eq_right_of_eq_false _ _ (eq_false h)]
+  rw [hres]
+  have hqp : q2 * p % p = 0 := Nat.mul_mod_left _ _
+  split
+  · rename_i h
+    refine ⟨by omega, ?_⟩
+    have e : (z / 2 ^ 32 - q2 * p / 2 ^ 32) * 2 ^ 32 + q2 * p = z := by
+      rw [Nat.sub_mul]; omega
+    rw [show z % p = ((z / 2 ^ 32 - q2 * p / 2 ^ 32) * 2 ^ 32 + q2 * p) % p by rw [e],
+      Nat.add_mod, hqp, Nat.add_zero, Nat.mod_mod]
+  · rename_i h
+    refine ⟨by omega, ?_⟩
+    have e : (z / 2 ^ 32 + p - q2 * p / 2 ^ 32) * 2 ^ 32 + q2 * p = z + p * 2 ^ 32 := by
+      rw [Nat.sub_mul, Nat.add_mul]; omega
+    have e' : (z / 2 ^ 32 + p - q2 * p / 2 ^ 32) * 2 ^ 32 % p =
+        ((z / 2 ^ 32 + p - q2 * p / 2 ^ 32) * 2 ^ 32 + q2 * p) % p := by
+      rw [Nat.add_mod _ (q2 * p), hqp, Nat.add_zero, Nat.mod_mod]
+    rw [e', e, Nat.add_mul_mod_self_left]
+
+/-- Canonical residues with equal products by `2 ^ 32` modulo `p` are equal. -/
+theorem eq_of_mul_two_pow_mod (a b : Nat) (ha : a < p) (hb : b < p)
+    (h : a * 2 ^ 32 % p = b * 2 ^ 32 % p) : a = b := by
+  have hodd : Nat.Coprime (2 ^ 32) p := by
+    apply Nat.Coprime.pow_left
+    rw [Nat.coprime_primes Nat.prime_two P.prime]
+    have := P.two_lt_modulus
+    omega
+  have hm : a ≡ b [MOD p] := Nat.ModEq.cancel_right_of_coprime (c := 2 ^ 32)
+    (Nat.Coprime.symm hodd) h
+  exact Nat.ModEq.eq_of_lt_of_lt hm ha hb
+
+/-- A multiplication of the lazy difference is the field's product of the difference. -/
+theorem mul_subL (w x y : FastField p) :
+    mul p w.val (subL p x.val y.val) = (w * (x - y)).val := by
+  have hp31 := P.modulus_lt_two_pow_31
+  have hp32 := P.modulus32_toNat
+  have hx := x.property
+  have hy := y.property
+  have hw := w.property
+  have hd : (subL p x.val y.val).toNat = x.val.toNat + p - y.val.toNat := by
+    unfold subL
+    rw [UInt32.toNat_add, UInt32.toNat_sub, hp32]
+    omega
+  rw [← mul_val, ← sub_val]
+  have hs := sub_eq (p := p) x.val y.val hx hy
+  have hsN : (sub p x.val y.val).toNat = if y.val.toNat ≤ x.val.toNat then
+      x.val.toNat - y.val.toNat else x.val.toNat + p - y.val.toNat := by
+    rw [hs]
+    split
+    · rename_i h
+      rw [UInt32.le_iff_toNat_le] at h
+      rw [UInt32.toNat_sub_of_le _ _ (UInt32.le_iff_toNat_le.mpr h),
+        ite_eq_left_of_eq_true _ _ (eq_true h)]
+    · rename_i h
+      rw [UInt32.le_iff_toNat_le] at h
+      have ha : (x.val + P.modulus32).toNat = x.val.toNat + p := by
+        rw [UInt32.toNat_add, hp32]; exact Nat.mod_eq_of_lt (by omega)
+      rw [UInt32.toNat_sub_of_le _ _ (UInt32.le_iff_toNat_le.mpr (by rw [ha]; omega)), ha,
+        ite_eq_right_of_eq_false _ _ (eq_false h)]
+  have hsl : (sub p x.val y.val).toNat < 2 * p := by rw [hsN]; split <;> omega
+  obtain ⟨h1, e1⟩ := mul_residue (p := p) w.val _ hw (by rw [hd]; omega)
+  obtain ⟨h2, e2⟩ := mul_residue (p := p) w.val _ hw hsl
+  apply UInt32.toNat_inj.mp
+  apply eq_of_mul_two_pow_mod _ _ h1 h2
+  rw [e1, e2, hd, hsN]
+  split
+  · rename_i h
+    rw [show x.val.toNat + p - y.val.toNat = x.val.toNat - y.val.toNat + p by omega, Nat.mul_add,
+      Nat.add_mul_mod_self_right]
+  · rfl
 
 end CompPoly.CPolynomial.NTTFast.Packed

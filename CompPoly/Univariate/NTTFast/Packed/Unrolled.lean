@@ -44,6 +44,12 @@ meta def sub (d : Dialect) (x y : Term) : MacroM Term :=
   | .words => `($(name "sub") $(name "p") $x $y)
   | .fields => `($(name "fieldSub") $x $y)
 
+/-- A difference that only a multiplication reads: unreduced on words (`subL`). -/
+meta def subL (d : Dialect) (x y : Term) : MacroM Term :=
+  match d with
+  | .words => `($(name "subL") $(name "p") $x $y)
+  | .fields => `($(name "fieldSub") $x $y)
+
 meta def mul (d : Dialect) (x y : Term) : MacroM Term :=
   match d with
   | .words => `($(name "mul") $(name "p") $x $y)
@@ -61,7 +67,8 @@ meta def lets (bs : Array (Ident × Term)) (body : Term) : MacroM Term :=
 
 /-- Sixteen radix-four DIF butterflies across the quarters at `i0, …, i3` with twiddles from
 `th` at `j`, `j1` and `tl` at `j`: lane `k` reads `x0_k, …, x3_k`, combines them into
-`a0_k, …, a3_k` and outputs `y0_k, …, y3_k`. -/
+`a0_k, …, a3_k` and outputs `y0_k, …, y3_k`. The differences the twiddles multiply stay
+unreduced on words. -/
 meta def step16 (d : Dialect) (lanes : Bool := true) : MacroM Term := do
   let b := name "b"
   let v (s : String) (q k : Nat) : Term := name s!"{s}{q}_{k}"
@@ -72,12 +79,12 @@ meta def step16 (d : Dialect) (lanes : Bool := true) : MacroM Term := do
       bs := bs.push (name s!"x{q}_{k}", ← read d b (name s!"i{q}") k)
     bs := bs.push (name s!"a0_{k}", ← add d (v "x" 0 k) (v "x" 2 k))
     bs := bs.push (name s!"a1_{k}", ← add d (v "x" 1 k) (v "x" 3 k))
-    bs := bs.push (name s!"a2_{k}", ← mul d (← tw "th" "j") (← sub d (v "x" 0 k) (v "x" 2 k)))
-    bs := bs.push (name s!"a3_{k}", ← mul d (← tw "th" "j1") (← sub d (v "x" 1 k) (v "x" 3 k)))
+    bs := bs.push (name s!"a2_{k}", ← mul d (← tw "th" "j") (← subL d (v "x" 0 k) (v "x" 2 k)))
+    bs := bs.push (name s!"a3_{k}", ← mul d (← tw "th" "j1") (← subL d (v "x" 1 k) (v "x" 3 k)))
     bs := bs.push (name s!"y0_{k}", ← add d (v "a" 0 k) (v "a" 1 k))
-    bs := bs.push (name s!"y1_{k}", ← mul d (← tw "tl" "j") (← sub d (v "a" 0 k) (v "a" 1 k)))
+    bs := bs.push (name s!"y1_{k}", ← mul d (← tw "tl" "j") (← subL d (v "a" 0 k) (v "a" 1 k)))
     bs := bs.push (name s!"y2_{k}", ← add d (v "a" 2 k) (v "a" 3 k))
-    bs := bs.push (name s!"y3_{k}", ← mul d (← tw "tl" "j") (← sub d (v "a" 2 k) (v "a" 3 k)))
+    bs := bs.push (name s!"y3_{k}", ← mul d (← tw "tl" "j") (← subL d (v "a" 2 k) (v "a" 3 k)))
   for q in [0:4] do
     bs := bs.push (b, ← store16 d b (name s!"i{q}") ((Array.range 16).map (v "y" q)))
   lets bs b
