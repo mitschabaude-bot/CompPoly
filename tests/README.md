@@ -73,3 +73,12 @@ refinement statements and coefficient ordering.
 ### Packed FFT native storage
 
 `CompPolyTests/NTT/NativeStorage.lean` and `CompPolyTests/NTT/Packed.lean` run as part of `lake exe CompPolyNativeSmoke`. Its compiled comparisons exercise the inline C of the backported `ByteArray` word accessors (`CompPoly/Data/ByteArray/Pack.lean`) against independent bytewise Lean operations, at every offset including out-of-range ones, and check that shared inputs are not mutated. These are checks of the runtime trust boundary; the packed FFT's batch stores and reads are Lean definitions over the accessors, covered with the FFT mathematics by the kernel refinement theorems. `Packed.lean` runs the packed FFT's compiled KoalaBear and BabyBear instances against the DFT specification and its parallel path against the sequential one.
+
+## BF64 word and packed-storage checks
+
+`CompPolyTests.Fields.Binary.BF64Word` compares all 4,096 monomial pairs and 1,024 generated pairs against BF64, then checks specialized extension products. The native `CompPolyBF64Smoke` executable exercises prepared maps, masked unary arithmetic, packed loads/stores, base-field Frobenius on the extension, dot products including empty buffers, and codecs. Run from the repository root:
+
+```bash
+systemd-run --user --scope -p MemoryMax=12G -- lake build CompPolyBF64Smoke
+timeout --kill-after=5s 30s .lake/build/bin/CompPolyBF64Smoke
+```

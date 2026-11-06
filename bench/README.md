@@ -426,3 +426,20 @@ python3 scripts/bench-fields.py --suite lde --validate-only
 This suite compares `NTTFast.Packed.LdePlan.cosetLde` (KoalaBear instance of the generic `Native.cosetLde`) with Plonky3's stock `TwoAdicSubgroupDft::coset_lde_batch` (0.4.2), followed by `bit_reverse_rows().to_row_major_matrix()` as in `TwoAdicFriPcs::commit`, for each of `Radix2DitParallel`, Monty31's `RecursiveDft` and `Radix2DFTSmallBatch`. Each call extends every column of a row-major `2^logH × width` matrix, the values of a polynomial on the subgroup of order `2^logH`, to the coset `3 · ⟨ω⟩` of order `2^(logH + bits)`, and returns the rows in bit-reversed order. The Lean side reads the matrix as Montgomery words in chunks of rows (`Native.rowChunks`, here one chunk) and returns row chunks, which a commitment hashes in parallel; `joinRows` copies them into one buffer. `Native.joinRows_cosetLde` proves the joined chunks equal to the specification `ldeSpec`: row `r` holds every column's Lagrange interpolant on the subgroup, at `shift · ω ^ bitrev r`.
 
 Each fixture holds the root of the extended domain, the shift and two matrices that alternate between iterations, as canonical little-endian 32-bit words. The root must equal Lean's certified root and Plonky3's two-adic generator. `CompPolyLdeBench` and `comppoly-field-bench --lde` read the same fixture; full output digests of all four implementations agree before timing, including single-row, odd-height and narrow matrices. Plans and twiddles are built outside timing; input copies, transposes, transforms and output assembly are timed. Workers follow the NTT suite's physical-core selection.
+
+## Polynomial-basis BF64 kernels
+
+The groups `fields-bf64-mul`, `fields-bf64-masked`, `fields-bf64-fixed`, and `fields-bf64-ext3` compare word multiplication with the existing BF64/Ext3 specification, independent throughput, and prepared nibble/byte maps. Validate their checksums before timing:
+
+```bash
+systemd-run --user --scope -p MemoryMax=12G -- lake exe CompPolyBench --validate-only --groups fields-bf64-mul,fields-bf64-masked,fields-bf64-fixed,fields-bf64-ext3
+```
+
+For user-space instruction counts and wall-clock times, build the marked runner and execute the Python driver. It uses Linux `perf_event_open`, requires access to hardware counters and logical CPU 5, excludes initialization and lookup-table preparation from product timings, and records preparation separately. Three alternating rounds report raw samples, load averages, stable sinks, and medians. The bitslice row includes both input transposes and the output transpose; it is a differential-tested screening candidate, outside the certified library API.
+
+```bash
+systemd-run --user --scope -p MemoryMax=12G -- lake build CompPolyBF64Bench
+python3 scripts/bench-bf64.py > bench/out/bf64-counts.jsonl
+```
+
+See [the BF64 kernel report](../docs/bench-bf64-word.md) for workloads, refinement theorems, measured costs, and the limits of the Rust comparison.

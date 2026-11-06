@@ -13,6 +13,7 @@ public import CompPolyBench.Compare
 public import CompPolyBench.Fields.Arith
 public import CompPolyBench.Fields.Binary.AdditiveNTT.Impl
 public import CompPolyBench.Fields.Binary.Tower
+public import CompPolyBench.Fields.Binary.BF64
 public import CompPolyBench.Fields.Binary.Tower.Scalar
 public import CompPolyBench.Fields.Binary.BF64
 public import CompPolyBench.Fields.Extension

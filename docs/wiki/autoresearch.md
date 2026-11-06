@@ -202,10 +202,7 @@ its rows there.
 
 Prerequisites rather than loop iterations, because a definition is missing
 before any optimisation applies: `Ext` over the Montgomery carrier (no
-`Fintype (FastField _)` instance), an Itoh-Tsujii inverse (no `Ext.frobenius` or
-`Ext.norm`), `clMul` from issue #129 (no group measures `carryLessMul`, and the
-`GF(2^64)` groups are blocked by the `Fintype BF64` hang described in
-[`benchmarking.md`](benchmarking.md)), and polynomial `pow` (no group).
+`Fintype (FastField _)` instance), a generic extension Itoh-Tsujii inverse (`Word.invMasked` covers BF64), and polynomial `pow` (no group). The BF64 word and masked-product groups measure polynomial-basis multiplication without enumerating the field; [their kernel report](../bench-bf64-word.md) distinguishes dependent chains, independent throughput, and prepared scalar maps.
 
 ## Stop condition
 

@@ -100,3 +100,11 @@ lean_exe axiomsweep where
   srcDir := "scripts"
   root := `AxiomSweep
   supportInterpreter := true
+
+/-- Pure-Lean binary-field kernels, with phase marks for hardware counters. -/
+lean_exe CompPolyBF64Bench where
+  srcDir := "bench"
+
+/-- Native packed binary-field and codec regressions. -/
+lean_exe CompPolyBF64Smoke where
+  srcDir := "tests"
