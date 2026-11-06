@@ -120,6 +120,51 @@ instance : Sub BF64 := ⟨fun a b => ofBitVec (a.toBitVec ^^^ b.toBitVec)⟩
 def mul (a b : BF64) : BF64 :=
   ofBitVec (reduce (carryLessMul (w := 128) a.toBitVec b.toBitVec))
 
+/-- Carry-less multiplication with one final width reduction. -/
+def carryLessMulNat (a b : BitVec 64) : BitVec 128 :=
+  BitVec.ofNat 128 (Fin.foldl 64 (fun acc i ↦
+    if a.toNat.testBit i then acc ^^^ (b.toNat <<< i.val) else acc) 0)
+
+private theorem ofNat_shiftLeft (a i : Nat) :
+    BitVec.ofNat 128 (a <<< i) = BitVec.ofNat 128 a <<< i := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_ofNat, BitVec.toNat_shiftLeft, Nat.shiftLeft_eq]
+  exact (Nat.mod_mul_mod a (2 ^ i) (2 ^ 128)).symm
+
+private theorem ofNat_foldCarryLess (a b n : Nat) :
+    BitVec.ofNat 128 (Fin.foldl n (fun acc i ↦
+      if a.testBit i then acc ^^^ (b <<< i.val) else acc) 0) =
+    Fin.foldl n (fun acc i ↦
+      if a.testBit i then acc ^^^ (BitVec.ofNat 128 b <<< i.val) else acc) 0 := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+    simp only [Fin.foldl_succ_last, Fin.val_castSucc, Fin.val_last]
+    split
+    · simp only [BitVec.ofNat_xor, ofNat_shiftLeft, ih]
+    · exact ih
+
+/-- The natural accumulator computes the complete carry-less product. -/
+theorem carryLessMulNat_eq (a b : BitVec 64) :
+    carryLessMulNat a b = carryLessMul (w := 128) a b := by
+  unfold carryLessMulNat carryLessMul
+  rw [ofNat_foldCarryLess]
+  have hb : BitVec.ofNat 128 b.toNat = zeroExtendTo b := by
+    apply BitVec.eq_of_toNat_eq
+    simp only [BitVec.toNat_ofNat, zeroExtendTo, BitVec.toNat_setWidth]
+  apply congrArg (fun f ↦ Fin.foldl 64 f (0 : BitVec 128))
+  funext acc i
+  simp only [BitVec.getLsbD, hb]
+
+/-- Multiply using an unbounded carry-less accumulator before reduction. -/
+def mulNat (a b : BF64) : BF64 :=
+  ofBitVec (reduce (carryLessMulNat a.toBitVec b.toBitVec))
+
+/-- Compiled products defer truncation until the carry-less accumulator is complete. -/
+@[csimp] theorem mul_eq_mulNat : @mul = @mulNat := by
+  funext a b
+  simp only [mul, mulNat, carryLessMulNat_eq]
+
 instance : Mul BF64 := ⟨mul⟩
 
 /-- The polynomial denoted by a carrier value. -/
