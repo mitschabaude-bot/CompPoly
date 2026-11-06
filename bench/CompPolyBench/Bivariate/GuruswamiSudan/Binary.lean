@@ -55,11 +55,38 @@ private def runVanishing (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup 
     records := records.push row
   return (⟨"gs-binary-vanishing", "Binary-field GS vanishing construction", records⟩, gen)
 
+private def normalizeSpec (v : Array BF64) : Option (Array BF64) :=
+  match firstNonzeroIndex? v with
+  | none => none
+  | some i =>
+    let pivot := v.getD i 0
+    if pivot == 0 then none else some (v.map fun c ↦ c / pivot)
+
+private def runNormalize (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+  let (words, gen) := (randomNatArray 4 (2 ^ 64 - 3)).run gen
+  let pool := words.map fun w ↦
+    #[0, 0] ++ (Array.range 6).map fun i ↦
+      if i % 3 == 0 then 0 else BF64.ofBitVec (BitVec.ofNat 64 (w + i + 2))
+  let mut records := #[]
+  for (label, normalize) in [("decoder", normalizeVector?), ("spec", normalizeSpec)] do
+    let row ← runTimedSpec
+      { name := s!"gs-normalize-bf64-{label}", representation := "Array BF64",
+        method := label, field := "GF(2^64)", inputShape := "8 entries, nonzero pivot",
+        digestIterations := 4, digestClass := "vector" }
+      preset (fun i ↦ normalize (pool.getD (i % 4) #[]))
+      (fun v ↦ checksumArray (fun x ↦ x.toBitVec.toNat) (v.getD #[]))
+      (sink := fun v ↦ (v.getD #[]).foldl
+        (fun acc x ↦ sinkStep acc (natSink x.toBitVec.toNat)) 0)
+    records := records.push row
+  return (⟨"gs-vector-normalization", "Binary-field GS vector normalization", records⟩, gen)
+
 /-- Setup cost centers shared by the certified binary-field production decoder. -/
 def binaryGSTasks : List BenchTask :=
   [BenchTask.fromGroupRunner
      ⟨"gs-interpolation-monomials", "GS weighted monomial enumeration"⟩ runMonomials,
    BenchTask.fromGroupRunner
-     ⟨"gs-binary-vanishing", "Binary-field GS vanishing construction"⟩ runVanishing]
+     ⟨"gs-binary-vanishing", "Binary-field GS vanishing construction"⟩ runVanishing,
+   BenchTask.fromGroupRunner
+     ⟨"gs-vector-normalization", "Binary-field GS vector normalization"⟩ runNormalize]
 
 end CompPolyBench

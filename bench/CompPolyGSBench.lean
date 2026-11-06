@@ -69,9 +69,19 @@ private def run {F : Type} [Field F] [BEq F] [LawfulBEq F] [DecidableEq F]
     if mode == "profile" then profile roots params w
     else if mode == "roots" then
       pure (roots.rootsYDegreeLt (CBivariate.linearYDivisor p) k)
-    else if mode == "normalize" then do
-      let some Q ← timed "normalization" fun _ ↦ pure
-          (LeeOSullivan.normalizeLeeCandidate? params.interp (CBivariate.linearYDivisor p)) |
+    else if mode == "normalize" || mode == "normalize-phases" then do
+      let rawQ := CBivariate.linearYDivisor p
+      let some Q ← if mode == "normalize" then
+          timed "normalization" fun _ ↦ pure (LeeOSullivan.normalizeLeeCandidate? params.interp rawQ)
+        else do
+          let basis ← timed "monomial-enumeration" fun _ ↦ pure (interpolationMonomials params.interp)
+          report s!"monomials={basis.size}"
+          let coeffs ← timed "coefficient-vector" fun _ ↦
+            pure (interpolationCoefficientVectorOnBasis basis rawQ)
+          let some normalized ← timed "vector-normalization" fun _ ↦ pure (normalizeVector? coeffs) |
+            throw <| IO.userError "vector normalization failed"
+          timed "polynomial-reconstruction" fun _ ↦
+            pure (some (interpolationPolynomialOnBasis basis normalized)) |
         throw <| IO.userError "normalization failed"
       unless CBivariate.composeY Q p == 0 do throw <| IO.userError "invalid normalized witness"
       return #[p]
@@ -85,8 +95,8 @@ The dense fixture has all `k` coefficients; the affine fixture isolates setup co
 def main (args : List String) : IO UInt32 := do
   let [level, mode, fixture] := args |
     throw <| IO.userError
-      "usage: CompPolyGSBench initial|middle|final profile|decode|roots|normalize affine|dense"
-  unless ["profile", "decode", "roots", "normalize"].contains mode do
+      "usage: CompPolyGSBench initial|middle|final profile|decode|roots|normalize|normalize-phases affine|dense"
+  unless ["profile", "decode", "roots", "normalize", "normalize-phases"].contains mode do
     throw <| IO.userError "invalid mode"
   unless fixture == "affine" || fixture == "dense" do throw <| IO.userError "invalid fixture"
   if level == "initial" then

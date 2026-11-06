@@ -104,3 +104,4 @@ fields-tower-bt128-square
 fields-bf64-mul
 gs-interpolation-monomials
 gs-binary-vanishing
+gs-vector-normalization

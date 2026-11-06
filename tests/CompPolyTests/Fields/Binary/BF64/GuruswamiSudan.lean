@@ -49,4 +49,13 @@ private def polynomialCases : Array (CPolynomial BF64) :=
 #guard polynomialCases.all fun p ↦ polynomialCases.all fun q ↦
   (BF64.structuredMulContext BF64).mul p q == p * q
 
+#guard (normalizeVector? (#[] : Array BF64)).isNone
+#guard (normalizeVector? (#[0, 0, 0] : Array BF64)).isNone
+#guard (normalizeVector? (#[0, 0, 1, 0, 1] : Array BF64)) == some #[0, 0, 1, 0, 1]
+#guard polynomialCases.all fun p ↦
+  let v : Array BF64 := #[0, 0] ++ p.val.coeffs
+  normalizeVector? v == match firstNonzeroIndex? v with
+    | none => none
+    | some i => some (v.map fun c ↦ c / v.getD i 0)
+
 end CompPolyTests.Fields.Binary.BF64.GuruswamiSudan
