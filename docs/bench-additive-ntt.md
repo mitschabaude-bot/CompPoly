@@ -44,7 +44,7 @@ Measurements use three alternating Lean/Rust samples per shape, one worker pinne
 
 All runs hold `/tmp/compstark-bench.lock`, which serializes cooperating benchmarks but does not make this shared server idle. Recorded 1/5/15-minute load averages bound the wall-time claims. CPU/toolchain versions, binary SHA-256s, input shapes, output digests and individual samples are retained in the JSON lines. These are single-threaded encoder measurements; they do not include Merkle hashing or establish end-to-end prover performance.
 
-## Recorded bit-plane results, 2026-11-06
+## Recorded bit-plane baseline, 2026-11-06
 
 The [bit-plane conformance records](bench-additive-ntt-bitsliced-conformance.jsonl) contain 31 passing cases: six exact-byte small fixtures, K and E at every domain logarithm 13–22, and all five production shapes. Every stage and final digest agrees with Rust, and every Lean inverse recovers the complete padded input byte-for-byte. The [performance records](bench-additive-ntt-bitsliced-performance.jsonl) retain all 30 samples and five medians. Both files identify identical binaries by SHA-256. The full library build, `lake test`, linked bit-plane regressions, import/style/documentation checks and axiom sweep pass without warnings. The sweep covers 14,188 declarations across 541 modules, with zero sorry taint and zero non-standard axiom taint.
 
@@ -78,10 +78,91 @@ The [packed baseline records](bench-additive-ntt-performance.jsonl) use the same
 | E / 19 | 118.332 | 33.654 | 3.52× | 1.801 / 0.320 |
 | E / 18 | 40.827 | 11.274 | 3.62× | 0.944 / 0.195 |
 
-The measured instruction gap is 20.7–31.7× Rust, so the proposed 2–3× estimate is not achieved. The bit-plane implementation improves instruction counts and memory use while preserving the certified refinement chain; these results do not establish Rust-comparable encoder or prover speed.
+The baseline instruction gap is 20.7–31.7× Rust, so these measurements do not achieve the proposed 2–3× estimate. The bit-plane implementation improves instruction counts and memory use while preserving the certified refinement chain; these results do not establish Rust-comparable encoder or prover speed.
 
 ## Performance limits
 
-The register layout removes per-lane software multiplication from the stage sweep, but scratch preparation, matrix application, block construction and packed-buffer ownership checks still cost instructions. A short cycle profile during the log-22 inverse identified scratch preparation and dot products as the leading hot functions; it does not partition the complete forward benchmark. Native scratch preparation also contains lazy constant getters for computed offsets. Their individual contribution is not isolated by the production table.
+The register layout removes per-lane software multiplication from the stage sweep, but scratch preparation, matrix application, block construction and packed-buffer ownership checks still cost instructions. The counter-marked decomposition below isolates scratch preparation, application and row movement. Runtime group bases and literal slot displacements keep offset expressions out of lazy constant getters; dot products are inlined into the matrix application.
 
 The physical codeword uses 512 bytes per row: 64 K coordinates, including unused zero coordinates. Logical output widths remain 56 K words or 48 K words for the production E workloads. Whole-process peak RSS includes the runtime, plan, original input message, physical codeword and transient buffers. Instruction counts are the primary comparison on this loaded host; wall seconds do not establish quiet-host performance or end-to-end prover speed.
+
+## Butterfly instruction decomposition
+
+The [baseline decomposition records](bench-additive-ntt-breakdown-before.jsonl) measure the kernel at `cd2f0b12c7146160cad556f46e95900602cb53ea`. Every substep is inside begin/end counter markers, using the same inherited counters, CPU 5, one worker and shared lock as the production sampler. Setup, plans, input construction and output consumption are outside these microbenchmark markers. Three samples are recorded for each part. Independent chains use 100,000 iterations; the empty Nat-loop floor uses 1,000,000. Actual and identity stage sweeps use ten repetitions over 65,536 rows, or 327,680 butterfly groups per sample. Application chains feed their output back as the next matrix masks, so they measure the fixed instruction path without table preparation inside the interval. Transpose and XOR chains retain their dependencies through separate generated functions. Counts include constructors, reference counting and calls belonging to each substep; these are instruction counts, not arithmetic-operation counts.
+
+| Isolated substep | Baseline instructions/iteration | Interpretation |
+| --- | ---: | --- |
+| Empty chain | 11.01 | Nat loop, decrement, increment and termination |
+| Matrix construction | 2,845.34 | 63 shift/reduce steps plus the matrix transpose |
+| Transpose | 2,265.06 | One complete 64×64 transpose |
+| Prepare four-bit input tables | 4,495.08 | Sixteen groups of sixteen combinations |
+| Apply prepared tables | 4,094.51 | 64 output planes, sixteen lookups each |
+| Butterfly XORs | 875.08 | Both 64-plane XORs |
+| Complete register butterfly | 9,402.52 | Preparation, application, XORs and state ownership |
+| Packed row movement | 1,231.52 | Two row loads and two row stores |
+
+The baseline actual stage costs 13,371.59 instructions/group with a different matrix for every butterfly (`i = 0`), 10,519.78 with 256 butterflies/matrix (`i = 8`), and 10,508.68 with 32,768 butterflies/matrix (`i = 15`). Identity stages cost 1,323.75, 1,255.02 and 1,254.75 respectively. The identity kernel's unused matrix construction is absent from generated C. These stage measurements capture the real machine-index loops and packed ownership path, whereas adding isolated function chains changes allocation and fusion opportunities. The long-span identity stage minus the isolated movement chain is only 23.23 instructions/group; this comparison includes differences in ownership/fusion, but rules out a multi-thousand-instruction indexing loop. The raw movement and identity measurements are retained separately rather than labeling their sum as pure indexing overhead.
+
+K/22/56/rate-1 has `ell = 21`: 44,040,192 butterfly groups and 4,194,302 matrix constructions. The 547,230,309,290-instruction production baseline therefore costs 12,425.70 instructions/group. Matrix construction amortizes to 269.94 after subtracting the 11-instruction chain floor; two boundary transposes per row amortize to 429.34. Weighting actual stage costs by their block counts gives approximately 10,781 instructions/group in the stages. The following reconciliation uses directly measured preparation/application/XOR chains and assigns their difference from the actual stage measurement to movement and control. It is not a claim that independently compiled microbenchmarks are exactly additive.
+
+| K/22 baseline component | Instructions/butterfly group |
+| --- | ---: |
+| Matrix building, amortized | 270 |
+| Input XOR-table preparation | 4,495 |
+| Matrix application | 4,095 |
+| Both XOR additions | 875 |
+| Packed movement, indexing, stage control and fusion residual | ≈1,046 |
+| Boundary transposes | 429 |
+| Remaining materialization, boundary movement and phase residual | ≈1,215 |
+| Complete timed phase | 12,426 |
+
+### Generated C and selected change
+
+The baseline `Scratch.c` contains 512 `lean_usize_once` calls and one `lean_uint32_once` call in `prepareScratch`, with 512 approved 32-bit writes. Thus filling 256 words also repeatedly checks 512 lazily initialized offset values. The stage's generated C calls `matrix` in the outer block loop, then loads two rows, prepares the input tables, applies the matrix, XORs and stores inside the span loop. Matrix preparation is already amortized over the block. The specialized inner fold takes `size_t` base, stride, bound and index arguments; its addresses use `lean_usize_shift_left` and `lean_usize_add`, with no Nat address conversion or multiplier-closure call inside the butterfly. There is no dense masked 64×64 application loop.
+
+The retained path passes a runtime group index and four scalar plane arguments to `prepareChunk`. Its table writes use immediate displacements from that base, eliminating the 512 lazy offset getters. One lazy UInt32 zero-value getter remains per group; it is included in the counters. `dotScratch` is inlined into `applyScratch`, allowing the native compiler to share extraction constants across output planes. The generated machine code uses nibble extraction and indexed loads/XORs; the two approved UInt32 reads combine into a machine-word load. No arithmetic extern, inline C, compiler-trusted proof or table of field products is introduced.
+
+The [table screening records](bench-additive-ntt-table-screen.jsonl) compare the runtime-base four-bit path before dot-product inlining against the byte experiment. Byte tables use eight groups of 256 words in 16 KiB. Gray-code traversal builds each group with 255 XORs; application uses eight lookups per output plane. The byte candidate passes 320 lane-product comparisons against masked field multiplication, but its preparation dominates:
+
+| Candidate | Prepare instructions | Apply instructions | Sum |
+| --- | ---: | ---: | ---: |
+| Runtime-base four-bit, separate dot calls | 1,952 | 4,095 | 6,047 |
+| Eight-bit Gray-code tables | 10,507 | 1,605 | 12,112 |
+| Runtime-base four-bit, inlined dots | 1,952 | 3,358 | 5,310 |
+
+The arithmetic model counts the 2,040 table-building XORs but omits materializing 2,048 table words. With the approved accessors, the generated byte-table preparation performs 4,096 UInt32 stores and splits nonzero words into low/high halves, in addition to address calculation, XORs, calls and register traffic. This explains why its roughly 2.6K abstract operations do not become 2.6K machine instructions. The complete byte multiplication chain costs 12,085 instructions, consistent with that sum after chain/fusion differences. The retained complete register butterfly costs 6,123 instructions, versus 9,403 at baseline. The [inlined decomposition records](bench-additive-ntt-breakdown-inline.jsonl) show actual stage costs of 10,091.59, 7,239.78 and 7,228.68 instructions/group for stages 0, 8 and 15: a reduction of 3,280 instructions/group. The byte experiment is confined to its benchmark executable; production has one certified four-bit path.
+
+`fillChunk_packed` proves the literal-address writes equal the mathematical packed table. `Scratch.packed_prepare`, `lookup_prepare` and `applyScratch_eq_applySpec` then certify the application against the matrix definition, preserving the stage, packed-transform and generic-encoder chain. Matrix reuse cannot also reuse these prepared tables across different inputs: every table word is an XOR combination of the current input planes. Under the retained path, matrix building averages about 270 instructions/group and an identity stage costs about 1,255. Even eliminating all movement/control through tile fusion would save at most about 17% of a long-span stage; this bound overstates what fusion can remove. Two- or three-stage fusion is therefore not implemented in this change. The remaining instruction gap is primarily table construction/application and Lean object/buffer traffic.
+
+Reproduce the microbenchmarks after building the runners:
+
+```bash
+systemd-run --user --scope -p MemoryMax=12G -- lake build CompPolyBitsliceBreakdown CompPolyBitsliceByteBench
+.lake/build/bin/CompPolyBitsliceByteBench check combined 0
+python3 scripts/bench-additive-ntt-breakdown.py stages .lake/build/bin/CompPolyBitsliceBreakdown
+python3 scripts/bench-additive-ntt-breakdown.py byte .lake/build/bin/CompPolyBitsliceByteBench
+```
+
+Generated-C inspection uses `.lake/build/ir/CompPoly/Fields/Binary/AdditiveNTT/Bitsliced/Scratch.c`, `Stage.c` and `Native.c`. The specialized `forwardStage` inner fold contains the hot butterfly, while its enclosing fold contains the `matrix` call. `objdump -d --disassemble=lp_CompPoly_AdditiveNTT_Bitsliced_applyScratch .lake/build/bin/CompPolyBitsliceBreakdown` shows the compiled extraction and indexed-load sequence; `lp_CompPoly_AdditiveNTT_Bitsliced_prepareChunk___redArg` shows literal displacements and paired UInt32 stores.
+
+### Runtime-base production results
+
+The [conformance records](bench-additive-ntt-cost-fix-conformance.jsonl) contain all 31 passing cases, including six exact-byte fixtures, K/E at every logarithm 13–22 and all production shapes. Every recorded stage and final output agrees with pinned Rust, and the Lean inverse recovers the complete padded input. The [production records](bench-additive-ntt-cost-fix-performance.jsonl) retain three alternating Lean/Rust samples per shape, with matching sinks and no multiplexed counters. Their binary hashes match the conformance run. Full `lake build`, `lake test`, linked regressions, import/style/documentation checks and axiom sweep pass without warnings; the sweep covers 14,191 declarations in 541 modules with zero sorry or non-standard-axiom taint.
+
+| Field / log domain / lanes / log rate | Lean instructions (billions) | Rust instructions (billions) | Instruction ratio | Lean seconds | Rust seconds | Lean peak RSS (GiB) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| K / 22 / 56 / 1 | 402.779 | 26.450 | 15.23× | 52.812 | 6.294 | 2.973 |
+| E / 21 / 16 / 4 | 164.604 | 9.149 | 17.99× | 16.639 | 1.308 | 1.137 |
+| E / 20 / 16 / 7 | 67.069 | 3.643 | 18.41× | 8.588 | 0.549 | 0.579 |
+| E / 19 / 16 / 10 | 25.915 | 1.203 | 21.54× | 3.663 | 0.277 | 0.326 |
+| E / 18 / 16 / 13 | 9.124 | 0.356 | 25.66× | 0.874 | 0.082 | 0.198 |
+
+| Field / log domain | Instruction reduction from bit-plane baseline | Lean plan seconds | Rust plan seconds | Rust peak RSS (GiB) |
+| --- | ---: | ---: | ---: | ---: |
+| K / 22 | 1.36× | 11.483 | 0.000171 | 2.628 |
+| E / 21 | 1.36× | 4.365 | 0.000108 | 0.799 |
+| E / 20 | 1.33× | 2.051 | 0.000146 | 0.380 |
+| E / 19 | 1.30× | 1.451 | 0.000130 | 0.190 |
+| E / 18 | 1.24× | 0.447 | 0.000089 | 0.097 |
+
+Boundary load averages span 4.30–6.62 / 5.69–7.15 / 7.05–7.90 (1/5/15 minutes). These are loaded-host single-worker wall times; instruction reductions compare against the recorded bit-plane baseline, while wall-time comparisons use the interleaved Rust samples. Phase timing includes allocation and input/output layout conversion, excludes plan/message setup, and ends before digesting. Whole-process peak RSS includes plans, message, physical codeword and runtime memory. K/22 costs 9,146 instructions/butterfly group, versus 12,426 at baseline; its output RSS is 2.102 GiB. The retained path reduces instructions and preserves the memory bound, but the 2–3× Rust target remains unachieved.

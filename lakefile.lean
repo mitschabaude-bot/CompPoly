@@ -141,3 +141,12 @@ lean_exe CompPolyBitsliceNTTBench where
 /-- Linked bit-plane multiplication, layout and forward/inverse encoder regressions. -/
 lean_exe CompPolyBitsliceSmoke where
   srcDir := "tests"
+
+/-- Counter-marked butterfly sub-steps and actual stage traversals. -/
+lean_exe CompPolyBitsliceBreakdown where
+  srcDir := "bench"
+  moreLeancArgs := #["-march=native", "-fno-vectorize", "-fno-slp-vectorize"]
+
+lean_exe CompPolyBitsliceByteBench where
+  srcDir := "bench"
+  moreLeancArgs := #["-march=native", "-fno-vectorize", "-fno-slp-vectorize"]

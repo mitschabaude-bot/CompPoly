@@ -87,11 +87,79 @@ def fillGroup (b : BF64.Packed.Buffer 256) (g : Fin 16) (t : Chunk) : BF64.Packe
 theorem fillChunk_packed (s : Scratch) (g : USize) (hg : g.toNat < 16) (t : Chunk) :
     (fillChunk s g hg t).packed =
       fillGroup s.packed ⟨g.toNat, hg⟩ t := by
+  have h0 : (g * 128 + 0).toNat = 128 * g.toNat + 0 := by
+    rw [chunkOffset_toNat g 0 hg (by rw [Native.small 0 (by decide)]; omega),
+      Native.small 0 (by decide)]
+    omega
+  have h1 : (g * 128 + 8).toNat = 128 * g.toNat + 8 := by
+    rw [chunkOffset_toNat g 8 hg (by rw [Native.small 8 (by decide)]; omega),
+      Native.small 8 (by decide)]
+    omega
+  have h2 : (g * 128 + 16).toNat = 128 * g.toNat + 16 := by
+    rw [chunkOffset_toNat g 16 hg (by rw [Native.small 16 (by decide)]; omega),
+      Native.small 16 (by decide)]
+    omega
+  have h3 : (g * 128 + 24).toNat = 128 * g.toNat + 24 := by
+    rw [chunkOffset_toNat g 24 hg (by rw [Native.small 24 (by decide)]; omega),
+      Native.small 24 (by decide)]
+    omega
+  have h4 : (g * 128 + 32).toNat = 128 * g.toNat + 32 := by
+    rw [chunkOffset_toNat g 32 hg (by rw [Native.small 32 (by decide)]; omega),
+      Native.small 32 (by decide)]
+    omega
+  have h5 : (g * 128 + 40).toNat = 128 * g.toNat + 40 := by
+    rw [chunkOffset_toNat g 40 hg (by rw [Native.small 40 (by decide)]; omega),
+      Native.small 40 (by decide)]
+    omega
+  have h6 : (g * 128 + 48).toNat = 128 * g.toNat + 48 := by
+    rw [chunkOffset_toNat g 48 hg (by rw [Native.small 48 (by decide)]; omega),
+      Native.small 48 (by decide)]
+    omega
+  have h7 : (g * 128 + 56).toNat = 128 * g.toNat + 56 := by
+    rw [chunkOffset_toNat g 56 hg (by rw [Native.small 56 (by decide)]; omega),
+      Native.small 56 (by decide)]
+    omega
+  have h8 : (g * 128 + 64).toNat = 128 * g.toNat + 64 := by
+    rw [chunkOffset_toNat g 64 hg (by rw [Native.small 64 (by decide)]; omega),
+      Native.small 64 (by decide)]
+    omega
+  have h9 : (g * 128 + 72).toNat = 128 * g.toNat + 72 := by
+    rw [chunkOffset_toNat g 72 hg (by rw [Native.small 72 (by decide)]; omega),
+      Native.small 72 (by decide)]
+    omega
+  have h10 : (g * 128 + 80).toNat = 128 * g.toNat + 80 := by
+    rw [chunkOffset_toNat g 80 hg (by rw [Native.small 80 (by decide)]; omega),
+      Native.small 80 (by decide)]
+    omega
+  have h11 : (g * 128 + 88).toNat = 128 * g.toNat + 88 := by
+    rw [chunkOffset_toNat g 88 hg (by rw [Native.small 88 (by decide)]; omega),
+      Native.small 88 (by decide)]
+    omega
+  have h12 : (g * 128 + 96).toNat = 128 * g.toNat + 96 := by
+    rw [chunkOffset_toNat g 96 hg (by rw [Native.small 96 (by decide)]; omega),
+      Native.small 96 (by decide)]
+    omega
+  have h13 : (g * 128 + 104).toNat = 128 * g.toNat + 104 := by
+    rw [chunkOffset_toNat g 104 hg (by rw [Native.small 104 (by decide)]; omega),
+      Native.small 104 (by decide)]
+    omega
+  have h14 : (g * 128 + 112).toNat = 128 * g.toNat + 112 := by
+    rw [chunkOffset_toNat g 112 hg (by rw [Native.small 112 (by decide)]; omega),
+      Native.small 112 (by decide)]
+    omega
+  have h15 : (g * 128 + 120).toNat = 128 * g.toNat + 120 := by
+    rw [chunkOffset_toNat g 120 hg (by rw [Native.small 120 (by decide)]),
+      Native.small 120 (by decide)]
+    omega
+  have hmul : 128 * g.toNat / 8 = 16 * g.toNat := by omega
+  have hdiv (j : Nat) : (128 * g.toNat + j) / 8 = 16 * g.toNat + j / 8 := by omega
   unfold fillGroup
-  simp (disch := (rw [nibbleOffset_toNat g hg]; omega)) only
-    [fillChunk, Scratch.packed_write, nibbleOffset_toNat g hg]
+  simp (disch := (simp only [h0, h1, h2, h3, h4, h5, h6, h7,
+      h8, h9, h10, h11, h12, h13, h14, h15]; omega)) only
+    [fillChunk, Scratch.packed_write, h0, h1, h2, h3, h4, h5, h6, h7,
+      h8, h9, h10, h11, h12, h13, h14, h15]
   simp only [Fin.foldl_succ_last, Fin.foldl_zero, Fin.val_castSucc, Fin.val_last]
-  simp [Nat.mul_div_cancel_left _ (by decide : 0 < 8), Chunk.get]
+  simp [Chunk.get, hdiv, hmul]
 
 /-- Reading a sequence of overwrites depends only on whether its index was visited. -/
 theorem read_filling (index : Fin k → Fin n) (f : Fin n → BF64.Word)
@@ -124,7 +192,7 @@ def sourceChunk (a : Block) (g : Fin 16) : Chunk :=
 theorem Scratch.packed_prepare (s : Scratch) (a : Block) :
     (prepareScratch s a).packed = Fin.foldl 16 (fun b g =>
       fillGroup b g (sourceChunk a g)) s.packed := by
-  simp (disch := decide) only [prepareScratch, fillChunk_packed, Native.small]
+  simp (disch := decide) only [prepareScratch, prepareChunk, fillChunk_packed, Native.small]
   simp only [Fin.foldl_succ_last, Fin.foldl_zero]
   rfl
 

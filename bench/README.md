@@ -447,3 +447,7 @@ python3 scripts/bench-bf64.py > bench/out/bf64-counts.jsonl
 ```
 
 See [the BF64 kernel report](../docs/bench-bf64-word.md) for workloads, refinement theorems, measured costs, and the limits of the Rust comparison.
+
+## Additive butterfly decomposition
+
+Build `CompPolyBitsliceBreakdown` and `CompPolyBitsliceByteBench` with `systemd-run --user --scope -p MemoryMax=12G -- lake build CompPolyBitsliceBreakdown CompPolyBitsliceByteBench`. The first runner isolates operation chains and actual/identity stage sweeps. The second screens eight-bit Four-Russians tables, constructing combinations in Gray-code order; `.lake/build/bin/CompPolyBitsliceByteBench check combined 0` checks its lane products against field multiplication. It is a benchmark experiment, outside the certified library path. Run `python3 scripts/bench-additive-ntt-breakdown.py stages .lake/build/bin/CompPolyBitsliceBreakdown` or `python3 scripts/bench-additive-ntt-breakdown.py byte .lake/build/bin/CompPolyBitsliceByteBench`. Both suites use three CPU-5 samples, the shared lock and inherited counters between explicit markers, with setup and result consumption excluded. See [the cost breakdown](../docs/bench-additive-ntt.md#butterfly-instruction-decomposition) for interpretation.
