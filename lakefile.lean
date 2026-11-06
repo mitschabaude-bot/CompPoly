@@ -108,3 +108,12 @@ lean_exe CompPolyBF64Bench where
 /-- Native packed binary-field and codec regressions. -/
 lean_exe CompPolyBF64Smoke where
   srcDir := "tests"
+
+/-- Matched packed binary-field additive encoder and Rust stage conformance. -/
+lean_exe CompPolyAdditiveBench where
+  srcDir := "bench"
+  moreLeancArgs := #["-march=native"]
+
+/-- Linked generic K/E agreement, inverse, layout and basis conversion regressions. -/
+lean_exe CompPolyAdditiveSmoke where
+  srcDir := "tests"

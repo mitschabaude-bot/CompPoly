@@ -1,0 +1,18 @@
+[package]
+name = "comppoly-additive-ntt-reference"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+pcs = { path = "@SOURCE@/crates/pcs" }
+primitives = { path = "@SOURCE@/crates/primitives" }
+
+[[bin]]
+name = "additive-ntt-reference"
+path = "main.rs"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

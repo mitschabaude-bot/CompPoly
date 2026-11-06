@@ -42,6 +42,7 @@ public import CompPolyTests.Fields.BabyBear.Fast
 public import CompPolyTests.Fields.BabyBear.FastExt4
 public import CompPolyTests.Fields.Binary.AdditiveNTT.Basis
 public import CompPolyTests.Fields.Binary.AdditiveNTT.BasisConversion
+public import CompPolyTests.Fields.Binary.AdditiveNTT.Packed
 public import CompPolyTests.Fields.Binary.AdditiveNTT.Compatibility
 public import CompPolyTests.Fields.Binary.AdditiveNTT.Executable
 public import CompPolyTests.Fields.Binary.AdditiveNTT.NovelPolynomialBasis

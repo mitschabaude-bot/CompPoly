@@ -82,3 +82,7 @@ refinement statements and coefficient ordering.
 systemd-run --user --scope -p MemoryMax=12G -- lake build CompPolyBF64Smoke
 timeout --kill-after=5s 30s .lake/build/bin/CompPolyBF64Smoke
 ```
+
+## Packed additive encoder native checks
+
+Build with `systemd-run --user --scope -p MemoryMax=12G -- lake build CompPolyAdditiveSmoke`, then run `.lake/build/bin/CompPolyAdditiveSmoke`. These linked checks exercise the approved packed ByteArray accessors, compare K and E encodings to the generic encoder, verify initial lane reversal and leading padding, check inverse round trips including zero-stage and empty-lane boundaries, and check monomial-to-novel conversion. The test module is also imported by `CompPolyTests`; its executable checks require the linked runner. Cross-language fixtures and domain coverage use `scripts/bench-additive-ntt.py check` as described in [the comparison report](../docs/bench-additive-ntt.md).
