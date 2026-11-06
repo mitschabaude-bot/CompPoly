@@ -313,3 +313,11 @@ Algorithm changes often cascade into `Intermediate`, `Impl`, and `Correctness`.
   `Equiv` / `Impl`
 - For additive NTT: `Domain` -> `NovelPolynomialBasis` -> `Intermediate` ->
   `Algorithm` -> `Executable` -> `Correctness`; add `Impl` for concrete tower instances
+
+## Polynomial-basis word kernels
+
+`BF64.Word` stores the same polynomial coordinates as `BF64` in one `UInt64`. `Word.mul` is the scalar shift/XOR product with `0x1b` reduction; `Word.mulMasked` combines three masked 32-bit carry-less products. `squareMasked`, `frobeniusMasked`, and `invMasked` provide the corresponding unary operations. `WordProofs`, `MaskedProofs`, and `MaskedOpsProofs` prove agreement through `Word.toField` without compiler-trust axioms. The `CanonicalNat` and `ByteCodec` instances retain BF64's eight-byte little-endian encoding.
+
+`Word.NibbleMap` and `Word.ByteMap` prepare one shared scalar in 2 KiB or 16 KiB of packed storage. Their `toField_mul` theorems in `FixedMapProofs` relate lookup products to field multiplication. `Packed.Buffer n` stores exactly `8 * n` bytes using the existing packed byte-array accessors. Its `ByteCodec` round trip, `read_write`, and `read_ofFn` describe storage behavior.
+
+`WordExt3` stores the constant, linear, and quadratic coordinates of `BF64.Ext3`. Six-product Karatsuba multiplication, mixed scalar multiplication, squaring, repeated squaring, and the coordinate formula for the `2^64` Frobenius have refinement theorems in `WordExt3Proofs` and `WordExt3Frobenius`. The codec agrees with the specification's 24-byte coefficient codec. `WordExt3.dot` consumes packed triples and accumulates double-width polynomial coefficients before reduction; `toField_dot` proves agreement with the specification sum for every length. Deferred reduction does not guarantee a faster loop: [the kernel report](../bench-bf64-word.md) records both dot implementations and their instruction counts.

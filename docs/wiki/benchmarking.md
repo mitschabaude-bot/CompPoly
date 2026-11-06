@@ -354,16 +354,7 @@ Recorded so they are not rediscovered. The audit and plan live in
   so the feature comes before the measurement. No prime-field `square` group
   either, deliberately: `square` is `mul x x` on every prime carrier here, and
   Plonky3 has no field-level `square` benchmark for the same reason.
-- The polynomial-basis `GF(2^64)` of `CompPoly/Fields/Binary/BF64/` and its
-  cubic extension have no group, and **cannot have one until a library bug is
-  fixed**. `BF64.instFintype` (`CompPoly/Fields/Binary/BF64/Impl.lean:391`) is
-  a closed constant whose value is a `Finset` of all `2 ^ 64` elements, and
-  Lean evaluates closed constants at module initialisation — so any executable
-  importing that module hangs before `main` runs. Elaboration never notices,
-  because the interpreter forces constants on demand, which is why the tests
-  build. Marking the instance `noncomputable` is not the fix: `Extension.Ext`
-  takes `[Fintype F]` and its operations then stop compiling, so the repair is
-  to `CompPoly/Fields/Extension/` rather than to the instance.
+- Polynomial-basis `GF(2^64)` and its cubic extension have `fields-bf64-mul`, `fields-bf64-fixed`, `fields-bf64-masked`, and `fields-bf64-ext3` groups. They use the proof-only `Finite BF64` interface and do not enumerate the field at module initialization. The marked instruction-count runner also covers unary arithmetic, packed dot products, and a rejected bitslice screening candidate; see [the BF64 word-kernel measurements](../bench-bf64-word.md).
 - External comparisons beyond the small-field suite below remain to be added. Peers and the "on par" bar live in
   [`docs/bench-audit-2026.md` §13](../bench-audit-2026.md#13-external-comparison-targets):
   measure Plonky3 (scalar, SIMD off) for the small fields and multiplicative

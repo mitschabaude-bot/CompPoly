@@ -12,6 +12,7 @@ public import CompPolyBench.Compare
 public import CompPolyBench.Fields.Arith
 public import CompPolyBench.Fields.Binary.AdditiveNTT.Impl
 public import CompPolyBench.Fields.Binary.Tower
+public import CompPolyBench.Fields.Binary.BF64
 public import CompPolyBench.Fields.Binary.Tower.Scalar
 public import CompPolyBench.Fields.Extension
 public import CompPolyBench.Fields.Montgomery
@@ -35,7 +36,8 @@ namespace CompPolyBench
 def allTasks : List BenchTask :=
   harnessTasks ++ univariateTasks ++ multivariateTasks ++ multilinearTasks ++ bivariateTasks ++
     factorTasks ++ guruswamiSudanTasks ++ additiveNttTasks ++ extensionTasks ++
-    montgomeryInvTasks ++ towerTasks ++ towerScalarTasks ++ fieldArithTasks ++ planesTasks
+    montgomeryInvTasks ++ towerTasks ++ towerScalarTasks ++ fieldArithTasks ++ planesTasks ++
+    bf64Tasks
 
 /-- Metadata for every benchmark group accepted by the command-line selector. -/
 def allGroupInfos : List BenchGroupInfo :=
