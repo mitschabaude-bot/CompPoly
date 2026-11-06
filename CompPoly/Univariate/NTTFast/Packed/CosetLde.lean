@@ -138,19 +138,30 @@ of `s`, line `u` stored from word `p + u * ps` of `out`. -/
     ByteArray :=
   tile16_strided%
 
+/-- The first of the sixteen columns of tile column `ct` of `n ≥ 16` columns: `16 ct`, and for
+the tile column past the whole ones, the last sixteen columns. -/
+def tileColumn (n ct : Nat) : Nat := if ct < n / 16 then 16 * ct else n - 16
+
+/-- The tile columns of `n` columns: the whole blocks of sixteen, and from sixteen columns on a
+partial last block as the tile of the last sixteen columns, which overlaps the block before. -/
+def tileColumns (n : Nat) : Nat := if 16 ≤ n ∧ n % 16 ≠ 0 then n / 16 + 1 else n / 16
+
 /-- Rows `r0, …, r0 + rows - 1` of columns `c0, …, c0 + n - 1` of a row-major matrix of width
 `w`, transposed: column `c0 + j` at words `j * rows, …`. Whole `16 × 16` tiles move as tiles, a
 block of up to 1024 rows at a time and down the block before across, so that each column receives
-four kilobytes per block and the pages both sides touch stay few; the rest moves word by word. -/
+four kilobytes per block and the pages both sides touch stay few; from sixteen columns on, a
+partial last block of columns moves as the tiles of the last sixteen columns, writing the columns
+they share with the block before once more; the rest moves word by word. -/
 def transposeRows (m : @& ByteArray) (w c0 n r0 rows : Nat) : ByteArray := Id.run do
   let mut out := zeroWords (n * rows)
   for rb in [:(rows / 16 + 63) / 64] do
-    for ct in [:n / 16] do
+    for ct in [:tileColumns n] do
+      let cc := tileColumn n ct
       for rt in [64 * rb:min (64 * rb + 64) (rows / 16)] do
-        out := tileStrided m ((r0 + 16 * rt) * w + c0 + 16 * ct).toUSize w.toUSize out
-          (16 * ct * rows + 16 * rt).toUSize rows.toUSize
+        out := tileStrided m ((r0 + 16 * rt) * w + c0 + cc).toUSize w.toUSize out
+          (cc * rows + 16 * rt).toUSize rows.toUSize
   for j in [:n] do
-    let r1 := if j < 16 * (n / 16) then 16 * (rows / 16) else 0
+    let r1 := if 16 ≤ n then 16 * (rows / 16) else 0
     for r in [r1:rows] do
       out := write out (j * rows + r) (read m ((r0 + r) * w + c0 + j))
   return out
