@@ -200,7 +200,7 @@ theorem monomialGrid_nodup (bound : Nat) : (monomialGrid bound).Nodup := by
 /-- Weighted-degree monomial enumeration has no duplicate exponent pairs. -/
 theorem monomialsWeightedDegreeLE_nodup (xWeight yWeight bound : Nat) :
     (monomialsWeightedDegreeLE xWeight yWeight bound).toList.Nodup := by
-  simpa [monomialsWeightedDegreeLE] using
+  simpa only [monomialsWeightedDegreeLE_eq_grid, List.toList_toArray] using
     (monomialGrid_nodup bound).filter
       (fun m ↦ xWeight * m.xDegree + yWeight * m.yDegree ≤ bound)
 
@@ -209,7 +209,8 @@ theorem monomialsWeightedDegreeLE_sound
     {xWeight yWeight bound : Nat} {m : Monomial}
     (hm : m ∈ (monomialsWeightedDegreeLE xWeight yWeight bound).toList) :
     xWeight * m.xDegree + yWeight * m.yDegree ≤ bound := by
-  simp [monomialsWeightedDegreeLE] at hm
+  simp only [monomialsWeightedDegreeLE_eq_grid, List.toList_toArray,
+    List.mem_filter, decide_eq_true_eq] at hm
   exact hm.2
 
 /-- In a nodup array, equal in-bounds `getD` entries have equal indices. -/

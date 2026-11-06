@@ -970,7 +970,8 @@ theorem weightedDegreeBasis_complete_of_messageDegree_gt_one {F : Type*}
     nlinarith [hweight, hypos]
   have hweight' : i + yWeight params * j ≤ params.weightedDegreeBound := by
     simpa using hweight
-  unfold interpolationMonomials CBivariate.monomialsWeightedDegreeLE CBivariate.monomialGrid
+  rw [interpolationMonomials, CBivariate.monomialsWeightedDegreeLE_eq_grid]
+  unfold CBivariate.monomialGrid
   simp [hileBound, hjleBound, hweight']
 
 /-- Dense interpolation completeness in the ordinary positive-`Y`-weight range. -/

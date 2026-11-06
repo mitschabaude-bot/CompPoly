@@ -153,8 +153,66 @@ weighted degree at most `bound`. If a weight is zero, `bound` also serves as the
 finite exponent cap for that variable.
 -/
 def monomialsWeightedDegreeLE (xWeight yWeight bound : Nat) : Array Monomial :=
-  ((monomialGrid bound).filter fun m ↦
-    xWeight * m.xDegree + yWeight * m.yDegree ≤ bound).toArray
+  ((List.range (bound + 1)).flatMap fun y ↦
+    if yWeight * y ≤ bound then
+      let xCap := if xWeight = 0 then bound else min bound ((bound - yWeight * y) / xWeight)
+      (List.range (xCap + 1)).map fun x ↦ ({ xDegree := x, yDegree := y } : Monomial)
+    else []).toArray
+
+private theorem filter_range_le (n cap : Nat) :
+    (List.range n).filter (fun x ↦ decide (x ≤ cap)) = List.range (min n (cap + 1)) := by
+  induction n with
+  | zero => simp only [List.range_zero, List.filter_nil, Nat.zero_min]
+  | succ n ih =>
+      rw [List.range_succ, List.filter_append, ih]
+      by_cases h : n ≤ cap
+      · have hmin : min n (cap + 1) = n := by omega
+        have hmin' : min (n + 1) (cap + 1) = n + 1 := by omega
+        simp only [hmin, hmin', List.filter_cons, h, decide_true,
+          ite_true, List.filter_nil]
+        exact (List.range_succ).symm
+      · have hmin : min n (cap + 1) = cap + 1 := by omega
+        have hmin' : min (n + 1) (cap + 1) = cap + 1 := by omega
+        simp only [hmin, hmin', List.filter_cons, h, decide_false, Bool.false_eq_true,
+          ite_false, List.filter_nil, List.append_nil]
+
+/-- Row enumeration preserves the exponent-grid specification and its finite zero-weight caps. -/
+theorem monomialsWeightedDegreeLE_eq_grid (xWeight yWeight bound : Nat) :
+    monomialsWeightedDegreeLE xWeight yWeight bound =
+      ((monomialGrid bound).filter fun m ↦
+        xWeight * m.xDegree + yWeight * m.yDegree ≤ bound).toArray := by
+  unfold monomialsWeightedDegreeLE monomialGrid
+  rw [List.filter_flatMap]
+  congr 1
+  apply congrArg (fun f : Nat → List Monomial ↦ (List.range (bound + 1)).flatMap f)
+  funext y
+  rw [List.filter_map]
+  dsimp only [Function.comp_def]
+  by_cases hy : yWeight * y ≤ bound
+  · simp only [hy, ite_true]
+    by_cases hx : xWeight = 0
+    · simp only [hx, ite_true, Nat.zero_mul, Nat.zero_add, hy, decide_true,
+        List.filter_true]
+    · simp only [hx, ite_false]
+      have hpred :
+          (fun x ↦ decide (xWeight * x + yWeight * y ≤ bound)) =
+            (fun x ↦ decide (x ≤ (bound - yWeight * y) / xWeight)) := by
+        funext x
+        apply Bool.eq_iff_iff.mpr
+        simp only [decide_eq_true_eq]
+        rw [Nat.le_div_iff_mul_le (Nat.pos_of_ne_zero hx), Nat.mul_comm x xWeight]
+        omega
+      change _ = ((List.range (bound + 1)).filter
+        (fun x ↦ decide (xWeight * x + yWeight * y ≤ bound))).map _
+      rw [hpred, filter_range_le]
+      congr 2
+      omega
+  · simp only [hy, ite_false]
+    symm
+    rw [List.map_eq_nil_iff, List.filter_eq_nil_iff]
+    intro x _
+    simp only [decide_eq_true_eq]
+    omega
 
 /-- Shared monomial contributions for materialized and directly evaluated Hasse derivatives. -/
 def hasseDerivativeTermList {R : Type*} [Semiring R]
