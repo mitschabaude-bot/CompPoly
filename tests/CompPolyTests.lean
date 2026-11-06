@@ -14,6 +14,7 @@ public import CompPolyTests.Bivariate.GuruswamiSudan.Compose
 public import CompPolyTests.Bivariate.GuruswamiSudan.Core
 public import CompPolyTests.Bivariate.GuruswamiSudan.Filter
 public import CompPolyTests.Bivariate.GuruswamiSudan.Hasse
+public import CompPolyTests.Bivariate.GuruswamiSudan.Parameters
 public import CompPolyTests.Bivariate.GuruswamiSudan.Interpolation.ApproximantBasis
 public import CompPolyTests.Bivariate.GuruswamiSudan.Interpolation.Dense
 public import CompPolyTests.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan
@@ -40,6 +41,7 @@ public import CompPolyTests.Fields.BN254.Fast
 public import CompPolyTests.Fields.BabyBear.Fast
 public import CompPolyTests.Fields.BabyBear.FastExt4
 public import CompPolyTests.Fields.Binary.AdditiveNTT.Basis
+public import CompPolyTests.Fields.Binary.AdditiveNTT.BasisConversion
 public import CompPolyTests.Fields.Binary.AdditiveNTT.Compatibility
 public import CompPolyTests.Fields.Binary.AdditiveNTT.Executable
 public import CompPolyTests.Fields.Binary.AdditiveNTT.NovelPolynomialBasis
@@ -52,6 +54,8 @@ public import CompPolyTests.Fields.Binary.BF128Ghash.Prelude
 public import CompPolyTests.Fields.Binary.BF128Ghash.Presentation
 public import CompPolyTests.Fields.Binary.BF64
 public import CompPolyTests.Fields.Binary.BF64.Presentation
+public import CompPolyTests.Fields.Binary.BF64.Trace
+public import CompPolyTests.Fields.Binary.BF64.GuruswamiSudan
 public import CompPolyTests.Fields.Binary.Bytes
 public import CompPolyTests.Fields.Binary.Common
 public import CompPolyTests.Fields.Binary.Tower.Algebra

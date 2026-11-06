@@ -177,6 +177,8 @@ noncomputable, which would also break `Ext3`. The `#guard` checks in
 [`../../tests/CompPolyTests/Fields/Binary/BF64.lean`](../../tests/CompPolyTests/Fields/Binary/BF64.lean)
 run the compiled arithmetic and fail the build if that ever regresses.
 
+[`BF64/Trace.lean`](../../CompPoly/Fields/Binary/BF64/Trace.lean) supplies `smallPrimeTraceContext` and `ext3SmallPrimeTraceContext`, with explicit 64-bit and 192-bit basis arrays, spanning and independence theorems, and certified `fieldRootContext` / `ext3FieldRootContext` adapters. Their deterministic Shoup splitter uses binary trace coordinates and modular Frobenius powers. [The binary trace construction](../../CompPoly/Univariate/Roots/Shoup/BinaryTrace.lean) proves the trace-image and separating-coordinate contracts from cardinality and spanning; field enumeration is absent from the executable definitions.
+
 ## Binary Tower Surface
 
 The tower development splits into abstract theory, concrete constructions, and
@@ -296,6 +298,8 @@ The additive-NTT stack is split by role rather than by one monolithic file:
 
 When changing additive NTT, expect to read several of these files together.
 Algorithm changes often cascade into `Intermediate`, `Impl`, and `Correctness`.
+
+[`AdditiveNTT/BasisConversion.lean`](../../CompPoly/Fields/Binary/AdditiveNTT/BasisConversion.lean) supplies ordinary `monomialToNovelArray`, computing normalized subspace factors and eliminating coefficients from highest degree to lowest. `monomialToNovelArray_eq_equivFun` proves agreement with the mathematical novel-basis equivalence. Its runtime arguments are field arithmetic and the explicit basis function; finite-field enumerations and independence proofs are needed only by the correctness theorem. [`Univariate/Basis/Triangular.lean`](../../CompPoly/Univariate/Basis/Triangular.lean) contains the representation-independent elimination and reconstruction theorem. The implementation constructs basis polynomials and uses polynomial subtraction at each coefficient, so its cost grows quadratically or worse with the message length.
 
 ## Where To Start By Task
 

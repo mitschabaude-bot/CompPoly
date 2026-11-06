@@ -137,6 +137,14 @@ shared by the backends, and `Interpolation/Correctness.lean` the shared results
 (`interpolationWitnessIsValidBool_iff`, `lowMessageDegreeInterpolation_sound`).
 Named KoalaBear contexts for all four backends live in `Implementations.lean`.
 
+### Finite parameter selection
+
+[`Parameters.lean`](../../CompPoly/Bivariate/GuruswamiSudan/Parameters.lean) exposes `finiteGSParamSelector`. It searches multiplicities in `[1,N]` for `k > 1` and `e < N`, sets `D = s * (N - e) - 1`, and accepts only when the weighted monomial count exceeds `N * s * (s + 1) / 2`. `compactInterpolationMonomials` enumerates the weighted rows directly, and `interpolationWitness_exists_of_count_lt` turns the count into semantic interpolation existence without executing a dense solver.
+
+`mem_decode_finiteGSParamSelector_iff` proves exact degree-and-distance membership for the ordinary selector-backed decoder, assuming distinct abscissae and successful selection. `Parameters/Production.lean` provides kernel-checked selections and specialized coverage theorems for `(k,N,e) = (8192,16384,937)`, `(512,8192,5464)`, and `(32,4096,3620)`, selecting `(s,D) = (1,15446)`, `(1,2727)`, and `(2,951)`.
+
+[`BF64/GuruswamiSudan.lean`](../../CompPoly/Fields/Binary/BF64/GuruswamiSudan.lean) supplies `BF64.decodeScalar` and `BF64.decodeExt3Scalar`, combining Lee–O'Sullivan interpolation, subproduct trees, shifted reduction, and certified deterministic field roots. The structured interpolator's normalization uses `interpolationMonomials`, whose square exponent-grid scan costs `(D + 1)²` candidate pairs; selecting structured linear algebra alone does not remove that cost. Production runtime requires attention to normalization, polynomial arithmetic, and root reconstruction as well as the matrix solver.
+
 ### Root-finding backends
 
 Both find the `Y`-roots of the interpolated `Q` that are polynomials of bounded

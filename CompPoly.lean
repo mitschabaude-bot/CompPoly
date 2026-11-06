@@ -44,6 +44,10 @@ public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan.Corre
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan.Correctness.Soundness
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.WitnessDivisibility
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.WitnessDivisibilityCorrectness
+public import CompPoly.Bivariate.GuruswamiSudan.Parameters
+public import CompPoly.Bivariate.GuruswamiSudan.Parameters.Basic
+public import CompPoly.Bivariate.GuruswamiSudan.Parameters.Correctness
+public import CompPoly.Bivariate.GuruswamiSudan.Parameters.Production
 public import CompPoly.Bivariate.GuruswamiSudan.Polynomial
 public import CompPoly.Bivariate.GuruswamiSudan.PolynomialCorrectness
 public import CompPoly.Bivariate.GuruswamiSudan.Root.Alekhnovich.Algorithm
@@ -116,6 +120,7 @@ public import CompPoly.Fields.BabyBear.InterpolateCoset
 public import CompPoly.Fields.Basic
 public import CompPoly.Fields.Binary.AdditiveNTT.AdditiveNTT
 public import CompPoly.Fields.Binary.AdditiveNTT.Algorithm
+public import CompPoly.Fields.Binary.AdditiveNTT.BasisConversion
 public import CompPoly.Fields.Binary.AdditiveNTT.Correctness
 public import CompPoly.Fields.Binary.AdditiveNTT.Domain
 public import CompPoly.Fields.Binary.AdditiveNTT.Executable
@@ -139,8 +144,10 @@ public import CompPoly.Fields.Binary.BF64.BaseCertificate
 public import CompPoly.Fields.Binary.BF64.Basic
 public import CompPoly.Fields.Binary.BF64.Bytes
 public import CompPoly.Fields.Binary.BF64.Ext3
+public import CompPoly.Fields.Binary.BF64.GuruswamiSudan
 public import CompPoly.Fields.Binary.BF64.Impl
 public import CompPoly.Fields.Binary.BF64.Reduce
+public import CompPoly.Fields.Binary.BF64.Trace
 public import CompPoly.Fields.Binary.Common
 public import CompPoly.Fields.Binary.Common.Arithmetic
 public import CompPoly.Fields.Binary.Tower.Abstract.Algebra
@@ -328,6 +335,7 @@ public import CompPoly.ToMathlib.Polynomial.Irreducible
 public import CompPoly.ToMathlib.Polynomial.Roots
 public import CompPoly.Univariate.Barycentric
 public import CompPoly.Univariate.Basic
+public import CompPoly.Univariate.Basis.Triangular
 public import CompPoly.Univariate.BatchEval
 public import CompPoly.Univariate.BatchEval.Context
 public import CompPoly.Univariate.BatchEval.Correctness
@@ -462,6 +470,7 @@ public import CompPoly.Univariate.Roots.LasVegas.Probability.Uniform
 public import CompPoly.Univariate.Roots.RootProduct
 public import CompPoly.Univariate.Roots.Shoup
 public import CompPoly.Univariate.Roots.Shoup.Basic
+public import CompPoly.Univariate.Roots.Shoup.BinaryTrace
 public import CompPoly.Univariate.Roots.Shoup.Correctness
 public import CompPoly.Univariate.Roots.Shoup.FrobeniusLinear
 public import CompPoly.Univariate.Roots.SmoothSubgroup
