@@ -342,15 +342,23 @@ theorem replicateWord_encode (c : F) (n : Nat) (hn : 4 * n < USize.size) :
   unfold replicateWord
   simp only [Std.Legacy.Range.forIn_eq_forIn_range', Std.Legacy.Range.size,
     Nat.sub_zero, Nat.add_sub_cancel, Nat.div_one, ← List.range_eq_range',
-    bind_pure, List.forIn_pure_yield_eq_foldl, Id.run_pure]
-  rw [zeroWords_eq (p := p), ← upto_zero (Array.replicate n 0) fun _ ↦ c, List.range_eq_range',
-    foldl_tail _ _ _ _ _ (fun k _ hk ↦ write_upto _ (fun _ ↦ c) k
-      (by rw [Array.size_replicate]; omega) (by rw [Array.size_replicate]; omega)),
-    Nat.zero_add, upto_full _ _ _ (Array.size_replicate ..)]
+    bind_pure, pure_bind, dite_pure_yield, List.forIn_pure_yield_eq_foldl, Id.run_pure]
+  let f (_ : Nat) : F := c
+  rw [zeroWords_eq (p := p), foldl_blocks (Array.replicate n 0) f (n / 16) _ (fun m hm ↦ by
+    have h16 : 16 * m + 16 ≤ n := by omega
+    rw [dite_eq_left_of_eq_true (eq_true (by omega)),
+      CompPoly.CPolynomial.NTTFast.Packed.Native.write16U_encode _ _
+        (by rw [size_encode_fields, size_upto, Array.size_replicate]; omega)
+        (by rw [USize.toNat_ofNatLT, size_upto, Array.size_replicate]; omega)]
+    simp only [USize.toNat_ofNatLT]
+    exact congrArg encode (splice_upto _ f _ (by rw [Array.size_replicate]; omega))),
+    foldl_tail _ f _ _ _ (fun k _ hk ↦ write_upto _ f k (by rw [Array.size_replicate]; omega)
+      (by rw [Array.size_replicate]; omega)),
+    Nat.add_sub_cancel' (Nat.mul_div_le n 16), upto_full _ f _ (Array.size_replicate ..)]
   congr 1
   apply Array.ext (by rw [Array.size_ofFn, Array.size_replicate])
   intro j _ _
-  simp only [Array.getElem_ofFn, Array.getElem_replicate]
+  simp only [Array.getElem_ofFn, Array.getElem_replicate, f]
 
 /-- `mulAddInto16` splices multiply-adds in place. -/
 theorem mulAddInto16_encode (o b : Array F) (io ib : USize) (c : F) (hout hb)
