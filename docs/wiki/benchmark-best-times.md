@@ -25,6 +25,11 @@ overwritten.
 | 2026-11-06 | `7e5b072` | none | GS vector normalization | none | share one pivot inverse, ratio 0.136 on eight-entry vectors, five alternating rounds, matching digests, stable controls, no suspect rows |
 | 2026-11-06 | `e7f79a4` | none | polynomial-basis BF64 | none | truncate the carry-less accumulator once, ratio 0.601, five alternating rounds, matching digests, stable controls, no suspect rows |
 
+| 2026-11-06 | `9a955eb` | none | binary GS interpolation | none | five-round A/B, matching digests and stable controls: sparse sibling first ratio 0.706; batch denominator inversion 0.301; tree assembly for coefficient interpolation 0.124; no suspect rows |
+| 2026-11-06 | `9a955eb` | none | binary GS vanishing | none | certified subspace-chain recognition and construction ratio 0.817 on 32-point additive cosets, five alternating rounds, matching digests, stable controls, no suspect rows |
+| 2026-11-06 | `9a955eb` | none | Gao EEA and division | none | unit-locator shortcut ratio 0.293 at k=2,n=4, five alternating rounds, full polynomial sink, matching digests, stable controls, no suspect rows |
+| 2026-11-06 | `9a955eb` | none | GS lattice basis | none | sparse vanishing square, ratio 0.561, five alternating rounds, full matrix sink, matching digests, controls within 5.5%, no suspect rows |
+
 ## How to read and how to update the tables
 
 Every number below was measured on the **reference machine** under the same

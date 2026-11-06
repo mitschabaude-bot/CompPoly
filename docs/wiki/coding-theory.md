@@ -260,3 +260,13 @@ knowing which contracts they assume.
 
 BibTeX entries for these keys are in
 [`../../blueprint/src/references.bib`](../../blueprint/src/references.bib).
+
+## Binary-field scalar decoder dispatch
+
+`BF64.decodeScalar` and `BF64.decodeExt3Scalar` use the certified finite selector and `decodeWithUnique`. For `k < n` and `2 * cutoff ≤ n - k`, Gao returns a singleton or the empty list; the requested cutoff is checked independently of Gao's larger decoding radius. Outside that condition, the family uses Lee–O’Sullivan polynomial-lattice interpolation with the shifted Mulders–Storjohann reducer and certified trace-based roots. The public membership theorems describe exactly the degree-bounded candidates within the requested cutoff in either branch. The extraction parameters select Gao at `k,n,cutoff = 8192,16384,937` and GS at `512,8192,5464` and `32,4096,3620`.
+
+`GaoTree` supplies tree interpolation and a certified vanishing context to Gao's Euclidean stage. A proved compiler substitution handles a unit locator without generic polynomial division. `CoefficientInterpolationTree` identifies the lattice backend's coefficient-form interpolant with tree interpolation on distinct nodes, preserving the specified duplicate-node behavior. The tree interpolator computes all derivative inverses with one batch inversion and places the sparse sibling product first in convolution.
+
+`VanishingPolynomialContext.linearized` infers a binary-subspace chain from the nodes and checks its roots and expected degree before using the chain polynomial. The root, monicity and degree proof identifies it with the ordinary vanishing polynomial for every accepted array; arbitrary node arrays use subproduct construction. Polynomial multiplication and EEA remain the ordinary certified backends; this dispatch does not provide additive-NTT multiplication or half-GCD.
+
+`LeeOSullivan.SparseBasis` constructs the vanishing square with `MulContext.skipZeros` in multiplicity-two lattice rows. A proved compiler substitution preserves every matrix coefficient, including the generic multiplicities supported by the specification.
