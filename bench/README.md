@@ -2,6 +2,14 @@
 
 This directory contains the compiled benchmark executable for CompPoly.
 
+## Binary-field GS production profiling
+
+`CompPolyGSBench` runs the certified BF64/Ext3 scalar decoder at the three production parameter sets. Build with `lake build CompPolyGSBench`, then invoke `.lake/build/bin/CompPolyGSBench initial decode dense` (or `middle` / `final`). `dense` fills all message coefficients; `affine` isolates decoder setup costs with a two-coefficient message. Fixture evaluation is timed separately. Successful decoding checks that the list is exactly the supplied singleton.
+
+The `profile` mode times distinctness, vanishing construction, coefficient interpolation, module construction, row reduction, normalization, roots, and distance filtering using the production backend functions. `decode` calls the public selector-backed decoder directly. `normalize` and `roots` isolate those operations on the honest witness `Y - p`. Every phase prints and flushes a start marker before running, so a bounded run identifies the unfinished phase. Use `/usr/bin/time -v` for whole-process peak RSS and `perf record -F 99 -g` / `perf report --stdio --no-children` for sampled CPU attribution. Run all Lean/Lake commands and benchmark processes under `systemd-run --user --scope -p MemoryMax=12G --` when using the extraction fixture's resource budget.
+
+`fields-bf64-mul` in the main benchmark suite measures 64 dependent multiplications on a runtime-generated pool of full-width BF64 inputs. It supports the usual digest validation and alternating A/B driver.
+
 ## Running
 
 Run the benchmark from the repository root:

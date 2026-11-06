@@ -101,3 +101,4 @@ fields-tower-bt8-square
 fields-tower-bt8-inv
 fields-tower-bt64-square
 fields-tower-bt128-square
+fields-bf64-mul

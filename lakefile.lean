@@ -89,6 +89,10 @@ lean_exe CompPolyLdeBench where
   srcDir := "bench"
   moreLeancArgs := #["-march=native"]
 
+/-- Production-size certified binary-field GS decoding and phase profiling. -/
+lean_exe CompPolyGSBench where
+  srcDir := "bench"
+
 /-- Kernel-level axiom / `sorry` accounting with a committed regression baseline
 (`scripts/axiom_baseline.json`). Runtime-imports the built CompPoly oleans, so run it
 after `lake build`. See `scripts/AxiomSweep.lean`. -/

@@ -270,6 +270,8 @@ theorem, never by `@[implemented_by]` or `native_decide`.
    globs `CompPoly/*.lean` only, and the lakefile globs `CompPolyBench`
    submodules.
 
+The binary-field scalar GS production runner and its phase modes are documented in [`bench/README.md`](../../bench/README.md#binary-field-gs-production-profiling). Its direct decoding mode uses the selector-backed certified BF64/Ext3 contexts; the arithmetic cost center has the main-suite group `fields-bf64-mul`.
+
 ## Chained bodies
 
 A field operation is one or two nanoseconds and the harness floor is about

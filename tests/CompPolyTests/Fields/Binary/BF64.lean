@@ -50,6 +50,16 @@ theorem multiplication_matches_reference :
       (fun v => reduce (BinaryField.carryLessMul (w := 128) v.1 v.2.1) == v.2.2) = true := by
   decide +kernel
 
+/-- Full-width inputs and independently computed polynomial remainders exercise both folds. -/
+def reductionVectors : List (BitVec 128 × BitVec 64) :=
+  [(0, 0), (1, 1), (0x8000000000000000, 0x8000000000000000),
+   (0x10000000000000000, 0x1b),
+   (0x80000000000000000000000000000000, 0x80000000000000af),
+   (0xffffffffffffffffffffffffffffffff, 0xffffffffffffff35),
+   (0x0123456789abcdef0123456789abcdef, 0x1968f78bc4b52a56)]
+
+#guard reductionVectors.all fun (input, expected) ↦ reduce input == expected
+
 /-! ## Finiteness without runtime enumeration -/
 
 example : Finite _root_.BF64 := inferInstance
