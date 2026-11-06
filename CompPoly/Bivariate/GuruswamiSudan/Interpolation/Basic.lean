@@ -158,6 +158,22 @@ def normalizeVector? {F : Type*} [Field F] [BEq F] (v : Array F) :
       else
         some (v.map fun c ↦ c / pivot)
 
+/-- Normalize using a single shared inverse of the pivot. -/
+def normalizeVectorFast? {F : Type*} [Field F] [BEq F] (v : Array F) :
+    Option (Array F) :=
+  match firstNonzeroIndex? v with
+  | none => none
+  | some i =>
+      let pivot := v.getD i 0
+      if pivot == 0 then none else
+        let inverse := pivot⁻¹
+        some (v.map fun c ↦ c * inverse)
+
+/-- Compiled vector normalization shares the pivot inverse. -/
+@[csimp] theorem normalizeVector?_eq_fast : @normalizeVector? = @normalizeVectorFast? := by
+  funext F _ _ v
+  simp only [normalizeVector?, normalizeVectorFast?, div_eq_mul_inv]
+
 /-- Predicate for the normalized interpolation-witness API. -/
 def IsNormalizedInterpolationWitness {F : Type*} [Zero F] [One F] [BEq F]
     (coeffs : Array F) : Prop :=
