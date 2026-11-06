@@ -58,4 +58,29 @@ private def polynomialCases : Array (CPolynomial BF64) :=
     | none => none
     | some i => some (v.map fun c ↦ c / v.getD i 0)
 
+private def denseP : CPolynomial BF64 :=
+  CPolynomial.ofArray ((Array.range 8).map fun i ↦
+    BF64.ofBitVec (BitVec.ofNat 64 (0x9e3779b97f4a7c15 + 17 * i)))
+
+private def denseWord : GSReceivedWord BF64 :=
+  ⟨(Array.range 16).map fun i ↦
+    let x := BF64.ofBitVec (BitVec.ofNat 64 i)
+    (x, CPolynomial.eval x denseP)⟩
+
+#guard let result := BF64.decodeScalar 8 1 denseWord
+  result.size == 1 && result.contains denseP
+
+private def denseEP : CPolynomial BF64.Ext3 :=
+  CPolynomial.ofArray ((Array.range 4).map fun i ↦
+    CompPoly.Extension.Ext.ofFn fun j ↦
+      BF64.ofBitVec (BitVec.ofNat 64 (1234567 + 17 * i + 31 * j.val)))
+
+private def denseEWord : GSReceivedWord BF64.Ext3 :=
+  ⟨(Array.range 8).map fun i ↦
+    let x := CompPoly.Extension.Ext.ofBase (BF64.ofBitVec (BitVec.ofNat 64 i))
+    (x, CPolynomial.eval x denseEP)⟩
+
+#guard let result := BF64.decodeExt3Scalar 4 1 denseEWord
+  result.size == 1 && result.contains denseEP
+
 end CompPolyTests.Fields.Binary.BF64.GuruswamiSudan

@@ -19,6 +19,11 @@ overwritten.
 | 2026-10-23 | `92c5d21` | #395, #401 | packed NTT, coset LDE | none | the packed kernels are timed outside the suite: coset LDE of 2^15 × 2633 words 17% faster on one thread, 11% on sixteen (Ryzen 7 3700X, [benchmarking.md](benchmarking.md#proved-stores-and-checks-once-per-loop-2026-10-23)) |
 | 2026-10-23 | `c469bb4` | #401 | packed NTT, coset LDE | none | the packed kernels are timed outside the suite: CompStark's Keccak extension by columns, 2^15 × 2633 words, 22% faster on one thread and 27% on sixteen (Ryzen 7 3700X, [benchmarking.md](benchmarking.md#montgomery-products-by-high-words-leaf-stages-blocked-input-transposes-and-fused-coset-products-2026-10-23)) |
 | 2026-11-02 | `b282b7f` | none | coordinate planes | none | generic `ExtPlanes` against the quartic `Ext4Planes`, A/B of the `fields-planes-koalabear-ext4-*` groups on a Ryzen 7 3700X, both builds for the native CPU: products 12% faster, products by a scalar 27% faster, inverses and inverse denominators within 2% |
+| 2026-11-06 | `2cacc05` | none | polynomial-basis BF64 | none | Ryzen 7 3700X, five alternating rounds: sparse-modulus reduction ratio 0.747, matching digests, stable controls, no suspect rows; reference-machine tables unchanged |
+| 2026-11-06 | `17d929e` | none | GS weighted monomials | none | bounded row enumeration ratio 0.257 against an equality-certified grid baseline, five alternating rounds, matching digests, stable controls, no suspect rows; initial-size enumeration completes in 1 ms without the quadratic grid |
+| 2026-11-06 | `8180913` | none | binary GS vanishing | none | skip zero coefficient rows, ratio 0.753, five alternating rounds, matching digests, stable controls, no suspect rows |
+| 2026-11-06 | `7e5b072` | none | GS vector normalization | none | share one pivot inverse, ratio 0.136 on eight-entry vectors, five alternating rounds, matching digests, stable controls, no suspect rows |
+| 2026-11-06 | `e7f79a4` | none | polynomial-basis BF64 | none | truncate the carry-less accumulator once, ratio 0.601, five alternating rounds, matching digests, stable controls, no suspect rows |
 
 ## How to read and how to update the tables
 

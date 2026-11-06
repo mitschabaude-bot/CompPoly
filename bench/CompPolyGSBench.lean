@@ -36,8 +36,14 @@ private def profile {F : Type} [Field F] [BEq F] [LawfulBEq F] [DecidableEq F]
     CPolynomial.ModContext.remainderOnly
   let G ← timed "vanishing" fun _ ↦ pure (V.vanishingPolynomial (w.points.map Prod.fst))
   report s!"vanishing coefficients={G.val.size}"
-  let R ← timed "coefficient-interpolation" fun _ ↦
-    pure (CPolynomial.interpolateCoefficientFormWithVanishing E G w.points)
+  let R ← timed "coefficient-interpolation" fun _ ↦ do
+    let derivative ← timed "derivative" fun _ ↦ pure (CPolynomial.derivative G)
+    let values ← timed "derivative-evaluation" fun _ ↦
+      pure (E.evalBatchWith derivative (w.points.map Prod.fst))
+    timed "interpolation-assembly" fun _ ↦ pure <|
+      (List.range w.points.size).foldl (fun acc i ↦
+        acc + CPolynomial.interpolationTermWithVanishing G
+          (w.points.getD i (0, 0)) (values.getD i 0)) 0
   report s!"interpolant coefficients={R.val.size}"
   let basis ← timed "module-basis" fun _ ↦
     pure (leeOSullivanBasisRowsWithRG R G params.interp)
@@ -56,15 +62,26 @@ private def profile {F : Type} [Field F] [BEq F] [LawfulBEq F] [DecidableEq F]
     pure (candidates.filter (passesCandidateDistance w.points params.radius))
 
 private def run {F : Type} [Field F] [BEq F] [LawfulBEq F] [DecidableEq F]
-    (ofWord : Nat → F) (ctx : GSFilteredCoreContext F) (roots : GSRootContext F)
+    (ofWord ofCoefficient : Nat → F) (ctx : GSFilteredCoreContext F) (roots : GSRootContext F)
     (k n e : Nat) (mode fixture : String) : IO Unit := do
   let some params ← timed "selection" fun _ ↦ pure (finiteGSParamSelector.choose k n e) |
     throw <| IO.userError "parameter selection failed"
   report s!"k={k} n={n} e={e} params={repr params} fixture={fixture} mode={mode}"
-  let p := CPolynomial.ofArray <| if fixture == "affine" then #[ofWord 7, ofWord 3]
-    else (Array.range k).map fun i ↦ ofWord (1234567 + 1664525 * (i + 1))
+  let a := ofCoefficient 7
+  let b := ofCoefficient 3
+  let c := ofCoefficient 0x9e3779b97f4a7c15
+  let p := CPolynomial.ofArray <| if fixture == "affine" then #[a, b]
+    else ((Array.replicate k c).set! 0 (c + a)).set! 1 (c + b)
+  -- For power-of-two k in characteristic two, (X + 1)^(k - 1) has every coefficient one.
+  let value := fun x ↦ if fixture == "affine" then CPolynomial.eval x p
+    else c * (x + 1) ^ (k - 1) + a + b * x
+  let _ ← timed "fixture-validation" fun _ ↦ do
+    for i in [0:4] do
+      let x := ofWord i
+      unless value x == CPolynomial.eval x p do
+        throw <| IO.userError "dense fixture identity failed"
   let w ← timed "fixture-evaluation" fun _ ↦ pure (GSReceivedWord.mk <|
-    (Array.range n).map fun i ↦ let x := ofWord i; (x, CPolynomial.eval x p))
+    (Array.range n).map fun i ↦ let x := ofWord i; (x, value x))
   let result ← timed mode fun _ ↦
     if mode == "profile" then profile roots params w
     else if mode == "roots" then
@@ -72,13 +89,16 @@ private def run {F : Type} [Field F] [BEq F] [LawfulBEq F] [DecidableEq F]
     else if mode == "normalize" || mode == "normalize-phases" then do
       let rawQ := CBivariate.linearYDivisor p
       let some Q ← if mode == "normalize" then
-          timed "normalization" fun _ ↦ pure (LeeOSullivan.normalizeLeeCandidate? params.interp rawQ)
+          timed "normalization" fun _ ↦
+            pure (LeeOSullivan.normalizeLeeCandidate? params.interp rawQ)
         else do
-          let basis ← timed "monomial-enumeration" fun _ ↦ pure (interpolationMonomials params.interp)
+          let basis ← timed "monomial-enumeration" fun _ ↦
+            pure (interpolationMonomials params.interp)
           report s!"monomials={basis.size}"
           let coeffs ← timed "coefficient-vector" fun _ ↦
             pure (interpolationCoefficientVectorOnBasis basis rawQ)
-          let some normalized ← timed "vector-normalization" fun _ ↦ pure (normalizeVector? coeffs) |
+          let some normalized ← timed "vector-normalization" fun _ ↦
+              pure (normalizeVector? coeffs) |
             throw <| IO.userError "vector normalization failed"
           timed "polynomial-reconstruction" fun _ ↦
             pure (some (interpolationPolynomialOnBasis basis normalized)) |
@@ -91,21 +111,26 @@ private def run {F : Type} [Field F] [BEq F] [LawfulBEq F] [DecidableEq F]
   report s!"validated singleton coefficients={p.val.size}"
 
 /-- Decode an honest row at a production level, or time the decoder's constituent phases.
-The dense fixture has all `k` coefficients; the affine fixture isolates setup costs. -/
+The dense fixture is a geometric sum plus an affine term, with all `k` coefficients.
+The affine fixture isolates setup costs. -/
 def main (args : List String) : IO UInt32 := do
   let [level, mode, fixture] := args |
     throw <| IO.userError
-      "usage: CompPolyGSBench initial|middle|final profile|decode|roots|normalize|normalize-phases affine|dense"
+      ("usage: CompPolyGSBench initial|middle|final " ++
+        "profile|decode|roots|normalize|normalize-phases affine|dense")
   unless ["profile", "decode", "roots", "normalize", "normalize-phases"].contains mode do
     throw <| IO.userError "invalid mode"
   unless fixture == "affine" || fixture == "dense" do throw <| IO.userError "invalid fixture"
   if level == "initial" then
-    run (fun i ↦ BF64.ofBitVec (BitVec.ofNat 64 i)) BF64.gsFilteredCoreContext
+    let ofWord := fun i ↦ BF64.ofBitVec (BitVec.ofNat 64 i)
+    run ofWord ofWord BF64.gsFilteredCoreContext
       (rothRuckensteinRootContext BF64 BF64.fieldRootContext) 8192 16384 937 mode fixture
   else if level == "middle" || level == "final" then
     let ofWord := fun i ↦ (CompPoly.Extension.Ext.ofBase
       (BF64.ofBitVec (BitVec.ofNat 64 i)) : BF64.Ext3)
-    run ofWord BF64.ext3GSFilteredCoreContext
+    let ofCoefficient := fun i ↦ (CompPoly.Extension.Ext.ofFn fun j ↦
+      BF64.ofBitVec (BitVec.ofNat 64 (i * (2 * j.val + 1) + 17 * j.val)) : BF64.Ext3)
+    run ofWord ofCoefficient BF64.ext3GSFilteredCoreContext
       (rothRuckensteinRootContext BF64.Ext3 BF64.ext3FieldRootContext)
       (if level == "middle" then 512 else 32) (if level == "middle" then 8192 else 4096)
       (if level == "middle" then 5464 else 3620) mode fixture

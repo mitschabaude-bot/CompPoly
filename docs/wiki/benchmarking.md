@@ -959,3 +959,27 @@ Each stage's model is its layer with the layouts applied (`leafStage4Field_eq`: 
 ### Certified binary-field GS profiling
 
 `CompPolyGSBench` runs the selector-backed BF64/Ext3 decoder at the three extraction sizes and exposes its constituent phases. The `normalize-phases` mode separates basis enumeration, coefficient extraction, vector normalization and polynomial reconstruction. The main-suite groups `fields-bf64-mul`, `gs-interpolation-monomials`, `gs-binary-vanishing` and `gs-vector-normalization` provide differential measurement gates for these cost centers; see [the benchmark guide](../../bench/README.md).
+
+### Binary-field GS measurements (2026-11-06)
+
+These measurements use compiled Lean on the Ryzen 7 3700X under a 12 GiB process cap. They are phase diagnostics, not completed full-fixture decoding results. `CompPolyGSBench` checks singleton output on successful decoding. Dense messages have degree `k - 1`, and extension coefficients populate all three limbs. Fixture generation and four independent Horner checks are outside decoder timing. Every bound below is a timeout, not a completed decode time.
+
+The initial baseline profiles at `k,N,e = 8192,16384,937`, `512,8192,5464`, and `32,4096,3620` each exceeded a 60-second limit in vanishing construction, with whole-process peak RSS 74,804 / 73,896 / 68,428 KiB. The diagnostic messages were affine. CPU samples across the three profiles attributed 21–23% to `Nat.testBit`, about 9% to GMP exponentiation, 18% to allocation/freeing, and 7–8% to the carry-less fold. BF64 reduction, a natural-number carry-less accumulator and sparse convolution rows are individually proved refinements; their five-round A/B ratios are recorded in [the pass log](benchmark-best-times.md#pass-log).
+
+The initial interpolation basis contains 22,703 monomials. Its square exponent grid has 238,609,809 pairs: an isolated baseline normalization exceeded 20 seconds at 3,958,240 KiB RSS. Bounded row enumeration completes in 1 ms and preserves the exact grid order, including zero-weight boundaries. With that enumeration, normalization of `Y - p` for an affine `p` took 26,636 ms: 26,621 ms in vector normalization and 13 ms in reconstruction. Sharing the pivot inverse reduces the same normalization to 54 ms (39 ms vector, 13 ms reconstruction), with unchanged output and whole-process peaks of 73,096 / 73,220 KiB before / after sharing. These are isolated normalization measurements, not decoder totals.
+
+Affine root-only controls, using the certified root context on `Y - p`, completed in 1,342 / 13,822 / 870 ms at the three degree bounds. These controls use base-embedded extension coefficients. They validate a singleton result but do not measure roots of dense production interpolation witnesses.
+
+With all five refinements, the dense phase profiles have the following timings. Each whole-process run was bounded to 180 seconds, including fixture generation and validation; every run stopped in interpolation assembly.
+
+| Field / level | k / N / e | Fixture validation + evaluation | Vanishing | Derivative | Derivative evaluation | Interpolation assembly | Peak RSS (KiB) |
+|---|---|---:|---:|---:|---:|---|---:|
+| BF64 / initial | 8192 / 16384 / 937 | 0.262 + 4.145 s | 3.681 s | 0.029 s | 3.627 s | unfinished, >168 s | 72,852 |
+| Ext3 / middle | 512 / 8192 / 5464 | 0.187 + 9.695 s | 21.598 s | 0.373 s | 22.977 s | unfinished, >124 s | 76,888 |
+| Ext3 / final | 32 / 4096 / 3620 | 0.013 + 3.531 s | 11.465 s | 0.183 s | 10.003 s | unfinished, >154 s | 69,012 |
+
+In the dense initial profile, allocation/freeing accounts for about 29% of self samples. `interpolateCoefficientFormWithVanishing` constructs N synthetic quotients of degree N−1, scales each and adds it to the accumulator: quadratic arithmetic and allocation remain after vanishing construction. The existing subproduct interpolator is a separate API; the Lee–O'Sullivan coefficient interpolation path does not call it. A practical replacement needs a certified interpolation bridge plus fast polynomial multiplication, rather than only a faster vanishing context. The 64 + 32 row target has not been reached, and there are no completed production-size per-row decode timings to report. Small dense BF64 and full-limb Ext3 rows exercise the exact public decoders and check singleton output in the regression suite.
+
+The exact `decode` entry point also exceeded a 60-second whole-process bound at every dense production size, including fixture setup. Peak RSS was 69,160 / 75,016 / 66,660 KiB for initial / middle / final. All three printed `start decode` and returned timeout status 124; no result list was obtained. Library build with `--wfail`, the full regression suite, all four differential benchmark groups, style/import/documentation checks and the axiom sweep pass. The sweep reports zero sorry-tainted and zero nonstandard-axiom-tainted declarations. Existing public coverage theorem statements are unchanged.
+
+The monomial enumeration comparison uses the proved grid equality to compile a grid baseline through the same timed decoder entry point, with identical runtime inputs and sinks. Five alternating rounds give a 0.257 candidate/baseline ratio, matching digests, controls within 4%, and no suspect rows. The independent grid reference remains unchanged at ratio 0.998.
