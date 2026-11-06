@@ -23,8 +23,8 @@ private def runMonomials (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup 
   let mut records := #[]
   for (label, enumerate) in
       [("decoder", interpolationMonomials),
-       ("grid", fun params ↦ CBivariate.monomialsWeightedDegreeLE
-         1 (yWeight params) params.weightedDegreeBound)] do
+       ("grid", fun params ↦ ((CBivariate.monomialGrid params.weightedDegreeBound).filter
+         fun m ↦ m.xDegree + yWeight params * m.yDegree ≤ params.weightedDegreeBound).toArray)] do
     let row ← runTimedSpec
       { name := s!"gs-monomials-{label}", representation := "Array Monomial",
         method := label, field := "Nat", inputShape := "k=3,D=127..129",

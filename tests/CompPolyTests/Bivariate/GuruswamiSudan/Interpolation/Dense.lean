@@ -53,7 +53,14 @@ private def lowPoints : Array (Prod F3 F3) :=
 -- Pin the exponent order and the zero-weight boundary as well as membership.
 #guard (List.range 6).all fun k ↦ (List.range 12).all fun bound ↦
   let ps : GSInterpParams := ⟨k, 1, bound⟩
-  interpolationMonomials ps == CBivariate.monomialsWeightedDegreeLE 1 (yWeight ps) bound
+  interpolationMonomials ps == ((CBivariate.monomialGrid bound).filter fun m ↦
+    m.xDegree + yWeight ps * m.yDegree ≤ bound).toArray
+
+#guard (List.range 6).all fun xWeight ↦ (List.range 6).all fun yWeight ↦
+  (List.range 12).all fun bound ↦
+    CBivariate.monomialsWeightedDegreeLE xWeight yWeight bound ==
+      ((CBivariate.monomialGrid bound).filter fun m ↦
+        xWeight * m.xDegree + yWeight * m.yDegree ≤ bound).toArray
 
 end GuruswamiSudan.Interpolation.Dense
 
