@@ -42,4 +42,11 @@ private def eword : GSReceivedWord BF64.Ext3 :=
 
 #guard (BF64.decodeExt3Scalar 2 0 eword).contains ep
 
+private def polynomialCases : Array (CPolynomial BF64) :=
+  #[0, 1, p, CPolynomial.ofArray #[1, 0, 0, 0, BF64.ofBitVec 99],
+    CPolynomial.ofArray #[0, 1, BF64.ofBitVec 7, BF64.ofBitVec 13]]
+
+#guard polynomialCases.all fun p ↦ polynomialCases.all fun q ↦
+  (BF64.structuredMulContext BF64).mul p q == p * q
+
 end CompPolyTests.Fields.Binary.BF64.GuruswamiSudan
