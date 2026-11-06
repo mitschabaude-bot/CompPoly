@@ -56,6 +56,21 @@ private def runVanishing (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup 
     records := records.push row
   return (⟨"gs-binary-vanishing", "Binary-field GS vanishing construction", records⟩, gen)
 
+private def runWordVanishing (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+  let (offsets, gen) := (randomNatArray 2 1000).run gen
+  let pool := offsets.map fun offset ↦ (Array.range 1024).map fun i ↦
+    BF64.Word.mk (UInt64.ofNat (i + 1024 * offset))
+  let row ← runTimedSpec
+    { name := "gs-vanishing-word", representation := "CPolynomial BF64.Word",
+      method := "decoder", field := "GF(2^64)", inputShape := "1024-point additive cosets",
+      digestIterations := 2, digestClass := "polynomial" }
+    preset
+    (fun i ↦ (BF64.structuredVanishingContext BF64.Word).vanishingPolynomial
+      (pool.getD (i % 2) #[]))
+    (checksumCPolynomial fun x ↦ x.val.toNat)
+    (sink := fun p ↦ p.val.foldl (fun acc x ↦ sinkStep acc x.val) 0)
+  return (⟨"gs-word-vanishing", "Word-field additive vanishing construction", #[row]⟩, gen)
+
 private def runInterpolation (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
   let (words, gen) := (randomNatArray 256 (2 ^ 64 - 3)).run gen
   let xs := (Array.range 128).map fun i ↦ BF64.ofBitVec (BitVec.ofNat 64 i)
@@ -139,6 +154,8 @@ private def runNormalize (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup 
 /-- Setup cost centers shared by the certified binary-field production decoder. -/
 def binaryGSTasks : List BenchTask :=
   [BenchTask.fromGroupRunner
+     ⟨"gs-word-vanishing", "Word-field additive vanishing construction"⟩ runWordVanishing,
+   BenchTask.fromGroupRunner
      ⟨"gs-binary-basis", "Sparse vanishing powers in the GS lattice basis"⟩ runBasis,
    BenchTask.fromGroupRunner
      ⟨"gs-gao-euclid", "Gao Euclidean stage and exact division"⟩ runGaoEuclid,

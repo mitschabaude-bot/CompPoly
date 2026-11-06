@@ -236,7 +236,6 @@ theorem clMul32_poly (a b : UInt64) :
 theorem reduceWide_eq (lo hi : UInt64) : (reduceWide lo hi).toBitVec =
     reduce (lo.toBitVec.setWidth 128 ^^^ (hi.toBitVec.setWidth 128 <<< 64)) := by
   unfold reduceWide reduce foldStep
-  rw [cmul_comm, cmul_tail, cmul_comm, cmul_tail]
   change (lo.toBitVec ^^^ hi.toBitVec ^^^ (hi.toBitVec <<< 1) ^^^
     (hi.toBitVec <<< 3) ^^^ (hi.toBitVec <<< 4) ^^^
     ((hi.toBitVec >>> 63) ^^^ (hi.toBitVec >>> 61) ^^^ (hi.toBitVec >>> 60)) ^^^

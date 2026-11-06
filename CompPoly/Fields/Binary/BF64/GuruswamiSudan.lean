@@ -6,6 +6,9 @@ Authors: CompPoly Contributors
 module
 
 public import CompPoly.Fields.Binary.BF64.Trace
+public import CompPoly.Fields.Binary.BF64.WordField
+public import CompPoly.Univariate.Roots.Shoup.Transport
+public import CompPoly.Bivariate.GuruswamiSudan.FieldTransport
 public import CompPoly.Bivariate.GuruswamiSudan.Parameters
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan
 public import CompPoly.Bivariate.GuruswamiSudan.Root.RothRuckenstein.Correctness
@@ -26,6 +29,7 @@ theorem is independent of the received word's interpolation witness.
 namespace BF64
 
 open CompPoly CompPoly.GuruswamiSudan
+open CompPoly.CPolynomial.Roots.FiniteField
 
 /-- Polynomial multiplication used by the binary-field structured decoder. -/
 def structuredMulContext (F : Type*) [Field F] [BEq F] [LawfulBEq F] :
@@ -55,13 +59,37 @@ def ext3GSFilteredCoreContext : GSFilteredCoreContext Ext3 :=
   filteredCoreContextOfInterpRootContexts (structuredInterpolationContext Ext3)
     (rothRuckensteinRootContext Ext3 ext3FieldRootContext)
 
+/-- Deterministic trace splitting on the base-field word carrier. -/
+def wordFieldRootContext : FieldRootContext Word :=
+  let ctx := smallPrimeTraceContext.map Word.ringEquiv.symm
+  finiteFieldRootContext Word ctx.toFiniteFieldContext
+    (shoupLinearFactorProductSplitter ctx)
+    (rootProduct_satisfies_shoupSplitterInput _ _ ctx)
+
+/-- Deterministic trace splitting on the three-word extension carrier. -/
+def wordExt3FieldRootContext : FieldRootContext WordExt3 :=
+  let ctx := ext3SmallPrimeTraceContext.map WordExt3.ringEquiv.symm
+  finiteFieldRootContext WordExt3 ctx.toFiniteFieldContext
+    (shoupLinearFactorProductSplitter ctx)
+    (rootProduct_satisfies_shoupSplitterInput _ _ ctx)
+
+/-- Structured base-field decoder with masked machine-word arithmetic. -/
+def wordGSFilteredCoreContext : GSFilteredCoreContext Word :=
+  filteredCoreContextOfInterpRootContexts (structuredInterpolationContext Word)
+    (rothRuckensteinRootContext Word wordFieldRootContext)
+
+/-- Structured extension decoder with three-word Karatsuba arithmetic. -/
+def wordExt3GSFilteredCoreContext : GSFilteredCoreContext WordExt3 :=
+  filteredCoreContextOfInterpRootContexts (structuredInterpolationContext WordExt3)
+    (rothRuckensteinRootContext WordExt3 wordExt3FieldRootContext)
+
 /-- Executable base-field scalar list decoding with certified finite parameter selection. -/
 def decodeScalar (k e : Nat) (w : GSReceivedWord BF64) : Array (CPolynomial BF64) :=
-  decodeWithUnique gsFilteredCoreContext k e w
+  decodeMapped Word.ringEquiv wordGSFilteredCoreContext k e w
 
 /-- Executable extension-field scalar list decoding with certified parameter selection. -/
 def decodeExt3Scalar (k e : Nat) (w : GSReceivedWord Ext3) : Array (CPolynomial Ext3) :=
-  decodeWithUnique ext3GSFilteredCoreContext k e w
+  decodeMapped WordExt3.ringEquiv wordExt3GSFilteredCoreContext k e w
 
 /-- Exact base-field scalar coverage when finite parameter selection succeeds. -/
 theorem mem_decodeScalar_iff {k e : Nat} (w : GSReceivedWord BF64)
@@ -70,7 +98,7 @@ theorem mem_decodeScalar_iff {k e : Nat} (w : GSReceivedWord BF64)
     (hdistinct : DistinctXCoordinates w.points) (p : CPolynomial BF64) :
     p ∈ (decodeScalar k e w).toList ↔
       degreeLt p k ∧ candidateMismatchCount w.points p ≤ e :=
-  mem_decodeWithUnique_iff gsFilteredCoreContext w hselect hdistinct p
+  mem_decodeMapped_iff Word.ringEquiv wordGSFilteredCoreContext w hselect hdistinct p
 
 /-- Exact extension-field scalar coverage when finite parameter selection succeeds. -/
 theorem mem_decodeExt3Scalar_iff {k e : Nat} (w : GSReceivedWord Ext3)
@@ -79,6 +107,6 @@ theorem mem_decodeExt3Scalar_iff {k e : Nat} (w : GSReceivedWord Ext3)
     (hdistinct : DistinctXCoordinates w.points) (p : CPolynomial Ext3) :
     p ∈ (decodeExt3Scalar k e w).toList ↔
       degreeLt p k ∧ candidateMismatchCount w.points p ≤ e :=
-  mem_decodeWithUnique_iff ext3GSFilteredCoreContext w hselect hdistinct p
+  mem_decodeMapped_iff WordExt3.ringEquiv wordExt3GSFilteredCoreContext w hselect hdistinct p
 
 end BF64

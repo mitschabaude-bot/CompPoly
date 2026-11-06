@@ -54,7 +54,6 @@ private theorem xtime_eq (a : BitVec 64) : (a <<< 1) ^^^ ((0 - (a >>> 63)) &&& 0
     reduce (carryLessMul (w := 128) (2#64) a) := by
   rw [cmul_two]
   unfold reduce foldStep
-  rw [cmul_comm, cmul_tail, cmul_comm, cmul_tail]
   rw [top_bit]
   apply BitVec.eq_of_getLsbD_eq
   intro i hi

@@ -8,6 +8,7 @@ module
 import all CompPoly.Univariate.Basic
 public import CompPoly.Univariate.ReedSolomon.GaoTree
 public import CompPoly.Univariate.SparseMul
+public import CompPoly.Univariate.BinarySquare
 
 /-! # Certified vanishing polynomials from a binary subspace chain -/
 
@@ -24,6 +25,30 @@ def vanishingChainEval {F : Type*} [Mul F] [Add F] [Sub F] (cs : List F) (offset
 /-- Construct the polynomial represented by a subspace chain. -/
 def vanishingChainPolynomial (M : MulContext F) (cs : List F) (offset : F) : CPolynomial F :=
   cs.foldl (fun p c ↦ M.mul p (p + C c)) (linearFactor offset)
+
+/-- Build a characteristic-two subspace chain by Frobenius squaring and one scalar row. -/
+def vanishingChainPolynomialFast (M : MulContext F) (cs : List F) (offset : F) : CPolynomial F :=
+  if (2 : F) == 0 then
+    cs.foldl (fun p c ↦ binarySquare p + c • p) (linearFactor offset)
+  else cs.foldl (fun p c ↦ M.mul p (p + C c)) (linearFactor offset)
+
+/-- Compiled chains use the coefficientwise Frobenius when the field has characteristic two. -/
+@[csimp] theorem vanishingChainPolynomial_eq_fast :
+    @vanishingChainPolynomial = @vanishingChainPolynomialFast := by
+  funext F _ _ _ M cs offset
+  unfold vanishingChainPolynomialFast vanishingChainPolynomial
+  split
+  · rename_i h
+    have h2 : (2 : F) = 0 := eq_of_beq h
+    let : CharP F 2 := (CharP.charP_iff_prime_eq_zero (by decide)).mpr h2
+    congr 1
+    funext p c
+    rw [binarySquare_eq_mul_self, M.mul_eq_mul]
+    apply toPoly_injective
+    rw [toPoly_mul, toPoly_add, C_toPoly, toPoly_add, toPoly_mul, toPoly_smul,
+      Polynomial.smul_eq_C_mul]
+    ring
+  · rfl
 
 /-- Infer the successive subspace constants from coordinate-basis nodes. -/
 def vanishingChainConstants {F : Type*} [Zero F] [Mul F] [Add F] [Sub F]

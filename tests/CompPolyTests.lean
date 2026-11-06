@@ -56,6 +56,7 @@ public import CompPolyTests.Fields.Binary.BF64
 public import CompPolyTests.Fields.Binary.BF64Word
 public import CompPolyTests.Fields.Binary.BF64.Presentation
 public import CompPolyTests.Fields.Binary.BF64.Trace
+public import CompPolyTests.Fields.Binary.BF64.WordField
 public import CompPolyTests.Fields.Binary.BF64.GuruswamiSudan
 public import CompPolyTests.Fields.Binary.Bytes
 public import CompPolyTests.Fields.Binary.Common

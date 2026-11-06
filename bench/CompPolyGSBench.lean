@@ -28,6 +28,19 @@ private def timed {α : Type} (name : String) (action : Unit → IO α) : IO α 
   report s!"done {name} ms={(stop - start) / 1000000}"
   return result
 
+private def measured {α : Type} (action : Unit → IO α) : IO α := do
+  if (← IO.getEnv "COMP_POLY_COUNTERS") != some "1" then return ← action ()
+  report "begin"
+  let input ← IO.getStdin
+  unless (← input.getLine).trimAscii.toString == "go" do
+    throw <| IO.userError "missing counter acknowledgement"
+  let start ← IO.monoNanosNow
+  let result ← action ()
+  let stop ← IO.monoNanosNow
+  report s!"end {stop - start}"
+  let _ ← input.getLine
+  return result
+
 private def profile {F : Type} [Field F] [BEq F] [LawfulBEq F] [DecidableEq F]
     (tree : Bool) (roots : GSRootContext F) (params : GSExecParams) (w : GSReceivedWord F) :
     IO (Array (CPolynomial F)) := do
@@ -121,7 +134,7 @@ private def run {F : Type} [Field F] [BEq F] [LawfulBEq F] [DecidableEq F]
         throw <| IO.userError "dense fixture identity failed"
   let w ← timed "fixture-evaluation" fun _ ↦ pure (GSReceivedWord.mk <|
     (Array.range n).map fun i ↦ let x := ofWord i; (x, value x))
-  let result ← timed mode fun _ ↦
+  let result ← measured fun _ ↦ timed mode fun _ ↦
     if mode == "gao" || mode == "gao-profile" || mode == "gao-tree" then gao mode k w
     else if mode == "profile" || mode == "tree" then profile (mode == "tree") roots params w
     else if mode == "distance" then do
@@ -168,16 +181,30 @@ def main (args : List String) : IO UInt32 := do
   unless fixture == "affine" || fixture == "dense" do throw <| IO.userError "invalid fixture"
   if level == "initial" then
     let ofWord := fun i ↦ BF64.ofBitVec (BitVec.ofNat 64 i)
-    run ofWord ofWord BF64.decodeScalar
-      (rothRuckensteinRootContext BF64 BF64.fieldRootContext) 8192 16384 937 mode fixture
+    if mode == "decode" then
+      run ofWord ofWord BF64.decodeScalar
+        (rothRuckensteinRootContext BF64 BF64.fieldRootContext) 8192 16384 937 mode fixture
+    else
+      let word := fun i ↦ BF64.Word.ofField (ofWord i)
+      run word word (decodeWithUnique BF64.wordGSFilteredCoreContext)
+        (rothRuckensteinRootContext BF64.Word BF64.wordFieldRootContext)
+        8192 16384 937 mode fixture
   else if level == "middle" || level == "final" then
     let ofWord := fun i ↦ (CompPoly.Extension.Ext.ofBase
       (BF64.ofBitVec (BitVec.ofNat 64 i)) : BF64.Ext3)
     let ofCoefficient := fun i ↦ (CompPoly.Extension.Ext.ofFn fun j ↦
       BF64.ofBitVec (BitVec.ofNat 64 (i * (2 * j.val + 1) + 17 * j.val)) : BF64.Ext3)
-    run ofWord ofCoefficient BF64.decodeExt3Scalar
-      (rothRuckensteinRootContext BF64.Ext3 BF64.ext3FieldRootContext)
-      (if level == "middle" then 512 else 32) (if level == "middle" then 8192 else 4096)
-      (if level == "middle" then 5464 else 3620) mode fixture
+    let k := if level == "middle" then 512 else 32
+    let n := if level == "middle" then 8192 else 4096
+    let e := if level == "middle" then 5464 else 3620
+    if mode == "decode" then
+      run ofWord ofCoefficient BF64.decodeExt3Scalar
+        (rothRuckensteinRootContext BF64.Ext3 BF64.ext3FieldRootContext) k n e mode fixture
+    else
+      run (fun i ↦ BF64.WordExt3.ofField (ofWord i))
+        (fun i ↦ BF64.WordExt3.ofField (ofCoefficient i))
+        (decodeWithUnique BF64.wordExt3GSFilteredCoreContext)
+        (rothRuckensteinRootContext BF64.WordExt3 BF64.wordExt3FieldRootContext)
+        k n e mode fixture
   else throw <| IO.userError "invalid level"
   return 0

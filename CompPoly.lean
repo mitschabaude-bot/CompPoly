@@ -12,6 +12,7 @@ public import CompPoly.Bivariate.GuruswamiSudan.Context
 public import CompPoly.Bivariate.GuruswamiSudan.Core
 public import CompPoly.Bivariate.GuruswamiSudan.CoreCorrectness
 public import CompPoly.Bivariate.GuruswamiSudan.Executable
+public import CompPoly.Bivariate.GuruswamiSudan.FieldTransport
 public import CompPoly.Bivariate.GuruswamiSudan.Filter
 public import CompPoly.Bivariate.GuruswamiSudan.FilterCorrectness
 public import CompPoly.Bivariate.GuruswamiSudan.Implementations
@@ -164,6 +165,7 @@ public import CompPoly.Fields.Binary.BF64.WordExt3
 public import CompPoly.Fields.Binary.BF64.WordExt3Dot
 public import CompPoly.Fields.Binary.BF64.WordExt3Frobenius
 public import CompPoly.Fields.Binary.BF64.WordExt3Proofs
+public import CompPoly.Fields.Binary.BF64.WordField
 public import CompPoly.Fields.Binary.BF64.WordProofs
 public import CompPoly.Fields.Binary.Common
 public import CompPoly.Fields.Binary.Common.Arithmetic
@@ -359,6 +361,7 @@ public import CompPoly.Univariate.BatchEval.Correctness
 public import CompPoly.Univariate.BatchEval.Interpolation
 public import CompPoly.Univariate.BatchEval.Naive
 public import CompPoly.Univariate.BatchEval.SubproductTree
+public import CompPoly.Univariate.BinarySquare
 public import CompPoly.Univariate.Bytes
 public import CompPoly.Univariate.CMvEquiv
 public import CompPoly.Univariate.CoefficientInterpolation
@@ -492,6 +495,7 @@ public import CompPoly.Univariate.Roots.Shoup.Basic
 public import CompPoly.Univariate.Roots.Shoup.BinaryTrace
 public import CompPoly.Univariate.Roots.Shoup.Correctness
 public import CompPoly.Univariate.Roots.Shoup.FrobeniusLinear
+public import CompPoly.Univariate.Roots.Shoup.Transport
 public import CompPoly.Univariate.Roots.SmoothSubgroup
 public import CompPoly.Univariate.Roots.SmoothSubgroup.Basic
 public import CompPoly.Univariate.Roots.SmoothSubgroup.Correctness
