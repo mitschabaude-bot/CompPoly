@@ -192,3 +192,7 @@ python3 ./scripts/check-docs-integrity.py
 ### BF64 instruction counts
 
 `python3 scripts/bench-bf64.py` runs the built `CompPolyBF64Bench` on logical CPU 5, measuring marked arithmetic phases with Linux user-space instruction and cycle counters. It emits JSONL samples with host load, stable sinks, and medians; see [the benchmark README](../bench/README.md#polynomial-basis-bf64-kernels) for building and validation.
+
+### GS production instruction counts
+
+`python3 scripts/bench-gs.py .lake/build/bin/CompPolyGSBench initial decode dense` measures three dense production-row decodes on CPU 5, including public field conversions and distance filtering. Use `middle` or `final` for the extension levels; `tree` and `gao-tree` expose phase profiles on word arithmetic. Build the executable before measuring. Run the process under `systemd-run --user --scope -p MemoryMax=12G --`. The JSONL records wall time, exact unmultiplexed user-space instruction/cycle counts, whole-process peak RSS and phase messages. Module startup, fixture construction and result validation lie outside the marked decoder interval. See [the benchmark README](../bench/README.md#binary-field-gs-production-profiling).

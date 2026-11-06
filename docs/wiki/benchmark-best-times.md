@@ -29,6 +29,7 @@ overwritten.
 | 2026-11-06 | `9a955eb` | none | binary GS vanishing | none | certified subspace-chain recognition and construction ratio 0.817 on 32-point additive cosets, five alternating rounds, matching digests, stable controls, no suspect rows |
 | 2026-11-06 | `9a955eb` | none | Gao EEA and division | none | unit-locator shortcut ratio 0.293 at k=2,n=4, five alternating rounds, full polynomial sink, matching digests, stable controls, no suspect rows |
 | 2026-11-06 | `9a955eb` | none | GS lattice basis | none | sparse vanishing square, ratio 0.561, five alternating rounds, full matrix sink, matching digests, controls within 5.5%, no suspect rows |
+| 2026-11-06 | `dfa38d2` | none | word-field GS rows and vanishing | none | public dense production rows complete in 4.656 / 2.761 / 0.950 s on CPU 5, with 62.918 / 38.822 / 13.363 billion user instructions; coefficientwise Frobenius chain square ratios 0.939 (1024 word nodes) and 0.698 (32 spec nodes), five alternating rounds, matching digests, no suspect rows |
 
 ## How to read and how to update the tables
 
