@@ -9,6 +9,7 @@ public import CompPoly.Fields.Binary.BF64.Trace
 public import CompPoly.Bivariate.GuruswamiSudan.Parameters
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan
 public import CompPoly.Bivariate.GuruswamiSudan.Root.RothRuckenstein.Correctness
+public import CompPoly.Univariate.SparseMul
 
 /-!
 # Certified scalar GS decoders over BF64 and Ext3
@@ -26,7 +27,7 @@ open CompPoly CompPoly.GuruswamiSudan
 
 /-- Polynomial multiplication used by the binary-field structured decoder. -/
 def structuredMulContext (F : Type*) [Field F] [BEq F] [LawfulBEq F] :
-    CPolynomial.MulContext F := CPolynomial.MulContext.naive
+    CPolynomial.MulContext F := CPolynomial.MulContext.skipZeros
 
 /-- Lee–O'Sullivan interpolation with subproduct trees and shifted row reduction. -/
 def structuredInterpolationContext (F : Type*)

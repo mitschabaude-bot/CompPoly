@@ -477,6 +477,7 @@ public import CompPoly.Univariate.Roots.SmoothSubgroup
 public import CompPoly.Univariate.Roots.SmoothSubgroup.Basic
 public import CompPoly.Univariate.Roots.SmoothSubgroup.Correctness
 public import CompPoly.Univariate.Roots.Splitter
+public import CompPoly.Univariate.SparseMul
 public import CompPoly.Univariate.ToPoly
 public import CompPoly.Univariate.ToPoly.Core
 public import CompPoly.Univariate.ToPoly.Degree
