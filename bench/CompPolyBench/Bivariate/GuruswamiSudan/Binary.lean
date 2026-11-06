@@ -7,6 +7,7 @@ module
 
 public import CompPolyBench.Common
 public import CompPoly.Fields.Binary.BF64.GuruswamiSudan
+public import CompPoly.Univariate.BatchEval.Interpolation
 
 /-! # Binary-field GS setup benchmarks -/
 
@@ -41,19 +42,74 @@ private def runVanishing (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup 
   let pool := offsets.map fun offset ↦ (Array.range 32).map fun i ↦
     BF64.ofBitVec (BitVec.ofNat 64 (i + 32 * offset))
   let mut records := #[]
-  for (label, mul) in
-      [("decoder", BF64.structuredMulContext BF64), ("naive", CPolynomial.MulContext.naive)] do
+  for (label, V) in
+      [("decoder", BF64.structuredVanishingContext BF64),
+       ("naive", CPolynomial.VanishingPolynomialContext.subproduct CPolynomial.MulContext.naive)] do
     let row ← runTimedSpec
       { name := s!"gs-vanishing-bf64-{label}", representation := "CPolynomial BF64",
         method := label, field := "GF(2^64)", inputShape := "32-point additive cosets",
         digestIterations := 2, digestClass := "polynomial" }
       preset
-      (fun i ↦ (CPolynomial.VanishingPolynomialContext.subproduct mul).vanishingPolynomial
-        (pool.getD (i % 2) #[]))
+      (fun i ↦ V.vanishingPolynomial (pool.getD (i % 2) #[]))
       (checksumCPolynomial fun x ↦ x.toBitVec.toNat)
       (sink := fun p ↦ p.val.foldl (fun acc x ↦ sinkStep acc (natSink x.toBitVec.toNat)) 0)
     records := records.push row
   return (⟨"gs-binary-vanishing", "Binary-field GS vanishing construction", records⟩, gen)
+
+private def runInterpolation (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+  let (words, gen) := (randomNatArray 256 (2 ^ 64 - 3)).run gen
+  let xs := (Array.range 128).map fun i ↦ BF64.ofBitVec (BitVec.ofNat 64 i)
+  let pool := #[words.extract 0 128, words.extract 128 256] |>.map fun ys ↦
+    ys.map fun w ↦ BF64.ofBitVec (BitVec.ofNat 64 w)
+  let mut records := #[]
+  for (label, interpolate) in
+      [("tree", CPolynomial.interpolateSubproduct (BF64.structuredMulContext BF64)
+          CPolynomial.ModContext.remainderOnly xs),
+       ("coefficient", fun ys ↦ CPolynomial.interpolateCoefficientForm
+          (CPolynomial.VanishingPolynomialContext.subproduct (BF64.structuredMulContext BF64))
+          (CPolynomial.BatchEvalContext.subproduct BF64 (BF64.structuredMulContext BF64)
+            CPolynomial.ModContext.remainderOnly) (xs.zip ys))] do
+    let row ← runTimedSpec
+      { name := s!"gs-interpolation-bf64-{label}", representation := "CPolynomial BF64",
+        method := label, field := "GF(2^64)", inputShape := "128 additive nodes, arbitrary values",
+        digestIterations := 2, digestClass := "polynomial" }
+      preset (fun i ↦ interpolate (pool.getD (i % 2) #[]))
+      (checksumCPolynomial fun x ↦ x.toBitVec.toNat)
+      (sink := fun p ↦ p.val.foldl (fun acc x ↦ sinkStep acc (natSink x.toBitVec.toNat)) 0)
+    records := records.push row
+  return (⟨"gs-binary-interpolation", "Binary-field GS received interpolation", records⟩, gen)
+
+private def runGaoEuclid (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+  let (words, gen) := (randomNatArray 4 (2 ^ 64 - 3)).run gen
+  let pool := #[words.extract 0 2, words.extract 2 4] |>.map fun xs ↦
+    CPolynomial.ofArray (xs.map fun w ↦ BF64.ofBitVec (BitVec.ofNat 64 w))
+  let G : CPolynomial BF64 := CPolynomial.X ^ 4
+  let row ← runTimedSpec
+    { name := "gao-euclid-bf64", representation := "Option CPolynomial BF64",
+      method := "decoder", field := "GF(2^64)", inputShape := "k=2,n=4,degree<k",
+      digestIterations := 2, digestClass := "polynomial" }
+    preset (fun i ↦ ReedSolomon.Gao.decodeFrom 2 4 G (pool.getD (i % 2) 0))
+    (fun p ↦ checksumCPolynomial (fun x ↦ x.toBitVec.toNat) (p.getD 0))
+    (sink := fun p ↦ (p.getD 0).val.foldl
+      (fun acc x ↦ sinkStep acc (natSink x.toBitVec.toNat)) 0)
+  return (⟨"gs-gao-euclid", "Gao Euclidean stage and exact division", #[row]⟩, gen)
+
+private def runBasis (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+  let (words, gen) := (randomNatArray 8 (2 ^ 64 - 3)).run gen
+  let pool := #[words.extract 0 4, words.extract 4 8] |>.map fun xs ↦
+    CPolynomial.ofArray (xs.map fun w ↦ BF64.ofBitVec (BitVec.ofNat 64 w))
+  let xs := (Array.range 32).map fun i ↦ BF64.ofBitVec (BitVec.ofNat 64 i)
+  let G := (BF64.structuredVanishingContext BF64).vanishingPolynomial xs
+  let params : GSInterpParams := ⟨4, 2, 15⟩
+  let row ← runTimedSpec
+    { name := "gs-basis-bf64", representation := "PolynomialMatrix BF64",
+      method := "decoder", field := "GF(2^64)", inputShape := "k=4,n=32,m=2,D=15",
+      digestIterations := 2, digestClass := "matrix" }
+    preset (fun i ↦ leeOSullivanBasisRowsSparse (pool.getD (i % 2) 0) G params)
+    (checksumArray (checksumArray (checksumCPolynomial fun x ↦ x.toBitVec.toNat)))
+    (sink := fun rows ↦ rows.foldl (fun acc row ↦ row.foldl (fun acc p ↦
+      p.val.foldl (fun acc x ↦ sinkStep acc (natSink x.toBitVec.toNat)) acc) acc) 0)
+  return (⟨"gs-binary-basis", "Sparse vanishing powers in the GS lattice basis", #[row]⟩, gen)
 
 private def normalizeSpec (v : Array BF64) : Option (Array BF64) :=
   match firstNonzeroIndex? v with
@@ -83,6 +139,12 @@ private def runNormalize (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup 
 /-- Setup cost centers shared by the certified binary-field production decoder. -/
 def binaryGSTasks : List BenchTask :=
   [BenchTask.fromGroupRunner
+     ⟨"gs-binary-basis", "Sparse vanishing powers in the GS lattice basis"⟩ runBasis,
+   BenchTask.fromGroupRunner
+     ⟨"gs-gao-euclid", "Gao Euclidean stage and exact division"⟩ runGaoEuclid,
+   BenchTask.fromGroupRunner
+     ⟨"gs-binary-interpolation", "Binary-field GS received interpolation"⟩ runInterpolation,
+   BenchTask.fromGroupRunner
      ⟨"gs-interpolation-monomials", "GS weighted monomial enumeration"⟩ runMonomials,
    BenchTask.fromGroupRunner
      ⟨"gs-binary-vanishing", "Binary-field GS vanishing construction"⟩ runVanishing,

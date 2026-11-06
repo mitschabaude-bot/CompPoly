@@ -117,7 +117,8 @@ theorem leeOSullivanPositiveInterpolate_complete_of_row
   rcases normalizeLeeCandidate?_some_of_raw hHigh hrawNe hdegRaw with
     ⟨Q, hnorm⟩
   refine ⟨Q, ?_⟩
-  simp [hdistinctBool, G, R, basis, shift, reduced, hrowSel, hchoiceDegree,
+  simp [CPolynomial.interpolateCoefficientForm, hdistinctBool, G, R, basis, shift, reduced,
+    hrowSel, hchoiceDegree,
     hchoiceBound, hnorm]
 
 theorem leeOSullivanPositiveInterpolate_complete_of_span

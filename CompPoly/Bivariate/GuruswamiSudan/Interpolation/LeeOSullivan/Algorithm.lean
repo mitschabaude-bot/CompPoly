@@ -5,6 +5,9 @@ Authors: Valerii Huhnin
 -/
 module
 
+public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan.SparseBasis
+public import CompPoly.Univariate.CoefficientInterpolationTree
+
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan.Basic
 public import CompPoly.LinearAlgebra.PolynomialMatrix.ShiftedReduction
 
@@ -82,7 +85,7 @@ def leeOSullivanPositiveInterpolate
     Option (CBivariate F) :=
   if distinctXCoordinatesBool points then
     let G := V.vanishingPolynomial (points.map fun point ↦ point.1)
-    let R := CPolynomial.interpolateCoefficientFormWithVanishing E G points
+    let R := CPolynomial.interpolateCoefficientForm V E points
     let basis := leeOSullivanBasisRowsWithRG R G params
     let shift := leeOSullivanShifts params
     let reduced := reducer.reduce basis shift

@@ -10,6 +10,8 @@ public import CompPoly.Bivariate.GuruswamiSudan.Parameters
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan
 public import CompPoly.Bivariate.GuruswamiSudan.Root.RothRuckenstein.Correctness
 public import CompPoly.Univariate.SparseMul
+public import CompPoly.Bivariate.GuruswamiSudan.Unique
+public import CompPoly.Univariate.VanishingLinearized
 
 /-!
 # Certified scalar GS decoders over BF64 and Ext3
@@ -29,11 +31,16 @@ open CompPoly CompPoly.GuruswamiSudan
 def structuredMulContext (F : Type*) [Field F] [BEq F] [LawfulBEq F] :
     CPolynomial.MulContext F := CPolynomial.MulContext.skipZeros
 
+/-- Certified node vanishing polynomials for the structured binary-field decoder. -/
+def structuredVanishingContext (F : Type*) [Field F] [BEq F] [LawfulBEq F] :
+    CPolynomial.VanishingPolynomialContext F :=
+  CPolynomial.VanishingPolynomialContext.linearized (structuredMulContext F)
+
 /-- Lee–O'Sullivan interpolation with subproduct trees and shifted row reduction. -/
 def structuredInterpolationContext (F : Type*)
     [Field F] [BEq F] [LawfulBEq F] [DecidableEq F] : GSInterpContext F :=
   LeeOSullivan.leeOSullivanInterpContext
-    (CPolynomial.VanishingPolynomialContext.subproduct (structuredMulContext F))
+    (structuredVanishingContext F)
     (CPolynomial.BatchEvalContext.subproduct F (structuredMulContext F)
       CPolynomial.ModContext.remainderOnly)
     (PolynomialMatrix.muldersStorjohannFastReducerContext F)
@@ -50,11 +57,11 @@ def ext3GSFilteredCoreContext : GSFilteredCoreContext Ext3 :=
 
 /-- Executable base-field scalar list decoding with certified finite parameter selection. -/
 def decodeScalar (k e : Nat) (w : GSReceivedWord BF64) : Array (CPolynomial BF64) :=
-  decode gsFilteredCoreContext finiteGSParamSelector k e w
+  decodeWithUnique gsFilteredCoreContext k e w
 
 /-- Executable extension-field scalar list decoding with certified parameter selection. -/
 def decodeExt3Scalar (k e : Nat) (w : GSReceivedWord Ext3) : Array (CPolynomial Ext3) :=
-  decode ext3GSFilteredCoreContext finiteGSParamSelector k e w
+  decodeWithUnique ext3GSFilteredCoreContext k e w
 
 /-- Exact base-field scalar coverage when finite parameter selection succeeds. -/
 theorem mem_decodeScalar_iff {k e : Nat} (w : GSReceivedWord BF64)
@@ -63,7 +70,7 @@ theorem mem_decodeScalar_iff {k e : Nat} (w : GSReceivedWord BF64)
     (hdistinct : DistinctXCoordinates w.points) (p : CPolynomial BF64) :
     p ∈ (decodeScalar k e w).toList ↔
       degreeLt p k ∧ candidateMismatchCount w.points p ≤ e :=
-  mem_decode_finiteGSParamSelector_iff gsFilteredCoreContext w hselect hdistinct p
+  mem_decodeWithUnique_iff gsFilteredCoreContext w hselect hdistinct p
 
 /-- Exact extension-field scalar coverage when finite parameter selection succeeds. -/
 theorem mem_decodeExt3Scalar_iff {k e : Nat} (w : GSReceivedWord Ext3)
@@ -72,6 +79,6 @@ theorem mem_decodeExt3Scalar_iff {k e : Nat} (w : GSReceivedWord Ext3)
     (hdistinct : DistinctXCoordinates w.points) (p : CPolynomial Ext3) :
     p ∈ (decodeExt3Scalar k e w).toList ↔
       degreeLt p k ∧ candidateMismatchCount w.points p ≤ e :=
-  mem_decode_finiteGSParamSelector_iff ext3GSFilteredCoreContext w hselect hdistinct p
+  mem_decodeWithUnique_iff ext3GSFilteredCoreContext w hselect hdistinct p
 
 end BF64

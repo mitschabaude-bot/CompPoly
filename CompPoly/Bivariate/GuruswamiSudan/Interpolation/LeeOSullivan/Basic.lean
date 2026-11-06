@@ -5,6 +5,8 @@ Authors: Valerii Huhnin
 -/
 module
 
+public import CompPoly.Univariate.CoefficientInterpolationTree
+
 public import CompPoly.Bivariate.CoeffRows
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.Correctness
 public import CompPoly.Univariate.CoefficientInterpolation
@@ -57,7 +59,7 @@ def leeOSullivanBasisRows {F : Type*}
     (E : CPolynomial.BatchEvalContext F)
     (points : Array (F × F)) (params : GSInterpParams) : PolynomialMatrix F :=
   let G := V.vanishingPolynomial (points.map fun point ↦ point.1)
-  let R := CPolynomial.interpolateCoefficientFormWithVanishing E G points
+  let R := CPolynomial.interpolateCoefficientForm V E points
   leeOSullivanBasisRowsWithRG R G params
 
 end GuruswamiSudan

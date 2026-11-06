@@ -42,6 +42,7 @@ public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan.Corre
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan.Correctness.Rows
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan.Correctness.Selection
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan.Correctness.Soundness
+public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.LeeOSullivan.SparseBasis
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.WitnessDivisibility
 public import CompPoly.Bivariate.GuruswamiSudan.Interpolation.WitnessDivisibilityCorrectness
 public import CompPoly.Bivariate.GuruswamiSudan.Parameters
@@ -63,6 +64,7 @@ public import CompPoly.Bivariate.GuruswamiSudan.Root.RothRuckenstein.Correctness
 public import CompPoly.Bivariate.GuruswamiSudan.Root.RothRuckenstein.Lemmas
 public import CompPoly.Bivariate.GuruswamiSudan.Root.ShiftedSubstitution
 public import CompPoly.Bivariate.GuruswamiSudan.Root.ShiftedSubstitution.Lemmas
+public import CompPoly.Bivariate.GuruswamiSudan.Unique
 public import CompPoly.Bivariate.GuruswamiSudan.Util
 public import CompPoly.Bivariate.Kronecker
 public import CompPoly.Bivariate.ToPoly
@@ -345,6 +347,7 @@ public import CompPoly.Univariate.BatchEval.SubproductTree
 public import CompPoly.Univariate.Bytes
 public import CompPoly.Univariate.CMvEquiv
 public import CompPoly.Univariate.CoefficientInterpolation
+public import CompPoly.Univariate.CoefficientInterpolationTree
 public import CompPoly.Univariate.Context
 public import CompPoly.Univariate.Deriv
 public import CompPoly.Univariate.DivisionCorrectness
@@ -444,6 +447,7 @@ public import CompPoly.Univariate.ReedSolomon
 public import CompPoly.Univariate.ReedSolomon.GaoCorrectness
 public import CompPoly.Univariate.ReedSolomon.GaoDecoder
 public import CompPoly.Univariate.ReedSolomon.GaoNTT
+public import CompPoly.Univariate.ReedSolomon.GaoTree
 public import CompPoly.Univariate.ReedSolomon.NTTEncode
 public import CompPoly.Univariate.Roots
 public import CompPoly.Univariate.Roots.Backend
@@ -485,3 +489,4 @@ public import CompPoly.Univariate.ToPoly.Equiv
 public import CompPoly.Univariate.ToPoly.Impl
 public import CompPoly.Univariate.ToPoly.RingHom
 public import CompPoly.Univariate.Vanishing
+public import CompPoly.Univariate.VanishingLinearized
