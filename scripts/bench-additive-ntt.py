@@ -21,7 +21,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 REVISION = "9d8bce818aa7c7e18e67026e522a9b1539d0a57d"
-LEAN = ROOT / ".lake/build/bin/CompPolyAdditiveBench"
+LEAN = ROOT / ".lake/build/bin/CompPolyBitsliceNTTBench"
 RUST = ROOT / ".lake/additive-rust-target/release/additive-ntt-reference"
 LIBC = ctypes.CDLL(None, use_errno=True)
 PRODUCTION = [("k", 22, 56, 1), ("e", 21, 16, 4), ("e", 20, 16, 7),
@@ -34,7 +34,7 @@ def emit(**row):
 
 def build():
     subprocess.run(["systemd-run", "--user", "--scope", "-p", "MemoryMax=12G", "--",
-                    "lake", "build", "CompPolyAdditiveBench"], cwd=ROOT, check=True,
+                    "lake", "build", "CompPolyBitsliceNTTBench"], cwd=ROOT, check=True,
                    stdout=subprocess.DEVNULL)
     with tempfile.TemporaryDirectory(prefix="comppoly-additive-", suffix="-src") as tmp:
         source = Path(tmp) / "source"

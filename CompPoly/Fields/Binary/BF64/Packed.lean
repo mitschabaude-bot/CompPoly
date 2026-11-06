@@ -6,7 +6,7 @@ Authors: Gregor Mitscha-Baude
 module
 
 public import CompPoly.Fields.Binary.BF64.Word
-public import CompPoly.Data.ByteArray.Pack
+public import CompPoly.Data.ByteArray.Packed
 
 /-!
 # Packed binary-field coordinates
@@ -35,7 +35,7 @@ namespace Packed
 
 /-- Allocate a zero-filled packed buffer. -/
 def zeros (n : Nat) : Packed :=
-  ⟨n, ⟨Array.replicate (8 * n) 0⟩, by simp only [ByteArray.size, Array.size_replicate]⟩
+  ⟨n, ByteArray.zeros (8 * n), ByteArray.size_zeros _⟩
 
 /-- Load one word without allocating a boxed array element. -/
 @[inline] def get (a : Packed) (i : Fin a.size) : Word :=

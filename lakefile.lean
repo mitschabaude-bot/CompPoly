@@ -48,6 +48,16 @@ lean_lib CompPolyPackedNative where
   -- aligned whatever the caller's frame, which otherwise moved timings by 20% between builds.
   moreLeancArgs := #["-march=native", "-mstackrealign"]
 
+/-- Native scalar bit-plane kernels; scalar loads avoid costly SIMD repacking. -/
+lean_lib CompPolyBitslicedNative where
+  roots := #[`CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Block,
+    `CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Scratch,
+    `CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Native,
+    `CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Xor,
+    `CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Stage]
+  platformIndependent := true
+  moreLeancArgs := #["-march=native", "-mstackrealign", "-fno-vectorize", "-fno-slp-vectorize"]
+
 /-- CPU-targeted packed interpolation loops; realigning their stack measured 2.5% slower. -/
 lean_lib CompPolyInterpolateNative where
   roots := #[`CompPoly.Fields.BabyBear.InterpolateCoset,
@@ -116,4 +126,18 @@ lean_exe CompPolyAdditiveBench where
 
 /-- Linked generic K/E agreement, inverse, layout and basis conversion regressions. -/
 lean_exe CompPolyAdditiveSmoke where
+  srcDir := "tests"
+
+/-- Fixed-scalar bit-plane kernel regression and instruction-count screening. -/
+lean_exe CompPolyBitsliceBench where
+  srcDir := "bench"
+  moreLeancArgs := #["-march=native"]
+
+/-- Matched lane-bit-sliced additive encoder screening. -/
+lean_exe CompPolyBitsliceNTTBench where
+  srcDir := "bench"
+  moreLeancArgs := #["-march=native"]
+
+/-- Linked bit-plane multiplication, layout and forward/inverse encoder regressions. -/
+lean_exe CompPolyBitsliceSmoke where
   srcDir := "tests"
