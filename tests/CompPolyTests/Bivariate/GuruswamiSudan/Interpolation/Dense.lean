@@ -50,6 +50,11 @@ private def lowPoints : Array (Prod F3 F3) :=
   (interpolationMonomials lowParams) lowPoints lowParams).isNone
 #guard (denseInterpolate lowPoints lowParams).isSome
 
+-- Pin the exponent order and the zero-weight boundary as well as membership.
+#guard (List.range 6).all fun k ↦ (List.range 12).all fun bound ↦
+  let ps : GSInterpParams := ⟨k, 1, bound⟩
+  interpolationMonomials ps == CBivariate.monomialsWeightedDegreeLE 1 (yWeight ps) bound
+
 end GuruswamiSudan.Interpolation.Dense
 
 end CompPolyTests

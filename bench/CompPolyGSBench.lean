@@ -31,8 +31,8 @@ private def profile {F : Type} [Field F] [BEq F] [LawfulBEq F] [DecidableEq F]
     IO (Array (CPolynomial F)) := do
   let distinct ← timed "distinct" fun _ ↦ pure (distinctXCoordinatesBool w.points)
   unless distinct do throw <| IO.userError "duplicate abscissa"
-  let V := CPolynomial.VanishingPolynomialContext.subproduct CPolynomial.MulContext.naive
-  let E := CPolynomial.BatchEvalContext.subproduct F CPolynomial.MulContext.naive
+  let V := CPolynomial.VanishingPolynomialContext.subproduct (BF64.structuredMulContext F)
+  let E := CPolynomial.BatchEvalContext.subproduct F (BF64.structuredMulContext F)
     CPolynomial.ModContext.remainderOnly
   let G ← timed "vanishing" fun _ ↦ pure (V.vanishingPolynomial (w.points.map Prod.fst))
   report s!"vanishing coefficients={G.val.size}"

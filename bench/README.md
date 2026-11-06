@@ -10,6 +10,8 @@ The `profile` mode times distinctness, vanishing construction, coefficient inter
 
 `fields-bf64-mul` in the main benchmark suite measures 64 dependent multiplications on a runtime-generated pool of full-width BF64 inputs. It supports the usual digest validation and alternating A/B driver.
 
+`gs-interpolation-monomials` compares the decoder's monomial enumeration against the exponent-grid specification, preserving array order. `gs-binary-vanishing` compares the decoder's multiplication backend with naive multiplication on 32-point additive cosets. Both use runtime-generated inputs and checksum every output coordinate.
+
 ## Running
 
 Run the benchmark from the repository root:

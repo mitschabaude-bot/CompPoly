@@ -102,3 +102,5 @@ fields-tower-bt8-inv
 fields-tower-bt64-square
 fields-tower-bt128-square
 fields-bf64-mul
+gs-interpolation-monomials
+gs-binary-vanishing

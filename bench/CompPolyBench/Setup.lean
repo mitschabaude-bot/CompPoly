@@ -8,6 +8,7 @@ module
 public import CompPolyBench.Bivariate.Basic
 public import CompPolyBench.Bivariate.Factor
 public import CompPolyBench.Bivariate.GuruswamiSudan
+public import CompPolyBench.Bivariate.GuruswamiSudan.Binary
 public import CompPolyBench.Compare
 public import CompPolyBench.Fields.Arith
 public import CompPolyBench.Fields.Binary.AdditiveNTT.Impl
@@ -37,7 +38,7 @@ def allTasks : List BenchTask :=
   harnessTasks ++ univariateTasks ++ multivariateTasks ++ multilinearTasks ++ bivariateTasks ++
     factorTasks ++ guruswamiSudanTasks ++ additiveNttTasks ++ extensionTasks ++
     montgomeryInvTasks ++ towerTasks ++ towerScalarTasks ++ fieldArithTasks ++ planesTasks ++
-    bf64Tasks
+    bf64Tasks ++ binaryGSTasks
 
 /-- Metadata for every benchmark group accepted by the command-line selector. -/
 def allGroupInfos : List BenchGroupInfo :=

@@ -24,12 +24,16 @@ namespace BF64
 
 open CompPoly CompPoly.GuruswamiSudan
 
+/-- Polynomial multiplication used by the binary-field structured decoder. -/
+def structuredMulContext (F : Type*) [Field F] [BEq F] [LawfulBEq F] :
+    CPolynomial.MulContext F := CPolynomial.MulContext.naive
+
 /-- Lee–O'Sullivan interpolation with subproduct trees and shifted row reduction. -/
 def structuredInterpolationContext (F : Type*)
     [Field F] [BEq F] [LawfulBEq F] [DecidableEq F] : GSInterpContext F :=
   LeeOSullivan.leeOSullivanInterpContext
-    (CPolynomial.VanishingPolynomialContext.subproduct CPolynomial.MulContext.naive)
-    (CPolynomial.BatchEvalContext.subproduct F CPolynomial.MulContext.naive
+    (CPolynomial.VanishingPolynomialContext.subproduct (structuredMulContext F))
+    (CPolynomial.BatchEvalContext.subproduct F (structuredMulContext F)
       CPolynomial.ModContext.remainderOnly)
     (PolynomialMatrix.muldersStorjohannFastReducerContext F)
 
