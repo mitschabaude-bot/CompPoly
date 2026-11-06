@@ -135,12 +135,35 @@ theorem reductionConstant_lt : reductionConstant.toNat < 2 ^ 5 := by decide +ker
 
 /-- One reduction fold: replace the high half's factor of `x^64` by `baseTail`. -/
 def foldStep (x : BitVec 128) : BitVec 128 :=
-  carryLessMul (w := 128) (highHalf x) reductionConstant ^^^ zeroExtendTo (lowHalf x)
+  let h : BitVec 128 := zeroExtendTo (highHalf x)
+  h ^^^ (h <<< 1) ^^^ (h <<< 3) ^^^ (h <<< 4) ^^^ zeroExtendTo (lowHalf x)
+
+/-- The sparse reduction fold is multiplication by the modulus tail. -/
+theorem foldStep_eq_carryLessMul (x : BitVec 128) :
+    foldStep x =
+      carryLessMul (w := 128) (highHalf x) reductionConstant ^^^ zeroExtendTo (lowHalf x) := by
+  have hinj : Function.Injective (toPoly : BitVec 128 → Polynomial (ZMod 2)) := by
+    intro a b hab
+    apply BitVec.xor_eq_zero_iff.mp
+    by_contra hn
+    apply (toPoly_ne_zero_iff_ne_zero (a ^^^ b)).mpr hn
+    rw [toPoly_xor, hab, ZMod2Poly.add_self_cancel]
+  apply hinj
+  have hlt : (zeroExtendTo (w := 128) (highHalf x)).toNat < 2 ^ 64 := by
+    rw [toNat_zeroExtendTo _ (by decide)]
+    exact (highHalf x).isLt
+  simp only [foldStep, toPoly_xor,
+    toPoly_shiftLeft_no_overflow _ hlt (by decide : 64 + 1 ≤ 128),
+    toPoly_shiftLeft_no_overflow _ hlt (by decide : 64 + 3 ≤ 128),
+    toPoly_shiftLeft_no_overflow _ hlt (by decide : 64 + 4 ≤ 128),
+    toPoly_carryLessMul _ _ (by decide : 64 + 64 ≤ 128),
+    toPoly_zeroExtendTo _ (by decide : 64 ≤ 128), toPoly_reductionConstant, baseTail_eq]
+  ring
 
 /-- A fold preserves the residue modulo the modulus. -/
 theorem foldStep_mod (x : BitVec 128) :
     toPoly (foldStep x) % basePoly = toPoly x % basePoly := by
-  unfold foldStep
+  rw [foldStep_eq_carryLessMul]
   rw [toPoly_xor, toPoly_carryLessMul (highHalf x) reductionConstant (by omega),
     toPoly_reductionConstant, toPoly_zeroExtendTo (lowHalf x) (by omega), toPoly_halves x]
   rw [CanonicalEuclideanDomain.add_mod_eq (hn := basePoly_ne_zero)]
@@ -150,7 +173,7 @@ theorem foldStep_mod (x : BitVec 128) :
 /-- A fold of a value below `2 ^ (64 + d)` lands below `2 ^ (max 64 (d + 5))`. -/
 theorem foldStep_lt (x : BitVec 128) {d : ℕ} (hx : x.toNat < 2 ^ (64 + d)) :
     (foldStep x).toNat < 2 ^ (max 64 (d + 5)) := by
-  unfold foldStep
+  rw [foldStep_eq_carryLessMul]
   rw [BitVec.toNat_xor]
   refine Nat.xor_lt_two_pow ?_ ?_
   · exact lt_of_lt_of_le
