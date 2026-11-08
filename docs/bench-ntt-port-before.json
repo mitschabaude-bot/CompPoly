@@ -1,0 +1,581 @@
+{
+  "lean_revision": "302359f6011bcab03ae4a76e363cef63b876a68f",
+  "comparison_revision": "50601b6b96059a29b16c35d8129c959d0ff533b9",
+  "rust_revision": "9d8bce818aa7c7e18e67026e522a9b1539d0a57d",
+  "threads": 1,
+  "profiler": "Callgrind 3.22.0",
+  "runs": [
+    {
+      "engine": "lean",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "profile_sha256": "ddf05e3bffcac38ee728dcbca4fb61b2e321449a8007270c9f8383fd8f70dae7",
+      "output": "begin 41008945003\nend 99074987425\nsink 6161288611265212461:15484524747797890496\n",
+      "functions": [
+        {
+          "instructions": 1097446641,
+          "function": "PROGRAM TOTALS"
+        },
+        {
+          "instructions": 1097446641,
+          "function": "???:0x000000000009c800"
+        },
+        {
+          "instructions": 1097446641,
+          "function": "???:_lean_main"
+        },
+        {
+          "instructions": 1097446641,
+          "function": "???:clone"
+        },
+        {
+          "instructions": 1097446641,
+          "function": "???:lean::lthread::imp::_main(void*)"
+        },
+        {
+          "instructions": 1097446641,
+          "function": "???:lp_CompPoly___private_CompPolyBitsliceNTTBench_0__encode___redArg"
+        },
+        {
+          "instructions": 1097446641,
+          "function": "???:run_main"
+        },
+        {
+          "instructions": 1097446641,
+          "function": "???:std::__1::__function::__func<lean::mk_thread_proc(std::__1::function<void ()> const&, unsigned long)::$_0, void ()>::operator()[abi:nqe230100]()"
+        },
+        {
+          "instructions": 1097446641,
+          "function": "???:std::__1::__function::__func<lean_run_main::$_0, void ()>::operator()[abi:nqe230100]()"
+        },
+        {
+          "instructions": 820511180,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_forward___redArg"
+        },
+        {
+          "instructions": 820511171,
+          "function": "???:lp_CompPoly_Fin_foldl_loop___at___00AdditiveNTT_Bitsliced_forward_spec__0___redArg"
+        },
+        {
+          "instructions": 820510659,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_stageSweep___at___00AdditiveNTT_Bitsliced_forwardStage_spec__0___redArg"
+        },
+        {
+          "instructions": 820481007,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_foldAux___at___00AdditiveNTT_Bitsliced_fold___at___00AdditiveNTT_Bitsliced_stageSweep___at___00AdditiveNTT_Bitsliced_forwardStage_spec__0_spec__1_spec__3"
+        },
+        {
+          "instructions": 773988123,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_foldAux___at___00AdditiveNTT_Bitsliced_fold___at___00AdditiveNTT_Bitsliced_stageSweep___at___00AdditiveNTT_Bitsliced_forwardStage_spec__0_spec__0_spec__1___redArg"
+        },
+        {
+          "instructions": 348722005,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_applyScratch"
+        },
+        {
+          "instructions": 230396771,
+          "function": "???:lean_apply_1"
+        },
+        {
+          "instructions": 230396628,
+          "function": "???:lp_CompPoly_main___lam__1___boxed"
+        },
+        {
+          "instructions": 230395571,
+          "function": "???:lp_CompPoly_main___lam__1"
+        },
+        {
+          "instructions": 229347847,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_foldAux___at___00AdditiveNTT_Bitsliced_fold___at___00AdditiveNTT_Bitsliced_fromFn___at___00__private_CompPolyBitsliceNTTBench_0__buildInput_spec__0_spec__0_spec__1___redArg"
+        },
+        {
+          "instructions": 206500999,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_prepareScratch"
+        },
+        {
+          "instructions": 180622471,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_prepareChunk___redArg"
+        },
+        {
+          "instructions": 168132608,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_foldAux___at___00AdditiveNTT_Bitsliced_fold___at___00AdditiveNTT_Bitsliced_fromFn___at___00__private_CompPolyBitsliceNTTBench_0__buildInput_spec__0_spec__0_spec__1___redArg___lam__0"
+        },
+        {
+          "instructions": 110734950,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_transpose"
+        },
+        {
+          "instructions": 99778560,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_Native_store___redArg"
+        },
+        {
+          "instructions": 46537301,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_mapRows___at___00AdditiveNTT_Bitsliced_transposeRows_spec__0"
+        },
+        {
+          "instructions": 44690188,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_matrix"
+        },
+        {
+          "instructions": 26607616,
+          "function": "???:lean_string_eq_cold"
+        },
+        {
+          "instructions": 23851437,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_Native_load___redArg"
+        },
+        {
+          "instructions": 17432576,
+          "function": "???:0x0000000000188620"
+        },
+        {
+          "instructions": 16762130,
+          "function": "???:lean_alloc_small_object_core"
+        },
+        {
+          "instructions": 16591441,
+          "function": "???:lean_dec_ref_cold"
+        },
+        {
+          "instructions": 10046287,
+          "function": "???:_mi_malloc_generic(mi_theap_s*, unsigned long, unsigned long, mi_page_s**)"
+        },
+        {
+          "instructions": 7374229,
+          "function": "???:mi_free"
+        },
+        {
+          "instructions": 2148457,
+          "function": "???:mi_bin(unsigned long)"
+        },
+        {
+          "instructions": 1047088,
+          "function": "???:lp_CompPoly_ByteArray_zeros"
+        },
+        {
+          "instructions": 1046654,
+          "function": "???:lp_CompPoly_BF64_Packed_zeros"
+        },
+        {
+          "instructions": 1044860,
+          "function": "???:lp_CompPoly_ByteArray_fillZeros"
+        },
+        {
+          "instructions": 966936,
+          "function": "???:lean_byte_array_copy_slice"
+        },
+        {
+          "instructions": 844820,
+          "function": "???:0x0000000000188d80"
+        },
+        {
+          "instructions": 81527,
+          "function": "???:mi_theap_collect_ex(mi_theap_s*, mi_collect_e)"
+        },
+        {
+          "instructions": 48059,
+          "function": "???:0x0000000000189780"
+        },
+        {
+          "instructions": 28200,
+          "function": "???:lean_nat_pow"
+        },
+        {
+          "instructions": 18049,
+          "function": "???:mi_stats_add(mi_stats_s*, mi_stats_s const*)"
+        },
+        {
+          "instructions": 13505,
+          "function": "???:lean_obj_once_cold"
+        },
+        {
+          "instructions": 13101,
+          "function": "???:lean::mpz::mpz(unsigned long)"
+        },
+        {
+          "instructions": 10763,
+          "function": "???:_mi_theap_collect_retired(mi_theap_s*, bool)"
+        }
+      ]
+    },
+    {
+      "engine": "lean",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "profile_sha256": "7bea989c88ed6f4a1c18721a60b8a483745685291df1017c902b2db0757e7152",
+      "output": "begin 28331771811\nend 32343762390\nsink 13050689720805432533:11397353583634322925\n",
+      "functions": [
+        {
+          "instructions": 869501385,
+          "function": "PROGRAM TOTALS"
+        },
+        {
+          "instructions": 869501385,
+          "function": "???:0x000000000009c800"
+        },
+        {
+          "instructions": 869501385,
+          "function": "???:_lean_main"
+        },
+        {
+          "instructions": 869501385,
+          "function": "???:clone"
+        },
+        {
+          "instructions": 869501385,
+          "function": "???:lean::lthread::imp::_main(void*)"
+        },
+        {
+          "instructions": 869501385,
+          "function": "???:lp_CompPoly___private_CompPolyBitsliceNTTBench_0__encode___redArg"
+        },
+        {
+          "instructions": 869501385,
+          "function": "???:run_main"
+        },
+        {
+          "instructions": 869501385,
+          "function": "???:std::__1::__function::__func<lean::mk_thread_proc(std::__1::function<void ()> const&, unsigned long)::$_0, void ()>::operator()[abi:nqe230100]()"
+        },
+        {
+          "instructions": 869501385,
+          "function": "???:std::__1::__function::__func<lean_run_main::$_0, void ()>::operator()[abi:nqe230100]()"
+        },
+        {
+          "instructions": 641954608,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_forward___redArg"
+        },
+        {
+          "instructions": 641954599,
+          "function": "???:lp_CompPoly_Fin_foldl_loop___at___00AdditiveNTT_Bitsliced_forward_spec__0___redArg"
+        },
+        {
+          "instructions": 641954198,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_stageSweep___at___00AdditiveNTT_Bitsliced_forwardStage_spec__0___redArg"
+        },
+        {
+          "instructions": 641931145,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_foldAux___at___00AdditiveNTT_Bitsliced_fold___at___00AdditiveNTT_Bitsliced_stageSweep___at___00AdditiveNTT_Bitsliced_forwardStage_spec__0_spec__1_spec__3"
+        },
+        {
+          "instructions": 595478149,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_foldAux___at___00AdditiveNTT_Bitsliced_fold___at___00AdditiveNTT_Bitsliced_stageSweep___at___00AdditiveNTT_Bitsliced_forwardStage_spec__0_spec__0_spec__1___redArg"
+        },
+        {
+          "instructions": 267919273,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_applyScratch"
+        },
+        {
+          "instructions": 181008087,
+          "function": "???:lean_apply_1"
+        },
+        {
+          "instructions": 181007944,
+          "function": "???:lp_CompPoly_main___lam__1___boxed"
+        },
+        {
+          "instructions": 181007633,
+          "function": "???:lp_CompPoly_main___lam__1"
+        },
+        {
+          "instructions": 179959529,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_foldAux___at___00AdditiveNTT_Bitsliced_fold___at___00AdditiveNTT_Bitsliced_fromFn___at___00__private_CompPolyBitsliceNTTBench_0__buildInput_spec__0_spec__0_spec__1___redArg"
+        },
+        {
+          "instructions": 158847001,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_prepareScratch"
+        },
+        {
+          "instructions": 138940441,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_prepareChunk___redArg"
+        },
+        {
+          "instructions": 118744320,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_foldAux___at___00AdditiveNTT_Bitsliced_fold___at___00AdditiveNTT_Bitsliced_fromFn___at___00__private_CompPolyBitsliceNTTBench_0__buildInput_spec__0_spec__0_spec__1___redArg___lam__0"
+        },
+        {
+          "instructions": 110703408,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_transpose"
+        },
+        {
+          "instructions": 79822848,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_Native_store___redArg"
+        },
+        {
+          "instructions": 46537301,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_mapRows___at___00AdditiveNTT_Bitsliced_transposeRows_spec__0"
+        },
+        {
+          "instructions": 44651996,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_matrix"
+        },
+        {
+          "instructions": 25165824,
+          "function": "???:lean_string_eq_cold"
+        },
+        {
+          "instructions": 19116687,
+          "function": "???:lp_CompPoly_AdditiveNTT_Bitsliced_Native_load___redArg"
+        },
+        {
+          "instructions": 17301504,
+          "function": "???:0x0000000000188620"
+        },
+        {
+          "instructions": 13271906,
+          "function": "???:lean_dec_ref_cold"
+        },
+        {
+          "instructions": 13234441,
+          "function": "???:lean_alloc_small_object_core"
+        },
+        {
+          "instructions": 7870684,
+          "function": "???:_mi_malloc_generic(mi_theap_s*, unsigned long, unsigned long, mi_page_s**)"
+        },
+        {
+          "instructions": 5898523,
+          "function": "???:mi_free"
+        },
+        {
+          "instructions": 1681494,
+          "function": "???:mi_bin(unsigned long)"
+        },
+        {
+          "instructions": 1047469,
+          "function": "???:lp_CompPoly_ByteArray_zeros"
+        },
+        {
+          "instructions": 1047035,
+          "function": "???:lp_CompPoly_BF64_Packed_zeros"
+        },
+        {
+          "instructions": 1044860,
+          "function": "???:lp_CompPoly_ByteArray_fillZeros"
+        },
+        {
+          "instructions": 966936,
+          "function": "???:lean_byte_array_copy_slice"
+        },
+        {
+          "instructions": 844157,
+          "function": "???:0x0000000000188d80"
+        },
+        {
+          "instructions": 68205,
+          "function": "???:mi_theap_collect_ex(mi_theap_s*, mi_collect_e)"
+        },
+        {
+          "instructions": 39321,
+          "function": "???:0x0000000000189780"
+        },
+        {
+          "instructions": 22320,
+          "function": "???:lean_nat_pow"
+        },
+        {
+          "instructions": 14783,
+          "function": "???:mi_stats_add(mi_stats_s*, mi_stats_s const*)"
+        },
+        {
+          "instructions": 13505,
+          "function": "???:lean_obj_once_cold"
+        },
+        {
+          "instructions": 12030,
+          "function": "???:_mi_theap_collect_retired(mi_theap_s*, bool)"
+        },
+        {
+          "instructions": 10329,
+          "function": "???:lean::mpz::mpz(unsigned long)"
+        }
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "profile_sha256": "ce79b36bc6a84f91a84c3d0b00637db791d484c0b267592eceadc2de719564e7",
+      "output": "begin 67232205\nend 5950428002\nsink 6161288611265212461:15484524747797890496\n",
+      "functions": [
+        {
+          "instructions": 68164770,
+          "function": "PROGRAM TOTALS"
+        },
+        {
+          "instructions": 136329540,
+          "function": "???:(below main)"
+        },
+        {
+          "instructions": 68164770,
+          "function": "???:0x000000000001f540"
+        },
+        {
+          "instructions": 68164770,
+          "function": "???:0x000000000002a150"
+        },
+        {
+          "instructions": 68164770,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::encode_lane_major"
+        },
+        {
+          "instructions": 68164770,
+          "function": "???:additive_ntt_reference::main"
+        },
+        {
+          "instructions": 68164770,
+          "function": "???:main"
+        },
+        {
+          "instructions": 68164770,
+          "function": "???:std::rt::lang_start::<()>::{closure#0}"
+        },
+        {
+          "instructions": 68164770,
+          "function": "???:std::rt::lang_start_internal"
+        },
+        {
+          "instructions": 68164770,
+          "function": "???:std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>"
+        },
+        {
+          "instructions": 68164287,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::transform"
+        },
+        {
+          "instructions": 58576230,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::run_layers"
+        },
+        {
+          "instructions": 54087606,
+          "function": "???:pcs::ntt::kernels::butterfly_lanes"
+        },
+        {
+          "instructions": 49971601,
+          "function": "???:parallel::for_each::<parallel::for_each_chunks_mut<primitives::field::gf2_64::F64, 1, parallel::chunks_mut<primitives::field::gf2_64::F64, <pcs::ntt::deep::DeepPass>::in_place::{closure#0}>::{closure#0}>::{closure#0}>::{closure#0}"
+        },
+        {
+          "instructions": 40033688,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::run_layers::{closure#2}"
+        },
+        {
+          "instructions": 18191343,
+          "function": "???:<pcs::ntt::gathered::GatheredPass>::run::{closure#0}"
+        },
+        {
+          "instructions": 18139358,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::run_layers::{closure#3}"
+        },
+        {
+          "instructions": 2480155,
+          "function": "???:0x0000000000188d80"
+        },
+        {
+          "instructions": 669384,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::twiddle"
+        }
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "profile_sha256": "5c0a832381d77574fc1643e35c0f6c829af10e41adb9267b21e5221421798120",
+      "output": "begin 17936129\nend 20696550504\nsink 13050689720805432533:11397353583634322925\n",
+      "functions": [
+        {
+          "instructions": 53482017,
+          "function": "PROGRAM TOTALS"
+        },
+        {
+          "instructions": 106964034,
+          "function": "???:(below main)"
+        },
+        {
+          "instructions": 53482017,
+          "function": "???:0x000000000001f540"
+        },
+        {
+          "instructions": 53482017,
+          "function": "???:0x000000000002a150"
+        },
+        {
+          "instructions": 53482017,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::encode_interleaved_with"
+        },
+        {
+          "instructions": 53482017,
+          "function": "???:additive_ntt_reference::main"
+        },
+        {
+          "instructions": 53482017,
+          "function": "???:main"
+        },
+        {
+          "instructions": 53482017,
+          "function": "???:std::rt::lang_start::<()>::{closure#0}"
+        },
+        {
+          "instructions": 53482017,
+          "function": "???:std::rt::lang_start_internal"
+        },
+        {
+          "instructions": 53482017,
+          "function": "???:std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>"
+        },
+        {
+          "instructions": 53481610,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::transform"
+        },
+        {
+          "instructions": 53480459,
+          "function": "???:<pcs::ntt::deep::DeepPass>::with_message::{closure#0}"
+        },
+        {
+          "instructions": 40109713,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::run_layers"
+        },
+        {
+          "instructions": 38190465,
+          "function": "???:pcs::ntt::kernels::butterfly_lanes"
+        },
+        {
+          "instructions": 23702276,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::run_layers::{closure#2}"
+        },
+        {
+          "instructions": 16376957,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::run_layers::{closure#3}"
+        },
+        {
+          "instructions": 12582555,
+          "function": "???:0x0000000000188d80"
+        },
+        {
+          "instructions": 786385,
+          "function": "???:0x0000000000189780"
+        },
+        {
+          "instructions": 379728,
+          "function": "???:<pcs::ntt::twiddles::AdditiveNttF64>::twiddle"
+        }
+      ]
+    }
+  ]
+}

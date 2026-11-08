@@ -22,6 +22,8 @@ The Rust gathered and deep passes sum to 68.163 M instructions, almost the compl
 
 On this CPU Rust's multiplication uses scalar PCLMUL instructions, while the four-lane kernel uses AVX2 XORs and vector reduction. Native Rust therefore remains the denominator; a scalar Rust oracle is only a correctness check.
 
+The [raw function records](bench-ntt-port-before.json) retain inclusive function counts and both complete output sinks. The E workload, with domain logarithm 14, 16 cubic-extension lanes and log inverse rate 4, costs 869.501 M Lean instructions versus 53.482 M native Rust instructions (16.26×). Its layer sweeps cost 641.931 M versus 40.110 M (16.00×). Rust uses a message-fed deep pass for this shape.
+
 ## Production phase baseline
 
 The matched complete-prover hardware-counter medians at leanvm-security `a211ede`, CompPoly `50601b6`, and CompStark `2b79a572` are recorded in leanvm-security's `docs/prover-clmul.json`. Each run produces the complete Rust-identical proof and passes the certified byte verifier. These are production SET and Fibonacci fixtures, distinct from the matched encoder workload above.
