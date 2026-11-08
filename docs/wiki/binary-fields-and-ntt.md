@@ -345,3 +345,5 @@ Scratch group preparation takes four scalar planes and a runtime group index, wi
 The word kernels expose the two halves of hardware carry-less multiplication with pure-Lean Karatsuba bodies. `mulMasked_eq_mulClmul` selects the compiled K product, and packed cubic dots accumulate the same double-width primitive before their final reductions. The [compiled trust and differential-test contract](serialization.md#packed-arrays) applies alongside the byte-array accessors.
 
 The [CLMUL kernel comparison](../bench-bf64-clmul.md) records native Rust instruction ratios, the A/B evidence for deferred cubic multiplication and prepared maps, and the retained high-reuse NTT table policy.
+
+The [additive NTT function comparison](../bench-ntt-port.md) maps the packed bit-plane encoder to native Rust's gathered and deep passes, records matched instruction counts, and distinguishes encoder measurements from complete commitment phases.
