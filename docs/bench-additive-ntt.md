@@ -166,3 +166,18 @@ The [conformance records](bench-additive-ntt-cost-fix-conformance.jsonl) contain
 | E / 18 | 1.24× | 0.447 | 0.000089 | 0.097 |
 
 Boundary load averages span 4.30–6.62 / 5.69–7.15 / 7.05–7.90 (1/5/15 minutes). These are loaded-host single-worker wall times; instruction reductions compare against the recorded bit-plane baseline, while wall-time comparisons use the interleaved Rust samples. Phase timing includes allocation and input/output layout conversion, excludes plan/message setup, and ends before digesting. Whole-process peak RSS includes plans, message, physical codeword and runtime memory. K/22 costs 9,146 instructions/butterfly group, versus 12,426 at baseline; its output RSS is 2.102 GiB. The retained path reduces instructions and preserves the memory bound, but the 2–3× Rust target remains unachieved.
+
+## Shared subset-sum plan preparation
+
+`Packed.stageTwiddlesShared` constructs each twiddle table by doubling a retained lower half and adding one normalized basis value to form its upper half. This takes linear work in the number of table entries, rather than independently summing every mask's selected coordinates. `subsetSums_size`, `subsetSums_get` and `stageTwiddles_code` prove the complete table size, each selected sum and exact agreement with the generic encoder. Both packed and bit-plane plans use the refinement; transform arithmetic, transposes, scalar multiplication tables and stage traversal are unchanged.
+
+The `additive-ntt-packed-plan` A/B group prepares complete plans at alternating log domains 6 and 7 and consumes every scalar byte inside timing. Five alternating rounds against the unfolded original definition, whose complete plan image is definitionally equal, report a candidate/baseline ratio of **0.190**, matching digests, all controls within 6.1%, and no `SUSPECT` rows. Validate with `.lake/build/bin/CompPolyBench --validate-only --groups additive-ntt-packed-plan`, then run `systemd-run --user --scope -p MemoryMax=12G -- ./scripts/bench-ab.sh run additive-ntt-packed-plan` after freezing the reference build. Large wall-time ratios are excluded from the conclusions because the shared host is loaded.
+
+The [plan counter records](bench-additive-ntt-plan.json) use the existing bit-plane runner's first `begin` marker. Each process prepares a complete plan and one message word at log rate equal to the log domain, then stops before constructing a physical codeword. Counts include executable startup and that one input word as well as plan construction; clocks cover only plan construction. Startup is included on both sides, so these are conservative whole-startup reductions rather than isolated twiddle-kernel counts. Five alternating samples per side use one worker on CPU 5 and the shared benchmark lock.
+
+| Log domain | Before startup + plan instructions | After startup + plan instructions | Reduction |
+| --- | ---: | ---: | ---: |
+| 18 | 5,516,381,500 | 533,775,692 | 90.32% |
+| 19 | 11,209,263,791 | 646,855,268 | 94.23% |
+
+The [compiled conformance records](bench-additive-ntt-plan-conformance.jsonl) contain six exact-byte small fixtures, K/E stage checkpoints and inverse recovery at every log domain 13–19, and K at log domain 20: 21 completed cases against pinned Rust. The complete library tests, linked bit-plane regressions and axiom sweep cover the refinement independently. The transform counters in the preceding production table exclude plan setup; this change does not reduce their 15–26× Rust gap. The complete leanVM SET and Fibonacci extension-commitment phases, including preparation, use about 7% fewer instructions.

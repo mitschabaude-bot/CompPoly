@@ -6,6 +6,7 @@ Authors: Valerii Huhnin
 module
 
 public import CompPolyBench.Common
+public import CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Plan
 
 /-!
 # Additive NTT Benchmarks
@@ -180,6 +181,27 @@ private def runAdditiveNttBtf4L7R2 (preset : BenchPreset) (gen : StdGen) :
   runAdditiveNttFastLargeCase 4 7 2 (by omega)
     "additive-ntt-btf4-l7-r2" "additive-ntt-btf4-l7-r2-fast" preset gen
 
+/-- Consume every prepared scalar byte so complete plans remain live inside timing. -/
+private def sinkPackedPlan (tables : Array BF64.Packed) : UInt64 :=
+  tables.foldl (fun acc table =>
+    table.bytes.foldl (fun acc byte => sinkStep acc byte.toUInt64) acc) 0
+
+/-- Measure complete scalar-plan preparation at alternating output-dependent domains. -/
+private def runPackedTwiddlePlan (preset : BenchPreset) (gen : StdGen) :
+    IO (BenchGroup × StdGen) := do
+  let record ← runTimedSpec
+    { name := "additive-ntt-packed-plan", representation := "bitsliced scalar plan",
+      method := "Plan.create", field := "BF64", inputShape := "log domains 6 and 7",
+      digestIterations := 2 }
+    preset (fun iteration =>
+      let d := 6 + iteration % 2
+      (AdditiveNTT.Bitsliced.Plan.create AdditiveNTT.Packed.flatBasis d (by omega)).words.toArray)
+    (fun tables => (sinkPackedPlan tables).toNat) (sink := sinkPackedPlan)
+  pure ({
+    groupKey := "additive-ntt-packed-plan",
+    title := "Packed additive plan preparation",
+    records := #[record] }, gen)
+
 /-- Runnable additive-NTT benchmark tasks. -/
 def additiveNttTasks : List BenchTask := [
   BenchTask.fromGroupRunner
@@ -190,7 +212,10 @@ def additiveNttTasks : List BenchTask := [
     runAdditiveNttBtf3L4R2,
   BenchTask.fromGroupRunner
     ⟨"additive-ntt-btf4-l7-r2", "Additive NTT BTF4 l=7 R_rate=2"⟩
-    runAdditiveNttBtf4L7R2
+    runAdditiveNttBtf4L7R2,
+  BenchTask.fromGroupRunner
+    ⟨"additive-ntt-packed-plan", "Packed additive plan preparation"⟩
+    runPackedTwiddlePlan
 ]
 
 end CompPolyBench

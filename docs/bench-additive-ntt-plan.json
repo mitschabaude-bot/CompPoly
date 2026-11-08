@@ -1,0 +1,157 @@
+{
+  "baseline_commit": "9e0e342bc383241e81ef8c070c9d37b2a3d525da",
+  "counter_interval": "Executable startup through the existing begin marker: Lean startup, complete scalar plan construction, and one input word. No transform, output layout conversion, or digest. The plan clock covers only construction.",
+  "arguments": [
+    "bench",
+    "k",
+    "DOMAIN",
+    "1",
+    "DOMAIN"
+  ],
+  "cpu": 5,
+  "threads": 1,
+  "baseline_binary_sha256": "268aff921d4872545075459a30c1a42f1772399a0c0157b0f634e6121fc0682a",
+  "candidate_binary_sha256": "7d861cdfe68d4261745a7a22e717a60aa2b6c7c82bb034e2d532de10dcd0cef4",
+  "samples": [
+    {
+      "side": "before",
+      "domain": 18,
+      "repetition": 0,
+      "plan_ns": 2282708329,
+      "startup_plan_input_instructions": 5516265810
+    },
+    {
+      "side": "after",
+      "domain": 18,
+      "repetition": 0,
+      "plan_ns": 558738099,
+      "startup_plan_input_instructions": 533823165
+    },
+    {
+      "side": "after",
+      "domain": 18,
+      "repetition": 1,
+      "plan_ns": 878246022,
+      "startup_plan_input_instructions": 533764007
+    },
+    {
+      "side": "before",
+      "domain": 18,
+      "repetition": 1,
+      "plan_ns": 5028052279,
+      "startup_plan_input_instructions": 5516462457
+    },
+    {
+      "side": "before",
+      "domain": 18,
+      "repetition": 2,
+      "plan_ns": 8073575144,
+      "startup_plan_input_instructions": 5516400878
+    },
+    {
+      "side": "after",
+      "domain": 18,
+      "repetition": 2,
+      "plan_ns": 4691309621,
+      "startup_plan_input_instructions": 533726508
+    },
+    {
+      "side": "after",
+      "domain": 18,
+      "repetition": 3,
+      "plan_ns": 1757447573,
+      "startup_plan_input_instructions": 534180292
+    },
+    {
+      "side": "before",
+      "domain": 18,
+      "repetition": 3,
+      "plan_ns": 11894435944,
+      "startup_plan_input_instructions": 5516369099
+    },
+    {
+      "side": "before",
+      "domain": 18,
+      "repetition": 4,
+      "plan_ns": 14515617686,
+      "startup_plan_input_instructions": 5516381500
+    },
+    {
+      "side": "after",
+      "domain": 18,
+      "repetition": 4,
+      "plan_ns": 635259027,
+      "startup_plan_input_instructions": 533775692
+    },
+    {
+      "side": "before",
+      "domain": 19,
+      "repetition": 0,
+      "plan_ns": 12945279173,
+      "startup_plan_input_instructions": 11209163447
+    },
+    {
+      "side": "after",
+      "domain": 19,
+      "repetition": 0,
+      "plan_ns": 14191750820,
+      "startup_plan_input_instructions": 646849601
+    },
+    {
+      "side": "after",
+      "domain": 19,
+      "repetition": 1,
+      "plan_ns": 1480328908,
+      "startup_plan_input_instructions": 646790657
+    },
+    {
+      "side": "before",
+      "domain": 19,
+      "repetition": 1,
+      "plan_ns": 36987601658,
+      "startup_plan_input_instructions": 11209263991
+    },
+    {
+      "side": "before",
+      "domain": 19,
+      "repetition": 2,
+      "plan_ns": 11459997800,
+      "startup_plan_input_instructions": 11209243533
+    },
+    {
+      "side": "after",
+      "domain": 19,
+      "repetition": 2,
+      "plan_ns": 1547730752,
+      "startup_plan_input_instructions": 646884737
+    },
+    {
+      "side": "after",
+      "domain": 19,
+      "repetition": 3,
+      "plan_ns": 5391783532,
+      "startup_plan_input_instructions": 646860733
+    },
+    {
+      "side": "before",
+      "domain": 19,
+      "repetition": 3,
+      "plan_ns": 5020819628,
+      "startup_plan_input_instructions": 11209263791
+    },
+    {
+      "side": "before",
+      "domain": 19,
+      "repetition": 4,
+      "plan_ns": 5011390721,
+      "startup_plan_input_instructions": 11209304998
+    },
+    {
+      "side": "after",
+      "domain": 19,
+      "repetition": 4,
+      "plan_ns": 5464940077,
+      "startup_plan_input_instructions": 646855268
+    }
+  ]
+}
