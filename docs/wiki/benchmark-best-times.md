@@ -30,6 +30,7 @@ overwritten.
 | 2026-11-06 | `9a955eb` | none | Gao EEA and division | none | unit-locator shortcut ratio 0.293 at k=2,n=4, five alternating rounds, full polynomial sink, matching digests, stable controls, no suspect rows |
 | 2026-11-06 | `9a955eb` | none | GS lattice basis | none | sparse vanishing square, ratio 0.561, five alternating rounds, full matrix sink, matching digests, controls within 5.5%, no suspect rows |
 | 2026-11-06 | `dfa38d2` | none | word-field GS rows and vanishing | none | public dense production rows complete in 4.656 / 2.761 / 0.950 s on CPU 5, with 62.918 / 38.822 / 13.363 billion user instructions; coefficientwise Frobenius chain square ratios 0.939 (1024 word nodes) and 0.698 (32 spec nodes), five alternating rounds, matching digests, no suspect rows |
+| 2026-11-08 | `99fb251` | none | binary additive NTT plans | none | complete scalar plans at log domains 6/7, five-round A/B ratio 0.190 with matching digests, controls within 6.1% and no suspect rows; startup plus plans at log domains 18/19 use 90%/94% fewer instructions; reference-machine tables unchanged |
 
 ## How to read and how to update the tables
 
