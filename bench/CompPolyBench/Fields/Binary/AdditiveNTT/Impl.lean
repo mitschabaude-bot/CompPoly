@@ -7,6 +7,7 @@ module
 
 public import CompPolyBench.Common
 public import CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Plan
+public import CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Layout
 
 /-!
 # Additive NTT Benchmarks
@@ -202,6 +203,24 @@ private def runPackedTwiddlePlan (preset : BenchPreset) (gen : StdGen) :
     title := "Packed additive plan preparation",
     records := #[record] }, gen)
 
+/-- Measure complete word-row encoding with an output-dependent input. -/
+private def runWordRows (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+  let plan := AdditiveNTT.Bitsliced.Plan.create AdditiveNTT.Packed.flatBasis 8 (by decide)
+  let record ← runTimedSpec
+    { name := "additive-ntt-word-rows", representation := "64 packed word lanes",
+      method := "encode", field := "BF64", inputShape := "log domain 8, log rate 1",
+      digestIterations := 2 }
+    preset (fun iteration =>
+      let input := AdditiveNTT.Packed.tabulate (2 ^ 8 * 64) fun i =>
+        (⟨(UInt64.ofNat (i.val + iteration) + 1) * 0x9e3779b97f4a7c15⟩ : BF64.Word)
+      (AdditiveNTT.Bitsliced.encode plan 7 (by decide) input (by decide)).val.bytes)
+    (fun bytes => (bytes.foldl (fun acc byte => sinkStep acc byte.toUInt64) 0).toNat)
+    (sink := fun bytes => bytes.foldl (fun acc byte => sinkStep acc byte.toUInt64) 0)
+  pure ({
+    groupKey := "additive-ntt-word-rows",
+    title := "Packed additive word-row encoding",
+    records := #[record] }, gen)
+
 /-- Runnable additive-NTT benchmark tasks. -/
 def additiveNttTasks : List BenchTask := [
   BenchTask.fromGroupRunner
@@ -215,7 +234,10 @@ def additiveNttTasks : List BenchTask := [
     runAdditiveNttBtf4L7R2,
   BenchTask.fromGroupRunner
     ⟨"additive-ntt-packed-plan", "Packed additive plan preparation"⟩
-    runPackedTwiddlePlan
+    runPackedTwiddlePlan,
+  BenchTask.fromGroupRunner
+    ⟨"additive-ntt-word-rows", "Packed additive word-row encoding"⟩
+    runWordRows
 ]
 
 end CompPolyBench
