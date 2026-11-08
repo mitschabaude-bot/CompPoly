@@ -92,4 +92,4 @@ systemd-run --user --scope -p MemoryMax=12G -- lake build CompPolyBF64Smoke Comp
 python3 scripts/bench-bf64.py > bench/out/bf64-counts.jsonl
 ```
 
-The axiom sweep must report zero `sorryAx` and zero nonstandard-axiom taint. No `native_decide`, new `@[extern]`, inline C, or unproved code substitution is used in the library kernels. See [the benchmark guide](wiki/benchmarking.md) for the general harness and [the binary-field guide](wiki/binary-fields-and-ntt.md#polynomial-basis-word-kernels) for the public modules.
+The axiom sweep must report zero `sorryAx` and zero nonstandard-axiom taint. These software-baseline measurements use kernel-safe Lean arithmetic. The compiled CLMUL implementation, its native Rust comparison and its explicit extern trust assumption are documented in [the CLMUL comparison](bench-bf64-clmul.md). See [the benchmark guide](wiki/benchmarking.md) for the general harness and [the binary-field guide](wiki/binary-fields-and-ntt.md#polynomial-basis-word-kernels) for the public modules.
