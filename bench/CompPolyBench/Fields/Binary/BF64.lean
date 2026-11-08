@@ -10,6 +10,8 @@ public import CompPoly.Fields.Binary.BF64.Word
 public import CompPoly.Fields.Binary.BF64.Masked
 public import CompPoly.Fields.Binary.BF64.FixedMap
 public import CompPoly.Fields.Binary.BF64.WordExt3
+public import CompPoly.Fields.Binary.BF64.WordExt3Dot
+public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Butterfly
 
 /-! # Polynomial-basis binary-field kernel benchmarks -/
 
@@ -53,6 +55,22 @@ private def runFixed (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × S
       records := #[scalarRow, nibbleRow, byteRow] }
   pure (group, gen)
 
+private def runTwiddle (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+  let (xs, gen) := (randomNatArray fieldPoolSize (2 ^ 64 - 3)).run gen
+  let pool := xs.map fun x => Word.mk (UInt64.ofNat (x + 2))
+  let scalar := pool[0]!
+  let rep : ChainRep Word :=
+    { representation := "certified shared twiddle", field := "BF64.Word", suffix := "prepared",
+      pool, constant := scalar, checksum := fun x => x.val.toNat, sink := Word.val }
+  let prepared := AdditiveNTT.Packed.Multiplier.prepared scalar
+  let direct := AdditiveNTT.Packed.Multiplier.masked scalar
+  let preparedRow ← chainLatencyRow "bf64" "twiddle" "prepared" "twiddle" chainRounds rep
+    prepared.apply preset
+  let directRow ← chainLatencyRow "bf64" "twiddle" "direct" "twiddle" chainRounds
+    { rep with suffix := "direct" } direct.apply preset
+  pure ({ groupKey := "fields-bf64-twiddle", title := "Shared additive twiddle",
+          records := #[preparedRow, directRow] }, gen)
+
 private def runExt3 (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
   let (xs, gen) := (randomNatArray (3 * fieldPoolSize) (2 ^ 64 - 3)).run gen
   let pool := (Array.range fieldPoolSize).map fun i =>
@@ -86,11 +104,56 @@ private def runMasked (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × 
     masked Word.mulMasked preset
   pure (group, gen)
 
+private def runDot (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+  let (xs, gen) := (randomNatArray (6 * 64) (2 ^ 64 - 3)).run gen
+  let element (offset i : Nat) : WordExt3 :=
+    ⟨⟨UInt64.ofNat (xs[offset + 3*i]! + 2)⟩, ⟨UInt64.ofNat (xs[offset + 3*i+1]! + 2)⟩,
+      ⟨UInt64.ofNat (xs[offset + 3*i+2]! + 2)⟩⟩
+  let a := WordExt3.ofFn 64 fun i => element 0 i.val
+  let b := WordExt3.ofFn 64 fun i => element (3*64) i.val
+  let reduced (a b : WordExt3.Buffer 64) :=
+    (List.finRange 64).foldl (fun acc i => WordExt3.add acc
+      (WordExt3.mul (WordExt3.read a i) (WordExt3.read b i))) ⟨⟨0⟩, ⟨0⟩, ⟨0⟩⟩
+  let checksum (x : WordExt3) := x.c0.val.toNat + 2^64*x.c1.val.toNat + 2^128*x.c2.val.toNat
+  let sink (x : WordExt3) := x.c0.val ^^^ x.c1.val ^^^ x.c2.val
+  let mut records := #[]
+  for (name, f) in [("reduced", reduced), ("deferred", WordExt3.dot)] do
+    let row ← runTimedSpec
+      { name := "bf64-ext3-dot-" ++ name, representation := "packed three-word coordinates",
+        method := name ++ " dot", field := "BF64.WordExt3", inputShape := "64 extension products",
+        workUnits := 64, digestIterations := 4, digestClass := "dot64" }
+      preset (fun iteration =>
+        f (Packed.write a ⟨0, by decide⟩ ⟨UInt64.ofNat (iteration % 4) ^^^ 0x123456789abcdef⟩) b)
+      checksum (sink := sink)
+    records := records.push row
+  let group : BenchGroup :=
+    { groupKey := "fields-bf64-ext3-dot", title := "Packed cubic-extension dots", records }
+  pure (group, gen)
+
+private def runMapSetup (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+  let mut records := #[]
+  for (name, f) in [("nibble", fun a => (Word.NibbleMap.ofScalar a).mul ⟨0xfedcba9876543210⟩),
+      ("byte", fun a => (Word.ByteMap.ofScalar a).mul ⟨0xfedcba9876543210⟩)] do
+    let row ← runTimedSpec
+      { name := "bf64-map-setup-" ++ name, representation := "packed shared-scalar map",
+        method := name ++ " setup and product", field := "BF64.Word", inputShape := "one scalar",
+        digestIterations := 4, digestClass := "setup" }
+      preset (fun iteration => f ⟨UInt64.ofNat (iteration % 4) ^^^ 0x123456789abcdef⟩)
+      (fun x => x.val.toNat) (sink := Word.val)
+    records := records.push row
+  let group : BenchGroup :=
+    { groupKey := "fields-bf64-map-setup", title := "Shared-scalar map preparation", records }
+  pure (group, gen)
+
 /-- BF64 scalar kernels, with specification digests on the same inputs. -/
 def bf64Tasks : List BenchTask :=
   [BenchTask.fromGroupRunner ⟨"fields-bf64-mul", "GF(2^64) multiplication"⟩ runBF64,
     BenchTask.fromGroupRunner ⟨"fields-bf64-fixed", "GF(2^64) shared multiplier"⟩ runFixed,
+    BenchTask.fromGroupRunner ⟨"fields-bf64-twiddle", "Shared additive twiddle"⟩ runTwiddle,
     BenchTask.fromGroupRunner ⟨"fields-bf64-ext3", "GF(2^192) multiplication"⟩ runExt3,
-    BenchTask.fromGroupRunner ⟨"fields-bf64-masked", "GF(2^64) masked product"⟩ runMasked]
+    BenchTask.fromGroupRunner ⟨"fields-bf64-masked", "GF(2^64) masked product"⟩ runMasked,
+    BenchTask.fromGroupRunner ⟨"fields-bf64-ext3-dot", "Packed cubic-extension dots"⟩ runDot,
+    BenchTask.fromGroupRunner
+      ⟨"fields-bf64-map-setup", "Shared-scalar map preparation"⟩ runMapSetup]
 
 end CompPolyBench

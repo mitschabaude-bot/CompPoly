@@ -5,6 +5,8 @@ open System Lake DSL
 package CompPoly where
   version := v!"0.1.0"
   testDriver := "CompPolyTests"
+  -- Inline carry-less products require PCLMUL on x86-64 or PMULL on AArch64.
+  moreLeancArgs := #["-march=native"]
   -- Downstream users fetch prebuilt artifacts from our GitHub releases instead of
   -- compiling CompPoly from source. Lake only does this for a package consumed as a
   -- dependency; it skips the root package, so this does not affect building CompPoly

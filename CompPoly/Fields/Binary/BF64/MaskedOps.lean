@@ -5,7 +5,7 @@ Authors: Gregor Mitscha-Baude
 -/
 module
 
-public import CompPoly.Fields.Binary.BF64.Masked
+public import CompPoly.Fields.Binary.BF64.MaskedProducts
 
 /-! # Squaring, Frobenius and inversion with masked integer products -/
 

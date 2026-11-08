@@ -289,4 +289,81 @@ theorem widePoly (lo hi mid : BitVec 64) :
   simp only [show ∀ a : BitVec 64, toPoly (a.setWidth 128) = toPoly a from
     fun a => toPoly_zeroExtendTo a (by omega)]
 
+/-- The two primitive halves reconstruct the full commuted polynomial product. -/
+theorem clMulWide_comm (a b : BF64.Word) :
+    ((clMulLo a.val b.val).toBitVec.setWidth 128 ^^^
+      ((clMulHi a.val b.val).toBitVec.setWidth 128 <<< 64)) =
+    carryLessMul (w := 128) b.val.toBitVec a.val.toBitVec := by
+  have hp : ∀ {w : Nat} (x y : BitVec w), toPoly x = toPoly y → x = y := by
+    intro w x y h
+    have hz : toPoly (x ^^^ y) = 0 := by rw [toPoly_xor, h, ZMod2Poly.add_self_cancel]
+    have hx : x ^^^ y = 0 := by
+      by_contra hn
+      exact (toPoly_ne_zero_iff_ne_zero _).mpr hn hz
+    exact BitVec.xor_eq_zero_iff.mp hx
+  apply hp
+  let lo := clMul32 a.val b.val
+  let hi := clMul32 (a.val >>> 32) (b.val >>> 32)
+  let mid := clMul32 (a.val ^^^ (a.val >>> 32)) (b.val ^^^ (b.val >>> 32)) ^^^ lo ^^^ hi
+  change toPoly ((lo.toBitVec ^^^ (mid.toBitVec <<< (32 : Nat))).setWidth 128 ^^^
+    ((hi.toBitVec ^^^ (mid.toBitVec >>> (32 : Nat))).setWidth 128 <<< (64 : Nat))) = _
+  rw [widePoly]
+  dsimp only [lo, hi, mid]
+  simp only [toPoly_xor, clMul32_poly, UInt64.toBitVec_xor,
+    UInt64.toBitVec_shiftRight, BitVec.setWidth_xor, toPoly_xor]
+  rw [toPoly_carryLessMul _ _ (by omega), splitPoly32 a.val.toBitVec,
+    splitPoly32 b.val.toBitVec]
+  simp only [UInt64.toBitVec_ofNat, BitVec.ushiftRight_eq', BitVec.toNat_umod,
+    BitVec.ofNat_eq_ofNat, BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod]
+  ring_nf
+  simp only [ZMod2Poly.two_eq_zero, mul_zero, add_zero]
+
+/-- The sparse reduction polynomial selects four shifted words. -/
+private theorem carryLessMul_reductionPolynomial (a : BitVec 64) :
+    carryLessMul (w := 128) (0x1b#64) a =
+      a.setWidth 128 ^^^ (a.setWidth 128 <<< 1) ^^^
+        (a.setWidth 128 <<< 3) ^^^ (a.setWidth 128 <<< 4) := by
+  simp [carryLessMul, Fin.foldl_succ_last, zeroExtendTo]
+
+/-- Multiplication by the reduction polynomial as one double-width identity. -/
+private theorem clMulWide_fold (a : UInt64) :
+    ((clMulLo a 0x1b).toBitVec.setWidth 128 ^^^
+      ((clMulHi a 0x1b).toBitVec.setWidth 128 <<< 64)) =
+      a.toBitVec.setWidth 128 ^^^ (a.toBitVec.setWidth 128 <<< 1) ^^^
+        (a.toBitVec.setWidth 128 <<< 3) ^^^ (a.toBitVec.setWidth 128 <<< 4) := by
+  exact (clMulWide_comm ⟨a⟩ ⟨0x1b⟩).trans (carryLessMul_reductionPolynomial a.toBitVec)
+
+/-- Multiplication by the sparse reduction polynomial, below degree 64. -/
+theorem clMulLo_fold (a : UInt64) :
+    clMulLo a 0x1b = a ^^^ (a <<< 1) ^^^ (a <<< 3) ^^^ (a <<< 4) := by
+  apply UInt64.toBitVec_inj.mp
+  apply BitVec.eq_of_getLsbD_eq
+  intro i hi
+  have h := congrArg (fun x : BitVec 128 => x.getLsbD i) (clMulWide_fold a)
+  interval_cases i <;> simpa [UInt64.toBitVec_xor, UInt64.toBitVec_shiftLeft,
+    UInt64.toBitVec_ofNat, BitVec.getLsbD_of_ge] using h
+
+/-- The overflow of multiplication by the sparse reduction polynomial. -/
+theorem clMulHi_fold (a : UInt64) :
+    clMulHi a 0x1b = (a >>> 63) ^^^ (a >>> 61) ^^^ (a >>> 60) := by
+  apply UInt64.toBitVec_inj.mp
+  apply BitVec.eq_of_getLsbD_eq
+  intro i hi
+  have h := congrArg (fun x : BitVec 128 => x.getLsbD (i+64)) (clMulWide_fold a)
+  interval_cases i <;> simpa [UInt64.toBitVec_xor, UInt64.toBitVec_shiftRight,
+    UInt64.toBitVec_ofNat, BitVec.getLsbD_of_ge, Bool.xor_comm, Bool.xor_left_comm] using h
+
+/-- Hardware reduction has exactly the shift/XOR specification. -/
+@[csimp] theorem reduceWide_eq_reduceClmul : reduceWide = reduceClmul := by
+  funext lo hi
+  simp only [reduceClmul, clMulLo_fold, clMulHi_fold, reduceWide]
+  ac_rfl
+
+/-- Compiled masked products use the hardware primitive and carry-less reduction. -/
+@[csimp] theorem mulMasked_eq_mulClmul : mulMasked = mulClmul := by
+  funext a b
+  change (⟨reduceWide (clMulLo a.val b.val) (clMulHi a.val b.val)⟩ : Word) = _
+  rw [reduceWide_eq_reduceClmul]
+  rfl
+
 end BF64.Word

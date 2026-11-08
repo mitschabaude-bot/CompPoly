@@ -46,7 +46,7 @@ def pin():
     os.sched_setaffinity(0, {5})
 
 
-def sample(op, n):
+def sample(binary, op, n):
     load_before = os.getloadavg()
     go_r, go_w = os.pipe()
     input_r, input_w = os.pipe()
@@ -58,7 +58,7 @@ def sample(op, n):
         os.dup2(input_r, 0)
         os.dup2(output_w, 1)
         pin()
-        os.execve(BENCH, [str(BENCH), op, str(n)], dict(os.environ, LEAN_NUM_THREADS="1"))
+        os.execve(binary, [str(binary), op, str(n)], dict(os.environ, LEAN_NUM_THREADS="1"))
     os.close(go_r)
     os.close(input_r)
     os.close(output_w)
@@ -113,7 +113,7 @@ def main():
     for round_index in range(3):
         workloads = WORKLOADS if round_index % 2 == 0 else list(reversed(WORKLOADS))
         for op, n in workloads:
-            row = sample(op, n)
+            row = sample(BENCH, op, n)
             samples.append(row)
             print(json.dumps(row), flush=True)
     for operations in (("scalar", "masked", "nibble", "byte"),

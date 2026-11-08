@@ -1,0 +1,17 @@
+[package]
+name = "comppoly-bf64-reference"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+primitives = { path = "@SOURCE@/crates/primitives" }
+
+[[bin]]
+name = "bf64-reference"
+path = "main.rs"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

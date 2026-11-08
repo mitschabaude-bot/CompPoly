@@ -16,8 +16,44 @@ public section
 
 open BF64 CompPoly
 
+example : Word.clMulLo 0x8000000000000000 2 = 0 ∧
+    Word.clMulHi 0x8000000000000000 2 = 1 := by decide
+
+example : Word.clMulLo 0xffffffffffffffff 0xffffffffffffffff = 0x5555555555555555 ∧
+    Word.clMulHi 0xffffffffffffffff 0xffffffffffffffff = 0x5555555555555555 := by decide
+
+/-- Independent double-word shift/XOR reference, without externs or compiler substitutions. -/
+@[noinline] private def carrylessReference (a b : UInt64) : UInt64 × UInt64 := Id.run do
+  let mut lo := 0
+  let mut hi := 0
+  for i in [0:64] do
+    if (a >>> UInt64.ofNat i) &&& 1 != 0 then
+      lo := lo ^^^ (b <<< UInt64.ofNat i)
+      if i != 0 then hi := hi ^^^ (b >>> UInt64.ofNat (64-i))
+  return (lo, hi)
+
+/-- Compare both compiled halves and the reduced product with independent software arithmetic. -/
+private def checkCarryless (a b : UInt64) : IO Unit := do
+  let expected := carrylessReference a b
+  unless Word.clMulLo a b == expected.1 && Word.clMulHi a b == expected.2 do
+    throw <| IO.userError s!"carry-less extern mismatch: {a}, {b}"
+  unless Word.mulClmul ⟨a⟩ ⟨b⟩ == Word.mul ⟨a⟩ ⟨b⟩ do
+    throw <| IO.userError s!"carry-less reduction mismatch: {a}, {b}"
+
 /-- Exercise the native buffer accessors and both prepared-map sizes. -/
 def main : IO UInt32 := do
+  let structured : List UInt64 := [0, 1, 2, 0xffffffffffffffff, 0x8000000000000000,
+    0xaaaaaaaaaaaaaaaa, 0x5555555555555555, 0xffffffff00000000, 0x00000000ffffffff]
+  for a in structured do
+    for b in structured do checkCarryless a b
+  for i in [0:64] do
+    for j in [0:64] do
+      checkCarryless ((1 : UInt64) <<< UInt64.ofNat i) ((1 : UInt64) <<< UInt64.ofNat j)
+  let mut seed : UInt64 := 0x123456789abcdef
+  for _ in [0:4096] do
+    let a := seed
+    seed := seed * 6364136223846793005 + 1442695040888963407
+    checkCarryless a seed
   for scalar in [0, 1, 2, 0xffffffffffffffff, 0xfedcba9876543210] do
     let a : Word := ⟨scalar⟩
     let nibble := Word.NibbleMap.ofScalar a

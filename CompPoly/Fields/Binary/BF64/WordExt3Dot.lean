@@ -62,10 +62,7 @@ private theorem wideEta (a : WideWord) : (⟨a.lo, a.hi⟩ : WideWord) = a := by
 @[inline] private def wideReduce (a : WideWord) : Word := ⟨Word.reduceWide a.lo a.hi⟩
 
 @[inline] private def wideMul (a b : Word) : WideWord :=
-  let lo := Word.clMul32 a.val b.val
-  let hi := Word.clMul32 (a.val >>> 32) (b.val >>> 32)
-  let mid := Word.clMul32 (a.val ^^^ (a.val >>> 32)) (b.val ^^^ (b.val >>> 32)) ^^^ lo ^^^ hi
-  ⟨lo ^^^ (mid <<< 32), hi ^^^ (mid >>> 32)⟩
+  ⟨Word.clMulLo a.val b.val, Word.clMulHi a.val b.val⟩
 
 private theorem wideReduce_add (a b : WideWord) :
     Word.toField (wideReduce (wideAdd a b)) =

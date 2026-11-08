@@ -5,7 +5,7 @@ Authors: Gregor Mitscha-Baude
 -/
 module
 
-public import CompPoly.Fields.Binary.BF64.Masked
+public import CompPoly.Fields.Binary.BF64.MaskedProducts
 public import CompPoly.Fields.Binary.BF64.Ext3
 public import CompPoly.Fields.Extension.Bytes
 
@@ -70,6 +70,40 @@ theorem toField_injective : Function.Injective toField :=
   let p12 := Word.add (Word.add (Word.mulMasked (Word.add a.c1 a.c2) (Word.add b.c1 b.c2)) p1) p2
   ⟨Word.add p0 p12, Word.add (Word.add p01 p12) p2,
     Word.add (Word.add p02 p1) p2⟩
+
+/-- Double-width carry-less product of two base-field words. -/
+@[inline] def wideProduct (a b : Word) : UInt64 × UInt64 :=
+  (Word.clMulLo a.val b.val, Word.clMulHi a.val b.val)
+
+/-- Coefficientwise addition of double-width products. -/
+@[inline] def wideXor (a b : UInt64 × UInt64) : UInt64 × UInt64 :=
+  (a.1 ^^^ b.1, a.2 ^^^ b.2)
+
+/-- Reduce one double-width product to a base-field word. -/
+@[inline] def reduceProduct (a : UInt64 × UInt64) : Word :=
+  ⟨Word.reduceWide a.1 a.2⟩
+
+/-- Six double-width products, with cubic folding before three base-field reductions. -/
+@[inline] def mulDeferred (a b : WordExt3) : WordExt3 :=
+  let p0 := wideProduct a.c0 b.c0
+  let p1 := wideProduct a.c1 b.c1
+  let p2 := wideProduct a.c2 b.c2
+  let p01 := wideXor (wideXor (wideProduct (Word.add a.c0 a.c1)
+    (Word.add b.c0 b.c1)) p0) p1
+  let p02 := wideXor (wideXor (wideProduct (Word.add a.c0 a.c2)
+    (Word.add b.c0 b.c2)) p0) p2
+  let p12 := wideXor (wideXor (wideProduct (Word.add a.c1 a.c2)
+    (Word.add b.c1 b.c2)) p1) p2
+  ⟨reduceProduct (wideXor p0 p12), reduceProduct (wideXor (wideXor p01 p12) p2),
+    reduceProduct (wideXor (wideXor p02 p1) p2)⟩
+
+/-- Linearity of base-field reduction identifies the deferred and scalar products. -/
+@[csimp] theorem mul_eq_mulDeferred : mul = mulDeferred := by
+  have hw (a b : Word) : Word.mulMasked a b =
+      (⟨Word.reduceWide (Word.clMulLo a.val b.val) (Word.clMulHi a.val b.val)⟩ : Word) := rfl
+  funext a b
+  simp only [mul, mulDeferred, hw, reduceProduct, wideProduct, wideXor, Word.add,
+    Word.reduceWide_xor]
 
 /-- Multiply by a base-field scalar using three base-field products. -/
 @[inline] def mulScalar (a : WordExt3) (b : Word) : WordExt3 :=

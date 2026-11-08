@@ -6,6 +6,7 @@ Authors: Gregor Mitscha-Baude
 module
 
 public import CompPoly.Fields.Binary.BF64.Packed
+public import CompPoly.Fields.Binary.BF64.MaskedProofs
 
 /-!
 # Fixed-multiplier lookup maps
@@ -30,6 +31,20 @@ namespace NibbleMap
 def ofScalar (a : Word) : NibbleMap :=
   ⟨Packed.ofFn 256 fun i => mul a ⟨UInt64.ofNat (i.val % 16) <<<
     UInt64.ofNat (4 * (i.val / 16))⟩⟩
+
+/-- Prepare every table entry with the compiled carry-less field product. -/
+def ofScalarClmul (a : Word) : NibbleMap :=
+  ⟨Packed.ofFn 256 fun i => mulMasked a ⟨UInt64.ofNat (i.val % 16) <<<
+    UInt64.ofNat (4 * (i.val / 16))⟩⟩
+
+/-- Carry-less table construction preserves every stored field coordinate. -/
+@[csimp] theorem ofScalar_eq_ofScalarClmul : ofScalar = ofScalarClmul := by
+  have hm : BF64.Word.mul = mulMasked := by
+    funext a b
+    apply toField_injective
+    simp only [toField_mul, toField_mulMasked]
+  funext a
+  simp only [ofScalar, ofScalarClmul, hm]
 
 private theorem digit_lt (a : UInt64) : (a &&& 15).toNat < 16 := by
   rw [UInt64.toNat_and]
@@ -83,6 +98,20 @@ namespace ByteMap
 def ofScalar (a : Word) : ByteMap :=
   ⟨Packed.ofFn 2048 fun i => mul a ⟨UInt64.ofNat (i.val % 256) <<<
     UInt64.ofNat (8 * (i.val / 256))⟩⟩
+
+/-- Prepare every table entry with the compiled carry-less field product. -/
+def ofScalarClmul (a : Word) : ByteMap :=
+  ⟨Packed.ofFn 2048 fun i => mulMasked a ⟨UInt64.ofNat (i.val % 256) <<<
+    UInt64.ofNat (8 * (i.val / 256))⟩⟩
+
+/-- Carry-less table construction preserves every stored field coordinate. -/
+@[csimp] theorem ofScalar_eq_ofScalarClmul : ofScalar = ofScalarClmul := by
+  have hm : BF64.Word.mul = mulMasked := by
+    funext a b
+    apply toField_injective
+    simp only [toField_mul, toField_mulMasked]
+  funext a
+  simp only [ofScalar, ofScalarClmul, hm]
 
 private theorem digit_lt (a : UInt64) : (a &&& 255).toNat < 256 := by
   rw [UInt64.toNat_and]
