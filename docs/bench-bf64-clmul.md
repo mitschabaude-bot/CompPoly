@@ -25,3 +25,23 @@ High-reuse additive-NTT twiddles retain their byte tables. Switching the prepare
 The kernel-safe refinement theorems retain pure Lean bodies for both primitive halves. The compiled smoke executable checks 8,273 pairs against an independent shift/XOR reference, reduction, cubic arithmetic, maps and packed storage. `lake build`, `lake test`, both BF64 and additive smoke executables, and `lake exe axiomsweep --check` pass; the sweep reports zero sorry-tainted or nonstandard-axiom-tainted declarations. AArch64's PMULL statement expression was cross-compiled but has not been executed on ARM. See the [compiled-code trust contract](wiki/serialization.md).
 
 Reproduce with `python3 scripts/bench-bf64-native.py FROZEN_SOFTWARE_BINARY`. The driver builds Lean inside a 12 GiB systemd scope and builds its Rust harness against a clean checkout of the pinned source before taking counters.
+
+## Scalar deferred-dot accumulation
+
+[Three alternating native-counter runs](bench-bf64-scalar-dot.jsonl) compare the CLMUL baseline `50601b6`, the scalar machine-offset dot, and pinned native Rust `9d8bce818aa7c7e18e67026e522a9b1539d0a57d`. Counts exclude setup and every sink agrees. The raw `software` engine key names the pre-change CLMUL executable in this record.
+
+| Kernel | Lean before instructions/product | Lean scalar instructions/product | Native Rust instructions/product | Scalar / Rust |
+| --- | ---: | ---: | ---: | ---: |
+| K dependent multiply | 17.01 | 17.01 | 9.00 | 1.89× |
+| K independent multiply | 5.76 | 5.76 | 8.33 | 0.69× |
+| E multiply | 81.01 | 81.01 | 53.00 | 1.53× |
+| K/E multiply | 48.09 | 48.10 | 41.02 | 1.17× |
+| K square | 18.01 | 18.01 | 20.00 | 0.90× |
+| K inverse | 1,217.94 | 1,217.94 | 747.20 | 1.63× |
+| K Frobenius | 167.12 | 167.08 | 139.02 | 1.20× |
+| E square | 50.09 | 50.09 | 58.02 | 0.86× |
+| E q-Frobenius | 27.01 | 27.01 | 9.00 | 3.00× |
+| E deferred dot | 385.41 | 64.61 | 36.70 | 1.76× |
+| E reduced dot | 249.24 | 249.24 | 66.25 | 3.76× |
+
+The packed dot passes ten `UInt64` accumulator arguments and a `USize` loop index. The generated C contains scalar updates and machine-offset loads, with one result allocation after the loop; no accumulator record or natural-number address arithmetic is allocated per product. `dot_code` proves equality for every buffer length, including empty buffers and lengths outside the native machine range. The [five-round A/B records](bench-bf64-scalar-dot-ab.json) give the deferred dot a 0.237 candidate/baseline ratio with matching digests and no suspect rows. Compiled smoke tests, group validation, the complete test library and the axiom sweep pass. Host load makes wall-time comparisons unsuitable.
