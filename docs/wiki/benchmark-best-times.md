@@ -32,6 +32,8 @@ overwritten.
 | 2026-11-06 | `dfa38d2` | none | word-field GS rows and vanishing | none | public dense production rows complete in 4.656 / 2.761 / 0.950 s on CPU 5, with 62.918 / 38.822 / 13.363 billion user instructions; coefficientwise Frobenius chain square ratios 0.939 (1024 word nodes) and 0.698 (32 spec nodes), five alternating rounds, matching digests, no suspect rows |
 | 2026-11-08 | `99fb251` | none | binary additive NTT plans | none | complete scalar plans at log domains 6/7, five-round A/B ratio 0.190 with matching digests, controls within 6.1% and no suspect rows; startup plus plans at log domains 18/19 use 90%/94% fewer instructions; reference-machine tables unchanged |
 
+| 2026-11-08 | `c1e783e` | none | BF64 CLMUL and cubic extension | none | native instruction ratios 1.89× for dependent K multiplication and 1.53× for E multiplication versus Rust; map setup and deferred cubic A/B improvements retained with matching digests and no suspect rows; [measurements](../bench-bf64-clmul.md), reference-machine times unchanged |
+
 ## How to read and how to update the tables
 
 Every number below was measured on the **reference machine** under the same
