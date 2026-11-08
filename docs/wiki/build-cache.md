@@ -65,7 +65,7 @@ builds the library, and runs `lake upload <tag>`.
 The build step is `rm -rf .lake/build && lake build CompPoly`, and the narrow target
 matters. `lake upload` packs the *whole* build directory, so a full `lake build` would
 also ship the benchmark executable's Linux-only `bin/` and `.o` output — bloating the
-asset and contradicting the platform-independence claim above. It also keeps the `-march=native` objects of the packed NTT kernels out of the archive: `lake build CompPoly` compiles no C, so a consumer's build compiles the kernels for its own CPU.
+asset and contradicting the platform-independence claim above. The CLMUL interpreter library is compiled during this build. Before packing, the workflow deletes `.lake/build/ir` and `.lake/build/lib/lib*CompPolyClMul*`; consumers compile native wrappers and packed NTT kernels for their own CPU.
 
 To attach an asset to a release that predates this workflow, or to replace one, use
 **Actions → Add Lean release tag → Run workflow** and give it the tag.
@@ -76,6 +76,7 @@ To attach an asset to a release that predates this workflow, or to replace one, 
 ```bash
 lake exe cache get
 rm -rf .lake/build && lake build CompPoly
+rm -rf .lake/build/ir .lake/build/lib/lib*CompPolyClMul*
 lake pack                       # writes .lake/CompPoly-oleans.tar.gz
 tar tzf .lake/CompPoly-oleans.tar.gz | head
 ```

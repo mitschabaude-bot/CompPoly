@@ -114,6 +114,8 @@ jobs:
         run: |
           rm -rf .lake/build
           lake build CompPoly
+          # Native wrappers must be rebuilt for the consumer CPU and platform.
+          rm -rf .lake/build/ir .lake/build/lib/lib*CompPolyClMul*
 
       - name: Pack and attach the archive
         env:

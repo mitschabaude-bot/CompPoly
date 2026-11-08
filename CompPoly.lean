@@ -177,6 +177,7 @@ public import CompPoly.Fields.Binary.BF64
 public import CompPoly.Fields.Binary.BF64.BaseCertificate
 public import CompPoly.Fields.Binary.BF64.Basic
 public import CompPoly.Fields.Binary.BF64.Bytes
+public import CompPoly.Fields.Binary.BF64.ClMul
 public import CompPoly.Fields.Binary.BF64.Ext3
 public import CompPoly.Fields.Binary.BF64.FixedMap
 public import CompPoly.Fields.Binary.BF64.FixedMapProofs

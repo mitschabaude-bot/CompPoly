@@ -34,6 +34,12 @@ lean_lib CompPoly where
   -- genuinely is platform-specific. Mathlib uses the same mechanism.
   platformIndependent := true
 
+/-- Load the inline CLMUL wrappers for interpreter evaluation as well as compiled code. -/
+lean_lib CompPolyClMul where
+  roots := #[`CompPoly.Fields.Binary.BF64.ClMul]
+  platformIndependent := true
+  precompileLibrary := true
+
 /-- CPU-targeted packed FFT kernels; the proof artifacts remain platform independent. -/
 lean_lib CompPolyPackedNative where
   roots := #[`CompPoly.Univariate.NTTFast.Packed.Native,
