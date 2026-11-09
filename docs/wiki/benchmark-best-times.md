@@ -34,6 +34,8 @@ overwritten.
 
 | 2026-11-08 | `c1e783e` | none | BF64 CLMUL and cubic extension | none | native instruction ratios 1.89× for dependent K multiplication and 1.53× for E multiplication versus Rust; map setup and deferred cubic A/B improvements retained with matching digests and no suspect rows; [measurements](../bench-bf64-clmul.md), reference-machine times unchanged |
 
+| 2026-11-09 | `992c92b` | none | packed BF64 extension dot | none | ten scalar unreduced accumulators and machine byte offsets; five-round A/B ratio 0.237, matching digests, no suspect rows; 64.61 instructions/product versus native Rust 36.70 (1.76×), [records](../bench-bf64-clmul.md#scalar-deferred-dot-accumulation) |
+
 ## How to read and how to update the tables
 
 Every number below was measured on the **reference machine** under the same
