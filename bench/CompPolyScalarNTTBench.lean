@@ -26,7 +26,8 @@ private def report (label : String) (a : BF64.Packed.Buffer n) : IO Unit := do
   let (lo, hi) := digest a
   IO.println s!"{label} {n} {lo} {hi}"
 
-@[noinline] private def encode (p : AdditiveNTT.Bitsliced.Plan flatBasis d hd) (ell : Nat) (hell : ell ≤ d)
+@[noinline] private def encode (p : AdditiveNTT.Bitsliced.Plan flatBasis d hd)
+    (ell : Nat) (hell : ell ≤ d)
     (lanes : Nat) (hl : 0 < lanes) (hn : 8 * (2 ^ d * lanes) < 4294967296)
     (input : Unit → BF64.Packed.Buffer (2 ^ d * lanes)) :=
   Scalar.forward p ell hell lanes hl (input ()) hn
