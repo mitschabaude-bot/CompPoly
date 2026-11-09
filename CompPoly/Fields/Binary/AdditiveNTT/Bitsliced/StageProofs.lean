@@ -26,7 +26,7 @@ def rowStage (p : Plan β d hd) (i : Fin d)
     (op : UInt64 → Block → Block → Block × Block) (a : Rows (2 ^ d))
     (hn : 8 * (2 ^ d * 64) < 4294967296) : Rows (2 ^ d) :=
   (pairList d i).foldl (updateRows (rowPartition d i) hn (fun j =>
-    op (BF64.Packed.read ⟨p.words[i.val], p.size_eq i⟩ j.1).val)) a
+    op (p.get i j.1).val)) a
 
 /-- A complete native stage refines the disjoint-row model. -/
 theorem stageSweep_eq_rowStage
@@ -51,7 +51,7 @@ theorem stageSweep_eq_rowStage
   simp only [fold_eq]
   simp only [Native.ofNat_toNat (2 ^ (d - i.val - 1)) hb,
     Native.ofNat_toNat (2 ^ i.val) hs, Fin.val_cast]
-  simp only [Native.read_eq, ← USize.ofNat_mul, ← Nat.mul_assoc]
+  simp only [← USize.ofNat_mul, ← Nat.mul_assoc]
   apply finFold_projection Prod.fst
   intro state u
   apply finFold_projection Prod.fst

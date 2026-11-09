@@ -51,3 +51,11 @@ The [hardware instruction samples](bench-ntt-port-scalar.json) contain three alt
 The CompPoly A/B group `additive-ntt-word-rows` measures complete row encoding. Five alternating medium runs report 1,837,983,500 ps/iteration for the frozen baseline and 775,525,000 for the scalar candidate (ratio 0.422, verdict `faster`), with zero mismatches, missing rows or `SUSPECT` flags. This comparison is a local loaded-host screening result.
 
 These encoder measurements do not establish production commitment performance. The scalar implementation uses individual layer sweeps and a dense existing twiddle plan. Rust's gathered/deep cache schedule, fused radix kernels, streaming row sink, batched Merkle hashing and thread scaling remain distinct implementation work.
+
+## Compact normalized-row plans
+
+The reusable forward plan retains normalized subspace coordinates and three 256-entry subset-sum byte tables per stage. A stage lookup uses three loads and two XORs below 24 block bits; larger blocks use the retained scalar row. `normalizedRow_eq` and `TwiddleRow.lookup_eq` identify every lookup with the generic stage twiddle. The shared table implementation derives from flock-core and is covered by `NOTICE`.
+
+The [instruction-only compact-plan samples](bench-ntt-port-compact.json) retain three alternating repetitions with one worker and complete-byte checks against native Rust. K encoding costs 146.716 M instructions versus 68.136 M Rust (2.15×); E encoding costs 90.407 M versus 41.340 M (2.19×). These samples exclude preparation and contain no wall-time measurements. The compact representation trades about 2.36 M transform instructions for plan storage independent of the complete twiddle domain; production phase measurements include preparation.
+
+Five alternating CompPoly A/B runs against the retained bit-plane baseline report 1,851,439,000 versus 790,410,500 ps/iteration (ratio 0.427, `faster`), with zero mismatches, missing rows or `SUSPECT` flags. The host remained heavily loaded.

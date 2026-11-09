@@ -85,7 +85,7 @@ theorem row_mul (r : USize) (hr : r.toNat < rows)
     have hu' : u.toNat < blocks := by
       have := USize.lt_iff_toNat_lt.mp hu
       rwa [Native.ofNat_toNat _ hb] at this
-    let m := matrix (Native.read ⟨p.words[i.val], p.size_eq i⟩ (by omega) u hu')
+    let m := matrix ((p.get i ⟨u.toNat, hu'⟩).val)
     let base := u * USize.ofNat (2 * span * 64)
     let stride := USize.ofNat (span * 64)
     have hbase : base.toNat = u.toNat * (2 * span) * 64 := by

@@ -103,9 +103,7 @@ def forwardStage (p : Bitsliced.Plan β d hd) (i : Fin d) (lanes : Nat)
       nlinarith), hstride]
     omega
   foldSmall blocks hb (fun u hu a =>
-    let t := read ⟨p.words[i.val], p.size_eq i⟩ (by
-      change 8 * blocks < 4294967296
-      nlinarith) u hu
+    let t := (p.get i ⟨u.toNat, hu⟩).val
     let base := u * (stride + stride)
     have hbase : base.toNat = u.toNat * (2 * span) := by
       rw [mul_toNat _ _ (by rw [hdouble]; nlinarith), hdouble]
@@ -176,9 +174,7 @@ def forwardStageBytes (p : Bitsliced.Plan β d hd) (i : Fin d) (lanes : Nat)
       nlinarith), hstride]
     omega
   pack <| foldSmall blocks hb (fun u hu a =>
-    let t := read ⟨p.words[i.val], p.size_eq i⟩ (by
-      change 8 * blocks < 4294967296
-      nlinarith) u hu
+    let t := (p.get i ⟨u.toNat, hu⟩).val
     let base := u * (stride + stride)
     have hbase : base.toNat = u.toNat * (2 * span) := by
       rw [mul_toNat _ _ (by rw [hdouble]; nlinarith), hdouble]
@@ -226,7 +222,7 @@ theorem forwardStage_eq (p : Bitsliced.Plan β d hd) (i : Fin d) (lanes : Nat)
     have := j.isLt
     nlinarith
   simp only [← USize.ofNat_add, ← USize.ofNat_mul, ← two_mul, butterfly_eq,
-    ofNat_toNat _ hlo, ofNat_toNat _ hhi, read_eq, ofNat_toNat _ hb,
+    ofNat_toNat _ hlo, ofNat_toNat _ hhi, ofNat_toNat _ hb,
     Bitsliced.Plan.toPacked, Packed.Plan.get, Vector.getElem_ofFn, Array.getElem_ofFn,
     lowerIndex, upperIndex, Fin.divNat]
   simp only [Nat.add_mul_div_left _ _ (by positivity : 0 < 2 ^ i.val * lanes),

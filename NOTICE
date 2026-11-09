@@ -1,0 +1,4 @@
+Compact additive NTT twiddle tables in CompPoly/Fields/Binary/AdditiveNTT/Packed/TwiddleRow.lean derive from succinctlabs/flock (flock-core), licensed MIT OR Apache-2.0.
+
+Copyright (c) 2026 Bain Capital Crypto, LP and Ron Rothblum.
+Modifications copyright 2026 Succinct Labs, Benedikt Bunz, William Wang.

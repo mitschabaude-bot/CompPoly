@@ -5,47 +5,65 @@ Authors: CompPoly Contributors
 -/
 module
 public import CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Fold
-public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Plan
-/-! # Packed scalar-only additive transform plans -/
+public import CompPoly.Fields.Binary.AdditiveNTT.Packed.TwiddleRow
+/-! # Compact normalized-row additive transform plans -/
 @[expose] public section
 namespace AdditiveNTT.Bitsliced
 open BF64
 
-/-- Retained scalar words, without per-scalar multiplication closures or byte maps. -/
+/-- Compact normalized rows and their three byte subset-sum tables. -/
 structure Plan (β : Fin 64 → Word) (d : Nat) (hd : d < 64) where
-  /-- Stage zero pairs adjacent rows. -/
-  words : Vector BF64.Packed d
-  /-- The scalar count of each stage. -/
-  size_eq : ∀ i : Fin d, words[i.val].size = 2 ^ (d - i.val - 1)
-  /-- Retained words are the generic encoder's twiddles. -/
-  correct : ∀ i u, BF64.Packed.read ⟨words[i.val], size_eq i⟩ u =
-    (Packed.stageTwiddles β d hd i).getD u.val 0
+  /-- Each stage retains its normalized row and fixed-size byte tables. -/
+  stages : Vector (Sigma Packed.TwiddleRow) d
+  /-- Compact lookup agrees with the generic encoder's twiddles. -/
+  correct : ∀ (i : Fin d) (u : Fin (2 ^ (d - i.val - 1))),
+    stages[i].2.lookup u.val = (Packed.stageTwiddles β d hd i).getD u.val 0
 
-/-- Materialize each scalar table in contiguous bytes. -/
-def Plan.create (β : Fin 64 → Word) (d : Nat) (hd : d < 64) : Plan β d hd :=
-  let tables := Vector.ofFn fun i : Fin d =>
-    let raw := Packed.stageTwiddles β d hd i
-    (Packed.tabulate (2 ^ (d - i.val - 1)) fun u => raw.getD u.val 0).val
-  { words := tables
-    size_eq := fun i => by
-      simp only [tables, Vector.getElem_ofFn]
-      exact (Packed.tabulate _ _).property
-    correct := fun i u => by
-      simp only [tables, Vector.getElem_ofFn]
-      exact Packed.read_tabulate _ _ u }
+/-- Prepare one normalized row without enumerating its complete block domain. -/
+def normalizedRow (β : Fin 64 → Word) (d : Nat) (hd : d < 64) (i : Fin d) :
+    Packed.TwiddleRow (d - i.val - 1) :=
+  let raw := computableNormalizedWValuesArray (ℓ := d) (R_rate := 0) β (by omega) i
+  Packed.TwiddleRow.create _ ⟨raw, by
+    simp only [raw, computableNormalizedWValuesArray, Array.size_ofFn, Nat.add_zero]⟩
 
-/-- A scalar plan has the existing certified packed-plan interface. -/
+/-- A compact normalized row recovers every generic additive-stage twiddle. -/
+theorem normalizedRow_eq (β : Fin 64 → Word) (d : Nat) (hd : d < 64) (i : Fin d)
+    (u : Fin (2 ^ (d - i.val - 1))) :
+    (normalizedRow β d hd i).lookup u.val = (Packed.stageTwiddles β d hd i).getD u.val 0 := by
+  rw [Packed.TwiddleRow.lookup_eq, Packed.rowSubset_eq]
+  simp only [normalizedRow, Packed.TwiddleRow.create, Packed.stageTwiddles,
+    computableTwiddleTableArray, Nat.add_zero, Array.getD_eq_getD_getElem?,
+    Array.getElem?_ofFn, u.isLt, ↓reduceDIte, Option.getD_some]
+  apply Finset.sum_congr rfl
+  intro k _
+  rw [Nat.getBit_eq_testBit]
+  split <;> rfl
+
+/-- Prepare compact normalized subspace rows and their byte tables. -/
+def Plan.create (β : Fin 64 → Word) (d : Nat) (hd : d < 64) : Plan β d hd where
+  stages := Vector.ofFn fun i => ⟨d - i.val - 1, normalizedRow β d hd i⟩
+  correct i u := by
+    have entry : (Vector.ofFn fun j : Fin d =>
+        (⟨d - j.val - 1, normalizedRow β d hd j⟩ : Sigma Packed.TwiddleRow))[i.val] =
+        ⟨d - i.val - 1, normalizedRow β d hd i⟩ := Vector.getElem_ofFn i.isLt
+    exact (congrArg (fun row : Sigma Packed.TwiddleRow => row.2.lookup u.val) entry).trans
+      (normalizedRow_eq β d hd i u)
+
+/-- Read one scalar from a compact normalized row. -/
+@[inline] def Plan.get (p : Plan β d hd) (i : Fin d)
+    (u : Fin (2 ^ (d - i.val - 1))) : Word := p.stages[i].2.lookup u.val
+
+/-- A compact scalar plan has the certified packed-plan interface. -/
 def Plan.toPacked (p : Plan β d hd) : Packed.Plan β d hd where
-  stages := Vector.ofFn fun i => Array.ofFn fun u =>
-    Packed.Multiplier.masked (BF64.Packed.read ⟨p.words[i.val], p.size_eq i⟩ u)
+  stages := Vector.ofFn fun i => Array.ofFn fun u => Packed.Multiplier.masked (p.get i u)
   stageSize i := by simp only [Vector.getElem_ofFn, Array.size_ofFn]
   scalar_eq i u := by
-    simp only [Vector.getElem_ofFn, Array.getElem_ofFn, Packed.Multiplier.masked]
+    simp only [Vector.getElem_ofFn, Array.getElem_ofFn, Packed.Multiplier.masked, Plan.get]
     exact p.correct i u
 
-/-- Specification-plan scalar lookup recovers the packed scalar. -/
+/-- Specification-plan scalar lookup recovers the compact scalar. -/
 theorem Plan.scalar_toPacked (p : Plan β d hd) (i : Fin d) (u : Fin (2 ^ (d - i.val - 1))) :
-    (p.toPacked.get i u).scalar = BF64.Packed.read ⟨p.words[i.val], p.size_eq i⟩ u := by
+    (p.toPacked.get i u).scalar = p.get i u := by
   simp only [Plan.toPacked, Packed.Plan.get, Vector.getElem_ofFn, Array.getElem_ofFn,
     Packed.Multiplier.masked]
 

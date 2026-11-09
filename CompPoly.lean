@@ -161,6 +161,7 @@ public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Plan
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Refinement
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Scalar
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Transform
+public import CompPoly.Fields.Binary.AdditiveNTT.Packed.TwiddleRow
 public import CompPoly.Fields.Binary.AdditiveNTT.ScalarExtension
 public import CompPoly.Fields.Binary.Aes.Arithmetic
 public import CompPoly.Fields.Binary.Aes.Basic

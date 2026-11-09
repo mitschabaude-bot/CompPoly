@@ -48,10 +48,10 @@ theorem read_rowStage (p : Plan β d hd) (i : Fin d)
     (hn : 8 * (2 ^ d * 64) < 4294967296) (j : PairIndex d i) (b : Fin 2) :
     readRow (rowStage p i op a hn) (rowPartition d i (j, b)) =
       if b = 0 then
-        (op (BF64.Packed.read ⟨p.words[i.val], p.size_eq i⟩ j.1).val
+        (op (p.get i j.1).val
           (readRow a (rowPartition d i (j, 0))) (readRow a (rowPartition d i (j, 1)))).1
       else
-        (op (BF64.Packed.read ⟨p.words[i.val], p.size_eq i⟩ j.1).val
+        (op (p.get i j.1).val
           (readRow a (rowPartition d i (j, 0))) (readRow a (rowPartition d i (j, 1)))).2 := by
   simp only [rowStage, read_rowSweep _ (rowPartition d i).injective hn _ _ _ (pairList_nodup d i),
     mem_pairList, ite_true]
