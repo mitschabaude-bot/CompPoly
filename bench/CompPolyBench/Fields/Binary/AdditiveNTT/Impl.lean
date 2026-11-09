@@ -8,6 +8,7 @@ module
 public import CompPolyBench.Common
 public import CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Plan
 public import CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Layout
+public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Gathered
 
 /-!
 # Additive NTT Benchmarks
@@ -223,6 +224,25 @@ private def runWordRows (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup �
     title := "Packed additive word-row encoding",
     records := #[record] }, gen)
 
+/-- Measure production-shaped far/deep sweeps with complete output-dependent inputs. -/
+private def runWindowRows (preset : BenchPreset) (gen : StdGen) : IO (BenchGroup × StdGen) := do
+  let plan := AdditiveNTT.Bitsliced.Plan.create AdditiveNTT.Packed.flatBasis 14 (by decide)
+  let record ← runTimedSpec
+    { name := "additive-ntt-window-rows", representation := "64 packed word lanes",
+      method := "forward", field := "BF64", inputShape := "log domain 14, log rate 1",
+      digestIterations := 2 }
+    preset (fun iteration =>
+      let input := AdditiveNTT.Packed.tabulate (2 ^ 14 * 64) fun i =>
+        (⟨(UInt64.ofNat (i.val + iteration) + 1) * 0x9e3779b97f4a7c15⟩ : BF64.Word)
+      (AdditiveNTT.Packed.Gathered.forward 8 plan 13 (by decide) 64 (by decide) input
+        (by decide)).val.bytes)
+    (fun bytes => (bytes.foldl (fun acc byte => sinkStep acc byte.toUInt64) 0).toNat)
+    (sink := fun bytes => bytes.foldl (fun acc byte => sinkStep acc byte.toUInt64) 0)
+  pure ({
+    groupKey := "additive-ntt-window-rows",
+    title := "Cache-window additive word-row transform",
+    records := #[record] }, gen)
+
 /-- Runnable additive-NTT benchmark tasks. -/
 def additiveNttTasks : List BenchTask := [
   BenchTask.fromGroupRunner
@@ -239,7 +259,10 @@ def additiveNttTasks : List BenchTask := [
     runPackedTwiddlePlan,
   BenchTask.fromGroupRunner
     ⟨"additive-ntt-word-rows", "Packed additive word-row encoding"⟩
-    runWordRows
+    runWordRows,
+  BenchTask.fromGroupRunner
+    ⟨"additive-ntt-window-rows", "Cache-window additive word-row transform"⟩
+    runWindowRows
 ]
 
 end CompPolyBench

@@ -156,6 +156,7 @@ public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Encoder
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Extension
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.FlatBasis
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Fused
+public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Gathered
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.IndexLemmas
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Layout
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Plan
@@ -163,6 +164,7 @@ public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Refinement
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Scalar
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Transform
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.TwiddleRow
+public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Window
 public import CompPoly.Fields.Binary.AdditiveNTT.ScalarExtension
 public import CompPoly.Fields.Binary.Aes.Arithmetic
 public import CompPoly.Fields.Binary.Aes.Basic
