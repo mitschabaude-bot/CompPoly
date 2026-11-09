@@ -5,7 +5,7 @@ Authors: CompPoly Contributors
 -/
 module
 
-import CompPoly.Fields.Binary.AdditiveNTT.Packed.Scalar
+import CompPoly.Fields.Binary.AdditiveNTT.Packed.Fused
 
 /-! # Compiled scalar additive-transform stage and prefix regressions -/
 

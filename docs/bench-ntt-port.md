@@ -59,3 +59,11 @@ The reusable forward plan retains normalized subspace coordinates and three 256-
 The [instruction-only compact-plan samples](bench-ntt-port-compact.json) retain three alternating repetitions with one worker and complete-byte checks against native Rust. K encoding costs 146.716 M instructions versus 68.136 M Rust (2.15×); E encoding costs 90.407 M versus 41.340 M (2.19×). These samples exclude preparation and contain no wall-time measurements. The compact representation trades about 2.36 M transform instructions for plan storage independent of the complete twiddle domain; production phase measurements include preparation.
 
 Five alternating CompPoly A/B runs against the retained bit-plane baseline report 1,851,439,000 versus 790,410,500 ps/iteration (ratio 0.427, `faster`), with zero mismatches, missing rows or `SUSPECT` flags. The host remained heavily loaded.
+
+## Fused radix-four sweeps
+
+The word-row encoder reads four separated slabs, keeps two consecutive stages in registers, and stores each word once. The native loop retains only the byte array and shares three compact twiddles per block. `forwardQuadNative_eq`, `forwardQuad_eq` and `forwardFused_code` identify the complete fused transform with the packed specification. Odd transform prefixes finish with a radix-two stage.
+
+The [instruction samples and complete-byte checks](bench-ntt-port-fused.json) cover eight K/E shapes against native Rust. At domain 14, K encoding costs 134.253 M instructions against 68.136 M Rust (1.97×); E costs 81.425 M against 41.340 M (1.97×). Three alternating repetitions use one worker on CPU 5. Plan preparation is outside the interval.
+
+Five alternating medium A/B runs against the frozen bit-plane baseline report 1,904,718,500 versus 829,121,000 ps/iteration (ratio 0.435, `faster`), with zero mismatches, missing rows or `SUSPECT` flags. The host load exceeded 90, so these elapsed measurements are screening evidence rather than uncontended performance claims. The smoke suite, complete library tests and axiom sweep pass; the sweep covers 14,355 declarations in 546 modules with zero `sorry` or nonstandard-axiom taint.

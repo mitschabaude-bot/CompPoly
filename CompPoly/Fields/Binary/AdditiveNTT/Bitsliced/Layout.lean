@@ -6,7 +6,7 @@ Authors: CompPoly Contributors
 module
 public import CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Refinement
 public import CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Codec
-public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Scalar
+public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Fused
 public import CompPoly.Fields.Binary.BF64.Packed.Ext
 /-! # Input and output transposition for packed bit-plane encoders -/
 @[expose] public section

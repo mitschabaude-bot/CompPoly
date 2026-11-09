@@ -155,6 +155,7 @@ public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Correctness
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Encoder
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Extension
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.FlatBasis
+public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Fused
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.IndexLemmas
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Layout
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Plan

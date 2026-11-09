@@ -211,3 +211,5 @@ the peer measured on the same CPU, which is the external comparison of
 `docs/bench-audit-2026.md` §13 and has not been built. Until it lands, treat the bar there
 as the target: within two to five times the *scalar* Plonky3 or Binius kernel for
 the same operation at the same size.
+
+The binary additive encoder has a proved scalar word-row path with compact byte-table twiddles and fused radix-four sweeps. Its matched native-Rust instruction comparison and A/B screening results are in [the encoder report](../bench-ntt-port.md). The fused sweep reads all four words before writing, and retains the byte array alone in the machine-loop accumulator.

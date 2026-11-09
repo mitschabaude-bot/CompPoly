@@ -5,7 +5,7 @@ Authors: CompPoly Contributors
 -/
 module
 
-import CompPoly.Fields.Binary.AdditiveNTT.Packed.Scalar
+import CompPoly.Fields.Binary.AdditiveNTT.Packed.Fused
 
 /-! # Matched scalar additive encoder and stage-conformance runner -/
 
@@ -92,13 +92,16 @@ def main (args : List String) : IO UInt32 := do
             let i : Fin d := ⟨ell - k - 1, by omega⟩
             output := Scalar.forwardStage p i lanes hl output hn
             report s!"stage-{i.val}" output
-          report "output" output
+          let complete := encode p ell hell lanes hl hn makeInput
+          unless complete.val.bytes == output.val.bytes do
+            throw <| IO.userError "complete fused encoding differs from stage checkpoints"
+          report "output" complete
           let recovered := inverse p.toPacked ell hell lanes output
           unless recovered.val.bytes == input.val.bytes do
             throw <| IO.userError "inverse did not recover tiled input"
           if mode == "dump" then
             let [path] := rest | throw <| IO.userError "dump requires one output path"
-            IO.FS.writeBinFile path output.val.bytes
+            IO.FS.writeBinFile path complete.val.bytes
         pure 0
        else throw <| IO.userError "codeword exceeds machine bound"
       else throw <| IO.userError "positive lane count required"

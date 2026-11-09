@@ -1,0 +1,469 @@
+{
+  "source_sha256": "445d7dbe6423bbcc082309ceface02e0985dccc8347a69b96879afb849921acb",
+  "binaries": {
+    "bitsliced": {
+      "path": "/home/agent/code/CompPoly-wt/ntt-port/.lake/build/bin/CompPolyBitsliceNTTBench",
+      "sha256": "5a696ca9e2f1c7f0b17131aee651d4c64bd1130c01b57fcaff84b01b53693f86"
+    },
+    "scalar": {
+      "path": "/home/agent/code/CompPoly-wt/ntt-port/.lake/build/bin/CompPolyScalarNTTBench",
+      "sha256": "e6ee9c3b52a4daa16fe519abb27945778e7586bc72512b2a40f2124e25720e1d"
+    },
+    "rust": {
+      "path": "/home/agent/code/leanvm-wt/perf-ntt/.lake/ntt-profile/rust-baseline",
+      "sha256": "46f424e98a61ae0321fcb481c5ff23b46507e63408c7b0f1e92f5cd15754120a"
+    }
+  },
+  "runs": [
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 0,
+      "instructions": 1097441300,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 68848,
+      "output_rss_kib": 75640,
+      "maxrss_kib": 75720,
+      "load_before": [
+        93.90625,
+        105.70849609375,
+        105.78466796875
+      ],
+      "load_after": [
+        93.5009765625,
+        105.23828125,
+        105.630859375
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 0,
+      "instructions": 134253008,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 64736,
+      "output_rss_kib": 68308,
+      "maxrss_kib": 71808,
+      "load_before": [
+        93.5009765625,
+        105.23828125,
+        105.630859375
+      ],
+      "load_after": [
+        93.861328125,
+        105.11767578125,
+        105.58984375
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 0,
+      "instructions": 68135975,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 5780,
+      "output_rss_kib": 12976,
+      "maxrss_kib": 20500,
+      "load_before": [
+        93.861328125,
+        105.11767578125,
+        105.58984375
+      ],
+      "load_after": [
+        93.861328125,
+        105.11767578125,
+        105.58984375
+      ]
+    },
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 0,
+      "instructions": 869500452,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 61808,
+      "output_rss_kib": 70520,
+      "maxrss_kib": 70604,
+      "load_before": [
+        93.861328125,
+        105.11767578125,
+        105.58984375
+      ],
+      "load_after": [
+        93.861328125,
+        105.11767578125,
+        105.58984375
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 0,
+      "instructions": 81425049,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 63580,
+      "output_rss_kib": 70944,
+      "maxrss_kib": 71028,
+      "load_before": [
+        93.861328125,
+        105.11767578125,
+        105.58984375
+      ],
+      "load_after": [
+        92.9111328125,
+        104.7333984375,
+        105.462890625
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 0,
+      "instructions": 41340296,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 2604,
+      "output_rss_kib": 9524,
+      "maxrss_kib": 22520,
+      "load_before": [
+        92.9111328125,
+        104.7333984375,
+        105.462890625
+      ],
+      "load_after": [
+        92.9111328125,
+        104.7333984375,
+        105.462890625
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 1,
+      "instructions": 68136259,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 5784,
+      "output_rss_kib": 12984,
+      "maxrss_kib": 22528,
+      "load_before": [
+        92.9111328125,
+        104.7333984375,
+        105.462890625
+      ],
+      "load_after": [
+        92.9111328125,
+        104.7333984375,
+        105.462890625
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 1,
+      "instructions": 134255199,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 64828,
+      "output_rss_kib": 70448,
+      "maxrss_kib": 73960,
+      "load_before": [
+        92.9111328125,
+        104.7333984375,
+        105.462890625
+      ],
+      "load_after": [
+        90.916015625,
+        104.12353515625,
+        105.26123046875
+      ]
+    },
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 1,
+      "instructions": 1097442208,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 65896,
+      "output_rss_kib": 70340,
+      "maxrss_kib": 73936,
+      "load_before": [
+        90.916015625,
+        104.12353515625,
+        105.26123046875
+      ],
+      "load_after": [
+        90.26904296875,
+        103.55712890625,
+        105.06494140625
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 1,
+      "instructions": 41340005,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 2604,
+      "output_rss_kib": 9524,
+      "maxrss_kib": 22540,
+      "load_before": [
+        90.26904296875,
+        103.55712890625,
+        105.06494140625
+      ],
+      "load_after": [
+        90.26904296875,
+        103.55712890625,
+        105.06494140625
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 1,
+      "instructions": 81423714,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 63604,
+      "output_rss_kib": 71800,
+      "maxrss_kib": 71728,
+      "load_before": [
+        90.26904296875,
+        103.55712890625,
+        105.06494140625
+      ],
+      "load_after": [
+        89.1259765625,
+        103.099609375,
+        104.90869140625
+      ]
+    },
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 1,
+      "instructions": 869483484,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 61660,
+      "output_rss_kib": 69864,
+      "maxrss_kib": 69760,
+      "load_before": [
+        89.1259765625,
+        103.099609375,
+        104.90869140625
+      ],
+      "load_after": [
+        89.1259765625,
+        103.099609375,
+        104.90869140625
+      ]
+    },
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 2,
+      "instructions": 1097440595,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 68896,
+      "output_rss_kib": 73020,
+      "maxrss_kib": 76672,
+      "load_before": [
+        89.1259765625,
+        103.099609375,
+        104.90869140625
+      ],
+      "load_after": [
+        88.3974609375,
+        102.259765625,
+        104.60498046875
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 2,
+      "instructions": 134252694,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 66844,
+      "output_rss_kib": 76060,
+      "maxrss_kib": 76120,
+      "load_before": [
+        88.3974609375,
+        102.259765625,
+        104.60498046875
+      ],
+      "load_after": [
+        89.6533203125,
+        102.0703125,
+        104.517578125
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 2,
+      "instructions": 68136293,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 5804,
+      "output_rss_kib": 12980,
+      "maxrss_kib": 22592,
+      "load_before": [
+        89.6533203125,
+        102.0703125,
+        104.517578125
+      ],
+      "load_after": [
+        89.6533203125,
+        102.0703125,
+        104.517578125
+      ]
+    },
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 2,
+      "instructions": 869498329,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 61680,
+      "output_rss_kib": 69448,
+      "maxrss_kib": 69760,
+      "load_before": [
+        89.6533203125,
+        102.0703125,
+        104.517578125
+      ],
+      "load_after": [
+        89.6533203125,
+        102.0703125,
+        104.517578125
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 2,
+      "instructions": 81425714,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 61040,
+      "output_rss_kib": 67192,
+      "maxrss_kib": 67328,
+      "load_before": [
+        89.6533203125,
+        102.0703125,
+        104.517578125
+      ],
+      "load_after": [
+        89.6533203125,
+        102.0703125,
+        104.517578125
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 2,
+      "instructions": 41340853,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 2604,
+      "output_rss_kib": 9528,
+      "maxrss_kib": 22616,
+      "load_before": [
+        89.6533203125,
+        102.0703125,
+        104.517578125
+      ],
+      "load_after": [
+        89.6533203125,
+        102.0703125,
+        104.517578125
+      ]
+    }
+  ]
+}
