@@ -1,0 +1,522 @@
+{
+  "binaries": {
+    "bitsliced": {
+      "path": "/home/agent/code/CompPoly-wt/ntt-port/.lake/build/bin/CompPolyBitsliceNTTBench",
+      "sha256": "5a696ca9e2f1c7f0b17131aee651d4c64bd1130c01b57fcaff84b01b53693f86"
+    },
+    "scalar": {
+      "path": "/home/agent/code/CompPoly-wt/ntt-port/.lake/ntt-port/scalar-final",
+      "sha256": "4ee890e2bde62c8e5fcbbed3b24b707b8a1f4452e9c069ddf779c9fbe271817c"
+    },
+    "rust": {
+      "path": "/home/agent/code/leanvm-wt/perf-ntt/.lake/ntt-profile/rust-baseline",
+      "sha256": "46f424e98a61ae0321fcb481c5ff23b46507e63408c7b0f1e92f5cd15754120a"
+    }
+  },
+  "runs": [
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 0,
+      "ns": 168606843,
+      "setup_ns": 1159379,
+      "instructions": 1097422568,
+      "cycles": 656777680,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 73244,
+      "output_rss_kib": 81436,
+      "maxrss_kib": 81548,
+      "load_before": [
+        61.39306640625,
+        78.5517578125,
+        86.53759765625
+      ],
+      "load_after": [
+        61.39306640625,
+        78.5517578125,
+        86.53759765625
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 0,
+      "ns": 33346741,
+      "setup_ns": 1220959,
+      "instructions": 144357216,
+      "cycles": 126848357,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 72944,
+      "output_rss_kib": 81136,
+      "maxrss_kib": 81152,
+      "load_before": [
+        61.39306640625,
+        78.5517578125,
+        86.53759765625
+      ],
+      "load_after": [
+        61.39306640625,
+        78.5517578125,
+        86.53759765625
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 0,
+      "ns": 14281873,
+      "setup_ns": 104511,
+      "instructions": 68135972,
+      "cycles": 39215210,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 5784,
+      "output_rss_kib": 12984,
+      "maxrss_kib": 24780,
+      "load_before": [
+        61.39306640625,
+        78.5517578125,
+        86.53759765625
+      ],
+      "load_after": [
+        61.39306640625,
+        78.5517578125,
+        86.53759765625
+      ]
+    },
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 0,
+      "ns": 137297656,
+      "setup_ns": 6175065,
+      "instructions": 869483043,
+      "cycles": 479237312,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 61704,
+      "output_rss_kib": 69904,
+      "maxrss_kib": 69888,
+      "load_before": [
+        61.39306640625,
+        78.5517578125,
+        86.53759765625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 0,
+      "ns": 20054336,
+      "setup_ns": 1283929,
+      "instructions": 88051897,
+      "cycles": 75420857,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 70652,
+      "output_rss_kib": 76796,
+      "maxrss_kib": 76932,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 0,
+      "ns": 10178843,
+      "setup_ns": 101160,
+      "instructions": 41340005,
+      "cycles": 22619542,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 2604,
+      "output_rss_kib": 9524,
+      "maxrss_kib": 24916,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 1,
+      "ns": 17022143,
+      "setup_ns": 100491,
+      "instructions": 68135970,
+      "cycles": 37074397,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 5804,
+      "output_rss_kib": 12980,
+      "maxrss_kib": 24924,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 1,
+      "ns": 36541725,
+      "setup_ns": 1277209,
+      "instructions": 144357197,
+      "cycles": 119210049,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 72932,
+      "output_rss_kib": 81124,
+      "maxrss_kib": 81276,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 1,
+      "ns": 157045819,
+      "setup_ns": 1136618,
+      "instructions": 1097422556,
+      "cycles": 612168030,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 73128,
+      "output_rss_kib": 81320,
+      "maxrss_kib": 81420,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 1,
+      "ns": 10175783,
+      "setup_ns": 106171,
+      "instructions": 41340042,
+      "cycles": 22575708,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 2604,
+      "output_rss_kib": 9524,
+      "maxrss_kib": 24812,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 1,
+      "ns": 18788846,
+      "setup_ns": 1236059,
+      "instructions": 88051900,
+      "cycles": 69948227,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 70640,
+      "output_rss_kib": 76784,
+      "maxrss_kib": 76928,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 1,
+      "ns": 123527366,
+      "setup_ns": 1154779,
+      "instructions": 869480933,
+      "cycles": 480017493,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 70300,
+      "output_rss_kib": 78492,
+      "maxrss_kib": 78604,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 2,
+      "ns": 156969038,
+      "setup_ns": 1167009,
+      "instructions": 1097422563,
+      "cycles": 611102990,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 70532,
+      "output_rss_kib": 78724,
+      "maxrss_kib": 78864,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 2,
+      "ns": 37674353,
+      "setup_ns": 1279670,
+      "instructions": 144357195,
+      "cycles": 120700742,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 73200,
+      "output_rss_kib": 81392,
+      "maxrss_kib": 81408,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "k",
+        14,
+        56,
+        1
+      ],
+      "repetition": 2,
+      "ns": 14302904,
+      "setup_ns": 110211,
+      "instructions": 68135963,
+      "cycles": 39160473,
+      "sink": "6161288611265212461:15484524747797890496",
+      "setup_rss_kib": 5804,
+      "output_rss_kib": 12980,
+      "maxrss_kib": 24992,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "bitsliced",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 2,
+      "ns": 139942695,
+      "setup_ns": 1305740,
+      "instructions": 869480945,
+      "cycles": 525198068,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 71124,
+      "output_rss_kib": 79316,
+      "maxrss_kib": 79372,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "scalar",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 2,
+      "ns": 35496247,
+      "setup_ns": 5063526,
+      "instructions": 88053431,
+      "cycles": 73880225,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 63984,
+      "output_rss_kib": 70132,
+      "maxrss_kib": 70092,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    },
+    {
+      "engine": "rust",
+      "shape": [
+        "e",
+        14,
+        16,
+        4
+      ],
+      "repetition": 2,
+      "ns": 10530586,
+      "setup_ns": 106360,
+      "instructions": 41340853,
+      "cycles": 24273125,
+      "sink": "13050689720805432533:11397353583634322925",
+      "setup_rss_kib": 2580,
+      "output_rss_kib": 9520,
+      "maxrss_kib": 24872,
+      "load_before": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ],
+      "load_after": [
+        60.3203125,
+        78.04443359375,
+        86.33056640625
+      ]
+    }
+  ]
+}

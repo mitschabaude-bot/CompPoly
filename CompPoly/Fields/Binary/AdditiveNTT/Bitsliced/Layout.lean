@@ -6,6 +6,8 @@ Authors: CompPoly Contributors
 module
 public import CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Refinement
 public import CompPoly.Fields.Binary.AdditiveNTT.Bitsliced.Codec
+public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Scalar
+public import CompPoly.Fields.Binary.BF64.Packed.Ext
 /-! # Input and output transposition for packed bit-plane encoders -/
 @[expose] public section
 set_option backward.isDefEq.respectTransparency false
@@ -135,5 +137,31 @@ theorem read_decode (p : Plan β d hd) (ell : Nat) (hell : ell ≤ d) (a : Rows 
       BF64.Packed.read (Packed.inverse p.toPacked ell hell 64 a) (wordIndex r c) := by
   rw [decode, read_transposeRows_word]
   exact inverse_represents p ell hell _ a (transposeRows_represents a hn) hn r c
+
+/-- Encode physical word rows with scalar carry-less butterflies. -/
+def encodeScalar (p : Plan β d hd) (ell : Nat) (hell : ell ≤ d) (a : Rows (2 ^ d))
+    (hn : 8 * (2 ^ d * 64) < 4294967296) : Rows (2 ^ d) :=
+  Packed.Scalar.forward p ell hell 64 (by decide) a hn
+
+/-- Scalar encoding preserves the complete bit-plane encoder's physical bytes. -/
+theorem encodeScalar_eq (p : Plan β d hd) (ell : Nat) (hell : ell ≤ d) (a : Rows (2 ^ d))
+    (hn : 8 * (2 ^ d * 64) < 4294967296) :
+    encodeScalar p ell hell a hn = encode p ell hell a hn := by
+  rw [encodeScalar, Packed.Scalar.forward_eq]
+  apply BF64.Packed.read_ext
+  intro j
+  let r : Fin (2 ^ d) := ⟨j.val / 64, by have := j.isLt; omega⟩
+  let c : Fin 64 := ⟨j.val % 64, Nat.mod_lt _ (by decide)⟩
+  have he : wordIndex r c = j := by
+    apply Fin.ext
+    dsimp [wordIndex, r, c]
+    omega
+  rw [← he]
+  exact (read_encode p ell hell a hn r c).symm
+
+/-- Compiled encoding uses the equivalent scalar word-row traversal. -/
+@[csimp] theorem encode_code : @encode = @encodeScalar := by
+  funext β d hd p ell hell a hn
+  exact (encodeScalar_eq p ell hell a hn).symm
 
 end AdditiveNTT.Bitsliced

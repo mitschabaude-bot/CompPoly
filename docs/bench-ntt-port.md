@@ -36,3 +36,18 @@ The matched complete-prover hardware-counter medians at leanvm-security `a211ede
 | Fibonacci | Extension commitments, summed | 2,048.376 | 101.020 | 20.28× |
 
 The initial phase includes plan setup and Merkle construction. The extension row sums every commitment within PCS opening. These counts do not establish multi-thread scaling or performance on the larger aggregation fixture.
+
+## Proved scalar word-row encoder
+
+The scalar encoder stores contiguous field words, applies descending shared-twiddle sweeps using the approved CLMUL multiplication, and fills replicated input rows with machine addresses. Each stage and every transform prefix is proved equal to the packed additive NTT; a compiler simplification theorem selects it for the bit-plane encoder interface. Complete-byte regression tests cover seven dimension/lane shapes, and the matched Rust harness checks eight K/E shapes. The machine loop accumulator contains only the byte array, avoiding packed structure allocation at each butterfly.
+
+The [hardware instruction samples](bench-ntt-port-scalar.json) contain three alternating repetitions of each retained executable, with one worker on CPU 5. Message construction, plan preparation and output digestion are outside the acknowledged encoding interval. The table uses hardware counters throughout; Callgrind's E reference count differs from the hardware count and is not substituted into these ratios. Host load was approximately 60–86, so these runs establish instruction counts, not uncontended elapsed time.
+
+| Workload | Bit-plane Lean M instructions | Scalar Lean M instructions | Native Rust M instructions | Scalar / Rust |
+| --- | ---: | ---: | ---: | ---: |
+| K: domain 14, live 56, log rate 1 | 1,097.423 | 144.357 | 68.136 | 2.12× |
+| E: domain 14, live 16, log rate 4 | 869.481 | 88.052 | 41.340 | 2.13× |
+
+The CompPoly A/B group `additive-ntt-word-rows` measures complete row encoding. Five alternating medium runs report 1,837,983,500 ps/iteration for the frozen baseline and 775,525,000 for the scalar candidate (ratio 0.422, verdict `faster`), with zero mismatches, missing rows or `SUSPECT` flags. This comparison is a local loaded-host screening result.
+
+These encoder measurements do not establish production commitment performance. The scalar implementation uses individual layer sweeps and a dense existing twiddle plan. Rust's gathered/deep cache schedule, fused radix kernels, streaming row sink, batched Merkle hashing and thread scaling remain distinct implementation work.

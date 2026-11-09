@@ -159,6 +159,7 @@ public import CompPoly.Fields.Binary.AdditiveNTT.Packed.IndexLemmas
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Layout
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Plan
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Refinement
+public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Scalar
 public import CompPoly.Fields.Binary.AdditiveNTT.Packed.Transform
 public import CompPoly.Fields.Binary.AdditiveNTT.ScalarExtension
 public import CompPoly.Fields.Binary.Aes.Arithmetic
@@ -190,6 +191,7 @@ public import CompPoly.Fields.Binary.BF64.MaskedOpsProofs
 public import CompPoly.Fields.Binary.BF64.MaskedProducts
 public import CompPoly.Fields.Binary.BF64.MaskedProofs
 public import CompPoly.Fields.Binary.BF64.Packed
+public import CompPoly.Fields.Binary.BF64.Packed.Ext
 public import CompPoly.Fields.Binary.BF64.Reduce
 public import CompPoly.Fields.Binary.BF64.Trace
 public import CompPoly.Fields.Binary.BF64.Word

@@ -347,3 +347,9 @@ The word kernels expose the two halves of hardware carry-less multiplication wit
 The [CLMUL kernel comparison](../bench-bf64-clmul.md) records native Rust instruction ratios, the A/B evidence for deferred cubic multiplication and prepared maps, and the retained high-reuse NTT table policy.
 
 The [additive NTT function comparison](../bench-ntt-port.md) maps the packed bit-plane encoder to native Rust's gathered and deep passes, records matched instruction counts, and distinguishes encoder measurements from complete commitment phases.
+
+## Scalar word-row encoding
+
+`AdditiveNTT.Packed.Scalar` runs contiguous word-row butterflies with the approved carry-less multiplication primitives. Machine loop counters and byte-array accumulators keep packed-object bookkeeping outside the word loop. Each stage and every descending transform prefix equal the certified packed transform as complete buffers. `Bitsliced.encode` compiles to this scalar traversal through `encode_code`; its existing pointwise and field-level theorems retain the same specification.
+
+`Scalar.tileRows` and `Scalar.tileLanes` materialize evaluation cosets with machine word addresses. Their bounds require positive lanes and fewer than `2^32` bytes. The lane-major materializer preserves reversed live lanes and the leading zero prefix. `BF64.Packed.read_ext` promotes coordinate equality to equality of the complete underlying bytes.

@@ -158,3 +158,11 @@ lean_exe CompPolyBitsliceBreakdown where
 lean_exe CompPolyBitsliceByteBench where
   srcDir := "bench"
   moreLeancArgs := #["-march=native", "-fno-vectorize", "-fno-slp-vectorize"]
+
+/-- Compiled scalar additive-transform stage and prefix regressions. -/
+lean_exe CompPolyScalarSmoke where
+  srcDir := "tests"
+
+/-- Matched scalar additive encoder and native Rust comparison. -/
+lean_exe CompPolyScalarNTTBench where
+  srcDir := "bench"
